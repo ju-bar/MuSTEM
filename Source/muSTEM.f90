@@ -22,7 +22,7 @@
 !  
 !  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
 !
-!  Includes modifications by J. Barthel and L. J. Allen (2019 - 2021)
+!  Includes modifications by J. Barthel and L. J. Allen (2019 - 2022)
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
