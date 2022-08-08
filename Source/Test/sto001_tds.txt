@@ -1,0 +1,68 @@
+Device used for calculation
+    0
+Output filename
+    sto001_pacbed_tds
+Input crystal file name
+    SrTiO3.xtl
+Slice unit cell <1> yes <2> no
+    1
+Number of distinct potentials
+    2
+<1> manual or <2> auto slicing
+    2
+Thickness
+    250
+Scattering factor accuracy
+    1
+Tile supercell x
+    8
+Tile supercell y
+    8
+Number of pixels in x
+    1024
+Number of pixels in y
+    1024
+<1> Continue <2> Change
+    1
+Calculation type
+    2
+aperture cutoff
+    25.00000
+Defocus
+    0
+Change probe forming lens parameters
+    0
+<1> QEP <2> ABS
+    1
+Elastic and inelastic scattering output choice
+    1
+<0> Continue <1> Beam tilt <2> Specimen tilt
+    0
+Number of phase grates calculated
+    100
+Number of Monte Carlo calculated
+    10
+Number of ran1 discarded
+    1
+Plasmon setup: <1> bulk plasmons <2> generic low-loss <3> none.
+    3
+<0> continue <1> save <2> load
+    0
+<1> CBED <2> STEM/PACBED
+    2
+STEM modes
+    3
+STEM modes
+    0
+<1> Diffraction pattern for each probe position
+    4
+diffraction pattern y pixels
+    512
+diffraction pattern x pixels
+    512
+Probe scan menu choice
+    1
+<0> Proceed <1> Output probe intensity
+    0
+<0> Precalculated potentials <1> On-the-fly calculation
+    0

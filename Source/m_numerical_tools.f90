@@ -2,6 +2,9 @@
 !
 !  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
 !
+!  modified:
+!    2019-Dec-13, J. Barthel : code formatting, unirand, poirand1
+!
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
 !  the Free Software Foundation, either version 3 of the License, or
@@ -36,36 +39,83 @@ module m_numerical_tools
 	end interface
 
 contains        
-        
-        
-    subroutine displace(tauin, tauout, urms, a0, idum)
 
-        use m_precision
-    
-	    implicit none
 
-	    real(fp_kind) tauin(3), tauout(3), a0(3)
-	    real(fp_kind) urms
-	    integer(4) idum
-	    real(fp_kind) xran, yran, zran
-	    !real(fp_kind) gasdev
+	subroutine displace(tauin, tauout, urms, a0, idum)
 
-	    xran = gasdev(idum)
-	    yran = gasdev(idum)
-	    !zran = gasdev(idum)
+		use m_precision
 
-	    xran = xran * urms / a0(1)
-	    yran = yran * urms / a0(2)
-	    !zran = zran * urms / a0(3)
+		implicit none
 
-	    tauout(1) = tauin(1) + xran
-	    tauout(2) = tauin(2) + yran
-	    tauout(3) = tauin(3)
-    !	tauout(3) = tauin(3) + zran
+		real(fp_kind) tauin(3), tauout(3), a0(3)
+		real(fp_kind) urms
+		integer(4) idum
+		real(fp_kind) xran, yran, zran
+		!real(fp_kind) gasdev
+
+		xran = gasdev(idum)
+		yran = gasdev(idum)
+		!zran = gasdev(idum)
+
+		xran = xran * urms / a0(1)
+		yran = yran * urms / a0(2)
+		!zran = zran * urms / a0(3)
+
+		tauout(1) = tauin(1) + xran
+		tauout(2) = tauin(2) + yran
+		tauout(3) = tauin(3)
+		!	tauout(3) = tauin(3) + zran
+
+	end subroutine displace
 	
-    end subroutine displace
-
-subroutine normal_sample ( a, b, seed, x )
+	
+	function unirand(seed)
+		use m_precision, only: fp_kind
+		implicit none
+		real(fp_kind) :: unirand
+		integer(kind=4) :: seed
+		real(kind=8) :: x
+		x = r8_uniform_01(seed)
+		unirand = real(x, kind=fp_kind)
+	end function
+	
+	
+	function poirand1(m, seed)
+!*****************************************************************************80
+!
+!   POIRAND1 samples of the Poisson PDF with given mean value
+!
+!   Discussion:
+!		Donold Knuth's algorithm is fast for small mean values < 30
+!
+!   Input:
+!       real(fp_kind) m = PDF mean value
+!       integer(4) seed = rng seed
+!
+!   Output:
+!       integer(4) Poisson random sample
+!
+		use m_precision, only: fp_kind
+		implicit none
+		integer(kind=4) :: poirand1
+		real(fp_kind) :: m
+		integer(kind=4) :: seed
+		integer(kind=4) :: k
+		real(kind=8) :: md, p, l
+		md = dabs(dble(m))
+		l = dexp(-md)
+		k = 0
+		p = 1.D+0
+		do while (p > l)
+			k = k + 1
+			p = p * r8_uniform_01(seed)
+		end do
+		poirand1 = k-1
+	end function
+	
+	
+		
+	subroutine normal_sample ( a, b, seed, x )
 
 !*****************************************************************************80
 !
@@ -97,33 +147,33 @@ subroutine normal_sample ( a, b, seed, x )
 !
 !    Output, real ( kind = 8 ) X, a sample of the PDF.
 !
-  implicit none
+		implicit none
 
-  real ( kind = 8 ) a
-  real ( kind = 8 ) b
-  integer ( kind = 4 ) seed
-  real ( kind = 8 ) x
+		real ( kind = 8 ) a
+		real ( kind = 8 ) b
+		integer ( kind = 4 ) seed
+		real ( kind = 8 ) x
 
-  call normal_01_sample ( seed, x )
+		call normal_01_sample ( seed, x )
 
-  x = a + b * x
+		x = a + b * x
 
-  return
-end subroutine
+		return
+	end subroutine normal_sample
 
-!This function is a wrapper to the routine normal_01_sample that mimics
-!the interface to the gasdev function from Numerical Recipes (see comment
-!at the beginning of this file).
-function gasdev(seed)
-	real(fp_kind)::gasdev
-	real*8::x
-	integer*4,intent(inout)::seed
+	!This function is a wrapper to the routine normal_01_sample that mimics
+	!the interface to the gasdev function from Numerical Recipes (see comment
+	!at the beginning of this file).
+	function gasdev(seed)
+		real(fp_kind)::gasdev
+		real*8::x
+		integer*4,intent(inout)::seed
 
-	call normal_01_sample(seed,x)
-	gasdev = real(x, fp_kind)
-end function
+		call normal_01_sample(seed,x)
+		gasdev = real(x, fp_kind)
+	end function
 
-subroutine normal_01_sample ( seed, x )
+	subroutine normal_01_sample ( seed, x )
 
 !*****************************************************************************80
 !
@@ -156,23 +206,25 @@ subroutine normal_01_sample ( seed, x )
 !
 !    Output, real ( kind = 8 ) X, a sample of the standard normal PDF.
 !
-  implicit none
+		implicit none
 
-  real ( kind = 8 ) r1
-  real ( kind = 8 ) r2
-  real ( kind = 8 ), parameter :: r8_pi = 3.141592653589793D+00
-  !real ( kind = 8 ) r8_uniform_01
-  integer ( kind = 4 ) seed
-  real ( kind = 8 ) x
+		real ( kind = 8 ) r1
+		real ( kind = 8 ) r2
+		real ( kind = 8 ), parameter :: r8_pi = 3.141592653589793D+00
+		!real ( kind = 8 ) r8_uniform_01
+		integer ( kind = 4 ) seed
+		real ( kind = 8 ) x
 
-  r1 = r8_uniform_01 ( seed )
-  r2 = r8_uniform_01 ( seed )
-  x = sqrt ( -2.0D+00 * log ( r1 ) ) * cos ( 2.0D+00 * r8_pi * r2 )
+		r1 = r8_uniform_01 ( seed )
+		r2 = r8_uniform_01 ( seed )
+		x = sqrt ( -2.0D+00 * log ( r1 ) ) * cos ( 2.0D+00 * r8_pi * r2 )
 
-  return
-end subroutine
+		return
+	end subroutine normal_01_sample
+	
+	
 
-function r8_uniform_01 ( seed )
+	function r8_uniform_01 ( seed )
 
 !*****************************************************************************80
 !
@@ -245,37 +297,39 @@ function r8_uniform_01 ( seed )
 !    Output, real ( kind = 8 ) R8_UNIFORM_01, a new pseudorandom variate,
 !    strictly between 0 and 1.
 !
-  implicit none
+		implicit none
 
-  !integer ( kind = 4 ) i4_huge
-  integer ( kind = 4 ) k
-  real ( kind = 8 ) r8_uniform_01
-  integer ( kind = 4 ) seed
+		!integer ( kind = 4 ) i4_huge
+		integer ( kind = 4 ) k
+		real ( kind = 8 ) r8_uniform_01
+		integer ( kind = 4 ) seed
 
-  if ( seed == 0 ) then
-    write ( *, '(a)' ) ' '
-    write ( *, '(a)' ) 'R8_UNIFORM_01 - Fatal error!'
-    write ( *, '(a)' ) '  Input value of SEED = 0.'
-    stop 1
-  end if
+		if ( seed == 0 ) then
+			write ( *, '(a)' ) ' '
+			write ( *, '(a)' ) 'R8_UNIFORM_01 - Fatal error!'
+			write ( *, '(a)' ) '  Input value of SEED = 0.'
+			stop 1
+		end if
 
-  k = seed / 127773
+		k = seed / 127773
 
-  seed = 16807 * ( seed - k * 127773 ) - k * 2836
+		seed = 16807 * ( seed - k * 127773 ) - k * 2836
 
-  if ( seed < 0 ) then
-    seed = seed + i4_huge ( )
-  end if
-!
-!  Although SEED can be represented exactly as a 32 bit integer,
-!  it generally cannot be represented exactly as a 32 bit real number!
-!
-  r8_uniform_01 = real ( seed, kind = 8 ) * 4.656612875D-10
+		if ( seed < 0 ) then
+		seed = seed + i4_huge ( )
+		end if
+		!
+		!  Although SEED can be represented exactly as a 32 bit integer,
+		!  it generally cannot be represented exactly as a 32 bit real number!
+		!
+		r8_uniform_01 = real ( seed, kind = 8 ) * 4.656612875D-10
 
-  return
-end function
+		return
+	end function
+	
+	
 
-function i4_huge ( )
+	function i4_huge ( )
 
 !*****************************************************************************80
 !
@@ -322,17 +376,19 @@ function i4_huge ( )
 !
 !    Output, integer ( kind = 4 ) I4_HUGE, a "huge" I4.
 !
-  implicit none
+		implicit none
 
-  integer ( kind = 4 ) i4
-  integer ( kind = 4 ) i4_huge
+		integer ( kind = 4 ) i4
+		integer ( kind = 4 ) i4_huge
 
-  i4_huge = 2147483647
+		i4_huge = 2147483647
 
-  return
-end function
+		return
+	end function
 
-subroutine cubspl ( tau, c, n, ibcbeg, ibcend )
+
+
+	subroutine cubspl ( tau, c, n, ibcbeg, ibcend )
 
 !*****************************************************************************80
 !
@@ -402,19 +458,19 @@ subroutine cubspl ( tau, c, n, ibcbeg, ibcend )
 !    boundary condition at TAU(N), with the additional
 !    information taken from C(2,N).
 !
-  implicit none
+		implicit none
 
-  integer ( kind = 4 ) n
+		integer ( kind = 4 ) n
 
-  real ( kind = fp_kind ) c(4,n)
-  real ( kind = fp_kind ) divdf1
-  real ( kind = fp_kind ) divdf3
-  real ( kind = fp_kind ) dtau
-  real ( kind = fp_kind ) g
-  integer ( kind = 4 ) i
-  integer ( kind = 4 ) ibcbeg
-  integer ( kind = 4 ) ibcend
-  real ( kind = fp_kind ) tau(n)
+		real ( kind = fp_kind ) c(4,n)
+		real ( kind = fp_kind ) divdf1
+		real ( kind = fp_kind ) divdf3
+		real ( kind = fp_kind ) dtau
+		real ( kind = fp_kind ) g
+		integer ( kind = 4 ) i
+		integer ( kind = 4 ) ibcbeg
+		integer ( kind = 4 ) ibcend
+		real ( kind = fp_kind ) tau(n)
 !
 !  C(3,*) and C(4,*) are used initially for temporary storage.
 !
@@ -422,13 +478,13 @@ subroutine cubspl ( tau, c, n, ibcbeg, ibcend )
 !
 !  Store first divided difference of data in C(4,*).
 !
-  do i = 2, n
-    c(3,i) = tau(i) - tau(i-1)
-  end do
+		do i = 2, n
+			c(3,i) = tau(i) - tau(i-1)
+		end do
 
-  do i = 2, n 
-    c(4,i) = ( c(1,i) - c(1,i-1) ) / ( tau(i) - tau(i-1) )
-  end do
+		do i = 2, n 
+			c(4,i) = ( c(1,i) - c(1,i-1) ) / ( tau(i) - tau(i-1) )
+		end do
 !
 !  Construct the first equation from the boundary condition
 !  at the left endpoint, of the form:
@@ -437,44 +493,44 @@ subroutine cubspl ( tau, c, n, ibcbeg, ibcend )
 !
 !  IBCBEG = 0: Not-a-knot
 !
-  if ( ibcbeg == 0 ) then
+		if ( ibcbeg == 0 ) then
 
-    if ( n <= 2 ) then
-      c(4,1) = 1.0D+00
-      c(3,1) = 1.0D+00
-      c(2,1) = 2.0D+00 * c(4,2)
-      go to 120
-    end if
+			if ( n <= 2 ) then
+				c(4,1) = 1.0D+00
+				c(3,1) = 1.0D+00
+				c(2,1) = 2.0D+00 * c(4,2)
+				go to 120
+			end if
 
-    c(4,1) = c(3,3)
-    c(3,1) = c(3,2) + c(3,3)
-    c(2,1) = ( ( c(3,2) + 2.0D+00 * c(3,1) ) * c(4,2) * c(3,3) &
-      + c(3,2)**2 * c(4,3) ) / c(3,1)
+			c(4,1) = c(3,3)
+			c(3,1) = c(3,2) + c(3,3)
+			c(2,1) = ( ( c(3,2) + 2.0D+00 * c(3,1) ) * c(4,2) * c(3,3) &
+			  + c(3,2)**2 * c(4,3) ) / c(3,1)
 !
 !  IBCBEG = 1: derivative specified.
 !
-  else if ( ibcbeg == 1 ) then
+		else if ( ibcbeg == 1 ) then
 
-    c(4,1) = 1.0D+00
-    c(3,1) = 0.0D+00
+			c(4,1) = 1.0D+00
+			c(3,1) = 0.0D+00
 
-    if ( n == 2 ) then
-      go to 120
-    end if
+			if ( n == 2 ) then
+				go to 120
+			end if
 !
 !  Second derivative prescribed at left end.
 !
-  else
+		else
 
-    c(4,1) = 2.0D+00
-    c(3,1) = 1.0D+00
-    c(2,1) = 3.0D+00 * c(4,2) - c(3,2) / 2.0D+00 * c(2,1)
+			c(4,1) = 2.0D+00
+			c(3,1) = 1.0D+00
+			c(2,1) = 3.0D+00 * c(4,2) - c(3,2) / 2.0D+00 * c(2,1)
 
-    if ( n == 2 ) then
-      go to 120
-    end if
+			if ( n == 2 ) then
+				go to 120
+			end if
 
-  end if
+		end if
 !
 !  If there are interior knots, generate the corresponding
 !  equations and carry out the forward pass of Gauss elimination,
@@ -482,11 +538,11 @@ subroutine cubspl ( tau, c, n, ibcbeg, ibcend )
 !
 !    C(4,I) * S(I) + C(3,I) * S(I+1) = C(2,I).
 !
-  do i = 2, n-1
-    g = -c(3,i+1) / c(4,i-1)
-    c(2,i) = g * c(2,i-1) + 3.0D+00 * ( c(3,i) * c(4,i+1) + c(3,i+1) * c(4,i) )
-    c(4,i) = g * c(3,i-1) + 2.0D+00 * ( c(3,i) + c(3,i+1))
-  end do
+		do i = 2, n-1
+			g = -c(3,i+1) / c(4,i-1)
+			c(2,i) = g * c(2,i-1) + 3.0D+00 * ( c(3,i) * c(4,i+1) + c(3,i+1) * c(4,i) )
+			c(4,i) = g * c(3,i-1) + 2.0D+00 * ( c(3,i) + c(3,i+1))
+		end do
 !
 !  Construct the last equation from the second boundary condition, of
 !  the form
@@ -497,77 +553,77 @@ subroutine cubspl ( tau, c, n, ibcbeg, ibcend )
 !  back-substitution, since the C array happens to be set up just
 !  right for it at this point.
 !
-  if ( ibcend == 1 ) then
-    go to 160
-  end if
+		if ( ibcend == 1 ) then
+			go to 160
+		end if
 
-  if ( 1 < ibcend ) then
-    go to 110
-  end if
+		if ( 1 < ibcend ) then
+			go to 110
+		end if
  
-90    continue
+90		continue
 !
 !  Not-a-knot and 3 <= N, and either 3 < N or also not-a-knot
 !  at left end point.
 !
-  if ( n /= 3 .or. ibcbeg /= 0 ) then
-    g = c(3,n-1) + c(3,n)
-    c(2,n) = ( ( c(3,n) + 2.0D+00 * g ) * c(4,n) * c(3,n-1) + c(3,n)**2 &
-      * ( c(1,n-1) - c(1,n-2) ) / c(3,n-1) ) / g
-    g = - g / c(4,n-1)
-    c(4,n) = c(3,n-1)
-    c(4,n) = c(4,n) + g * c(3,n-1)
-    c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
-    go to 160
-  end if
+		if ( n /= 3 .or. ibcbeg /= 0 ) then
+			g = c(3,n-1) + c(3,n)
+			c(2,n) = ( ( c(3,n) + 2.0D+00 * g ) * c(4,n) * c(3,n-1) + c(3,n)**2 &
+			  * ( c(1,n-1) - c(1,n-2) ) / c(3,n-1) ) / g
+			g = - g / c(4,n-1)
+			c(4,n) = c(3,n-1)
+			c(4,n) = c(4,n) + g * c(3,n-1)
+			c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
+			go to 160
+		end if
 !
 !  N = 3 and not-a-knot also at left.
 !
-100   continue
+100		continue
  
-  c(2,n) = 2.0D+00 * c(4,n)
-  c(4,n) = 1.0D+00
-  g = -1.0D+00 / c(4,n-1)
-  c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
-  c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
-  go to 160
+		c(2,n) = 2.0D+00 * c(4,n)
+		c(4,n) = 1.0D+00
+		g = -1.0D+00 / c(4,n-1)
+		c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
+		c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
+		go to 160
 !
 !  IBCEND = 2: Second derivative prescribed at right endpoint.
 !
-110   continue
+110		continue
  
-  c(2,n) = 3.0D+00 * c(4,n) + c(3,n) / 2.0D+00 * c(2,n)
-  c(4,n) = 2.0D+00
-  g = -1.0D+00 / c(4,n-1)
-  c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
-  c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
-  go to 160
+		c(2,n) = 3.0D+00 * c(4,n) + c(3,n) / 2.0D+00 * c(2,n)
+		c(4,n) = 2.0D+00
+		g = -1.0D+00 / c(4,n-1)
+		c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
+		c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
+		go to 160
 !
 !  N = 2.
 !
-120   continue
+120		continue
   
-  if ( ibcend == 2  ) then
+		if ( ibcend == 2  ) then
 
-    c(2,n) = 3.0D+00 * c(4,n) + c(3,n) / 2.0D+00 * c(2,n)
-    c(4,n) = 2.0D+00
-    g = -1.0D+00 / c(4,n-1)
-    c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
-    c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
- 
-  else if ( ibcend == 0 .and. ibcbeg /= 0 ) then
+			c(2,n) = 3.0D+00 * c(4,n) + c(3,n) / 2.0D+00 * c(2,n)
+			c(4,n) = 2.0D+00
+			g = -1.0D+00 / c(4,n-1)
+			c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
+			c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
 
-    c(2,n) = 2.0D+00 * c(4,n)
-    c(4,n) = 1.0D+00
-    g = -1.0D+00 / c(4,n-1)
-    c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
-    c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
+		else if ( ibcend == 0 .and. ibcbeg /= 0 ) then
 
-  else if ( ibcend == 0 .and. ibcbeg == 0 ) then
+			c(2,n) = 2.0D+00 * c(4,n)
+			c(4,n) = 1.0D+00
+			g = -1.0D+00 / c(4,n-1)
+			c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
+			c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
 
-    c(2,n) = c(4,n)
+		else if ( ibcend == 0 .and. ibcbeg == 0 ) then
 
-  end if
+			c(2,n) = c(4,n)
+
+		end if
 !
 !  Back solve the upper triangular system 
 !
@@ -575,28 +631,30 @@ subroutine cubspl ( tau, c, n, ibcbeg, ibcend )
 !
 !  for the slopes C(2,I), given that S(N) is already known.
 !
-160   continue
+160		continue
  
-  do i = n-1, 1, -1
-    c(2,i) = ( c(2,i) - c(3,i) * c(2,i+1) ) / c(4,i)
-  end do
+		do i = n-1, 1, -1
+			c(2,i) = ( c(2,i) - c(3,i) * c(2,i+1) ) / c(4,i)
+		end do
 !
 !  Generate cubic coefficients in each interval, that is, the
 !  derivatives at its left endpoint, from value and slope at its
 !  endpoints.
 !
-  do i = 2, n
-    dtau = c(3,i)
-    divdf1 = ( c(1,i) - c(1,i-1) ) / dtau
-    divdf3 = c(2,i-1) + c(2,i) - 2.0D+00 * divdf1
-    c(3,i-1) = 2.0D+00 * ( divdf1 - c(2,i-1) - divdf3 ) / dtau
-    c(4,i-1) = 6.0D+00 * divdf3 / dtau**2
-  end do
+		do i = 2, n
+			dtau = c(3,i)
+			divdf1 = ( c(1,i) - c(1,i-1) ) / dtau
+			divdf3 = c(2,i-1) + c(2,i) - 2.0D+00 * divdf1
+			c(3,i-1) = 2.0D+00 * ( divdf1 - c(2,i-1) - divdf3 ) / dtau
+			c(4,i-1) = 6.0D+00 * divdf3 / dtau**2
+		end do
  
-  return
-end subroutine
+		return
+	end subroutine
 
-function ppvalu ( break, coef, l, k, x, jderiv )
+
+
+	function ppvalu ( break, coef, l, k, x, jderiv )
 
 !*****************************************************************************80
 !
@@ -661,60 +719,62 @@ function ppvalu ( break, coef, l, k, x, jderiv )
 !    Output, real ( kind = 8 ) PPVALU, the value of the JDERIV-th
 !    derivative of F at X.
 !
-  implicit none
+		implicit none
 
-  integer ( kind = 4 ) k
-  integer ( kind = 4 ) l
+		integer ( kind = 4 ) k
+		integer ( kind = 4 ) l
 
-  real ( kind = fp_kind ) break(l+1)
-  real ( kind = fp_kind ) coef(k,l)
-  real ( kind = fp_kind ) fmmjdr
-  real ( kind = fp_kind ) h
-  integer ( kind = 4 ) i
-  integer ( kind = 4 ) jderiv
-  integer ( kind = 4 ) m
-  integer ( kind = 4 ) ndummy
-  real ( kind = fp_kind ) ppvalu
-  real ( kind = fp_kind ) value
-  real ( kind = fp_kind ) x
+		real ( kind = fp_kind ) break(l+1)
+		real ( kind = fp_kind ) coef(k,l)
+		real ( kind = fp_kind ) fmmjdr
+		real ( kind = fp_kind ) h
+		integer ( kind = 4 ) i
+		integer ( kind = 4 ) jderiv
+		integer ( kind = 4 ) m
+		integer ( kind = 4 ) ndummy
+		real ( kind = fp_kind ) ppvalu
+		real ( kind = fp_kind ) value
+		real ( kind = fp_kind ) x
 
-  value = 0.0D+00
+		value = 0.0D+00
 
-  fmmjdr = k - jderiv
+		fmmjdr = k - jderiv
 !
 !  Derivatives of order K or higher are identically zero.
 !
-  if ( k <= jderiv ) then
-    return
-  end if
+		if ( k <= jderiv ) then
+			return
+		end if
 !
 !  Find the index I of the largest breakpoint to the left of X.
 !
-  call interv ( break, l+1, x, i, ndummy )
+		call interv ( break, l+1, x, i, ndummy )
 !
 !  Evaluate the JDERIV-th derivative of the I-th polynomial piece at X.
 !
-  h = x - break(i)
-  m = k
+		h = x - break(i)
+		m = k
  
-  do
+		do
 
-    value = ( value / fmmjdr ) * h + coef(m,i)
-    m = m - 1
-    fmmjdr = fmmjdr - 1.0D+00
+			value = ( value / fmmjdr ) * h + coef(m,i)
+			m = m - 1
+			fmmjdr = fmmjdr - 1.0D+00
 
-    if ( fmmjdr <= 0.0D+00 ) then
-      exit
-    end if
+			if ( fmmjdr <= 0.0D+00 ) then
+				exit
+			end if
 
-  end do
+		end do
 
-  ppvalu = value
- 
-  return
-end function
+		ppvalu = value
 
-subroutine interv ( xt, lxt, x, left, mflag )
+		return
+	end function
+
+
+
+	subroutine interv ( xt, lxt, x, left, mflag )
 
 !*****************************************************************************80
 !
@@ -789,144 +849,144 @@ subroutine interv ( xt, lxt, x, left, mflag )
 !     0: XT(I)   <= X  < XT(I+1)
 !    +1: XT(LXT) <  X
 !
-  implicit none
+		implicit none
 
-  integer ( kind = 4 ) lxt
+		integer ( kind = 4 ) lxt
 
-  integer ( kind = 4 ) left
-  integer ( kind = 4 ) mflag
-  integer ( kind = 4 ) ihi
-  integer ( kind = 4 ), save :: ilo = 1
-  integer ( kind = 4 ) istep
-  integer ( kind = 4 ) middle
-  real ( kind = fp_kind ) x
-  real ( kind = fp_kind ) xt(lxt)
+		integer ( kind = 4 ) left
+		integer ( kind = 4 ) mflag
+		integer ( kind = 4 ) ihi
+		integer ( kind = 4 ), save :: ilo = 1
+		integer ( kind = 4 ) istep
+		integer ( kind = 4 ) middle
+		real ( kind = fp_kind ) x
+		real ( kind = fp_kind ) xt(lxt)
 
-  ihi = ilo + 1
+		ihi = ilo + 1
 
-  if ( lxt <= ihi ) then
+		if ( lxt <= ihi ) then
 
-    if ( xt(lxt) <= x ) then
-      go to 110
-    end if
+			if ( xt(lxt) <= x ) then
+				go to 110
+			end if
 
-    if ( lxt <= 1 ) then
-      mflag = -1
-      left = 1
-      return
-    end if
+			if ( lxt <= 1 ) then
+				mflag = -1
+				left = 1
+				return
+			end if
 
-    ilo = lxt - 1
-    ihi = lxt
+			ilo = lxt - 1
+			ihi = lxt
 
-  end if
+		end if
 
-  if ( xt(ihi) <= x ) then
-    go to 20
-  end if
+		if ( xt(ihi) <= x ) then
+			go to 20
+		end if
 
-  if ( xt(ilo) <= x ) then
-    mflag = 0
-    left = ilo
-    return
-  end if
+		if ( xt(ilo) <= x ) then
+			mflag = 0
+			left = ilo
+			return
+		end if
 !
 !  Now X < XT(ILO).  Decrease ILO to capture X.
 !
-  istep = 1
+		istep = 1
 
-10 continue
+10		continue
 
-  ihi = ilo
-  ilo = ihi - istep
+		ihi = ilo
+		ilo = ihi - istep
 
-  if ( 1 < ilo ) then
-    if ( xt(ilo) <= x ) then
-      go to 50
-    end if
-    istep = istep * 2
-    go to 10
-  end if
+		if ( 1 < ilo ) then
+			if ( xt(ilo) <= x ) then
+				go to 50
+			end if
+			istep = istep * 2
+			go to 10
+		end if
 
-  ilo = 1
+		ilo = 1
 
-  if ( x < xt(1) ) then
-    mflag = -1
-    left = 1
-    return
-  end if
+		if ( x < xt(1) ) then
+			mflag = -1
+			left = 1
+			return
+		end if
 
-  go to 50
+		go to 50
 !
 !  Now XT(IHI) <= X.  Increase IHI to capture X.
 !
-20 continue
+20		continue
 
-  istep = 1
+		istep = 1
 
-30 continue
+30		continue
 
-  ilo = ihi
-  ihi = ilo + istep
+		ilo = ihi
+		ihi = ilo + istep
 
-  if ( ihi < lxt ) then
+		if ( ihi < lxt ) then
 
-    if ( x < xt(ihi) ) then
-      go to 50
-    end if
+			if ( x < xt(ihi) ) then
+				go to 50
+			end if
 
-    istep = istep * 2
-    go to 30
+			istep = istep * 2
+			go to 30
 
-  end if
+		end if
 
-  if ( xt(lxt) <= x ) then
-    go to 110
-  end if
+		if ( xt(lxt) <= x ) then
+			go to 110
+		end if
 !
 !  Now XT(ILO) < = X < XT(IHI).  Narrow the interval.
 !
-  ihi = lxt
+		ihi = lxt
 
-50 continue
+50		continue
 
-  do
+		do
 
-    middle = ( ilo + ihi ) / 2
+			middle = ( ilo + ihi ) / 2
 
-    if ( middle == ilo ) then
-      mflag = 0
-      left = ilo
-      return
-    end if
-!
-!  It is assumed that MIDDLE = ILO in case IHI = ILO+1.
-!
-    if ( xt(middle) <= x ) then
-      ilo = middle
-    else
-      ihi = middle
-    end if
+			if ( middle == ilo ) then
+				mflag = 0
+				left = ilo
+				return
+			end if
+			!
+			!  It is assumed that MIDDLE = ILO in case IHI = ILO+1.
+			!
+			if ( xt(middle) <= x ) then
+				ilo = middle
+			else
+				ihi = middle
+			end if
 
-  end do
+		end do
 !
 !  Set output and return.
 !
-110 continue
+110		continue
 
-  mflag = 1
+		mflag = 1
 
-  if ( x == xt(lxt) ) then
-    mflag = 0
-  end if
+		if ( x == xt(lxt) ) then
+			mflag = 0
+		end if
 
-  do left = lxt - 1, 1, -1
-    if ( xt(left) < xt(lxt) ) then
-      return
-    end if
-  end do
+		do left = lxt - 1, 1, -1
+			if ( xt(left) < xt(lxt) ) then
+				return
+			end if
+		end do
 
-  return
-end subroutine
+		return
+	end subroutine
 
 end module

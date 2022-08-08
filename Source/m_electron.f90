@@ -41,7 +41,7 @@ character(2), parameter :: element(92) = &
   'Ag','Cd','In','Sn','Sb','Te','I ','Xe','Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm', &
   'Yb','Lu','Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U '  /)
 real(fp_kind), parameter :: xrayFF(14,92) = reshape( &
-(/1.00_fp_kind,0.73235400_fp_kind,0.7538960_fp_kind,0.2838190_fp_kind,0.1900030_fp_kind,0.0391390_fp_kind,11.553918_fp_kind,4.59583100_fp_kind,1.54629900_fp_kind,26.4639640_fp_kind,0.37752300_fp_kind,0.00048700_fp_kind,2.0_fp_kind,8.769017454422158E-3_fp_kind,&
+(/1.00_fp_kind,0.489918_fp_kind,0.262003_fp_kind,0.196767_fp_kind,0.049879_fp_kind,0.00_fp_kind,20.6593_fp_kind,7.74039_fp_kind,49.5519_fp_kind,2.20159_fp_kind,0.0_fp_kind,0.001305_fp_kind,1.0_fp_kind,0.0_fp_kind,&
   2.00_fp_kind,0.73235400_fp_kind,0.7538960_fp_kind,0.2838190_fp_kind,0.1900030_fp_kind,0.0391390_fp_kind,11.553918_fp_kind,4.59583100_fp_kind,1.54629900_fp_kind,26.4639640_fp_kind,0.37752300_fp_kind,0.00048700_fp_kind,2.0_fp_kind,8.769017454422158E-3_fp_kind,&
   3.00_fp_kind,0.97463700_fp_kind,0.1584720_fp_kind,0.8118550_fp_kind,0.2624160_fp_kind,0.7901080_fp_kind,4.3349460_fp_kind,0.34245100_fp_kind,97.1029690_fp_kind,201.363824_fp_kind,1.40923400_fp_kind,0.00254200_fp_kind,3.0_fp_kind,3.053829815542358E-2_fp_kind,&
   4.00_fp_kind,1.53371200_fp_kind,0.6382830_fp_kind,0.6010520_fp_kind,0.1061390_fp_kind,1.1184140_fp_kind,42.662078_fp_kind,0.59542000_fp_kind,99.1065010_fp_kind,0.15134000_fp_kind,1.84309300_fp_kind,0.00251100_fp_kind,4.0_fp_kind,2.673011412693727E-2_fp_kind,&
@@ -1152,7 +1152,9 @@ data ionicFF_Peng(106)/t_ionicFF_peng('U ', 92,  +6, [0.687E+0, 0.114E+1, 0.183E
 		    fe = 0
 	    else
 		    fe = 0.023934*dZ/s2
+			
 	    endif
+		!write(*,*) 'used ions: s2=',s2,'  fe=',fe
         
 	    !First find atom
 	    do i=1,113
@@ -1164,6 +1166,7 @@ data ionicFF_Peng(106)/t_ionicFF_peng('U ', 92,  +6, [0.687E+0, 0.114E+1, 0.183E
 	        
 
 	        fe = fe+sum(ionicFF_Peng(i)%a(1:5)*exp(-ionicFF_Peng(i)%b(1:5)*s2))
+			!write(*,*) 'used peng: s2=',s2,'  fe=',fe
             return
             endif
         enddo
@@ -1175,7 +1178,8 @@ data ionicFF_Peng(106)/t_ionicFF_peng('U ', 92,  +6, [0.687E+0, 0.114E+1, 0.183E
         Zapprox = Z-dZ
         
         fe = fe+ elsa_ext(92,Zapprox,xrayFF(2:14,:),s2)
-        
+        !write(*,*) 'used WaKi: s2=',s2,'  fe=',fe
+		
     end function
     
     function Peng_ionic_FF_fractional_ionicity(s2,Z,dZ,cutoff) result(fe)
@@ -1195,7 +1199,7 @@ data ionicFF_Peng(106)/t_ionicFF_peng('U ', 92,  +6, [0.687E+0, 0.114E+1, 0.183E
         
         !Find floor and ceiling of fractional ionicity and calculate
         Zceil = ceiling(dZ)
-        frac = modulo(dZ,1.0)
+        frac = modulo(dZ,1.0_fp_kind)
         fe = Peng_ionic_FF_integer_ionicity(s2,Z,Zceil,cutoff_)*frac
         Zfloor = floor(dZ)
         fe = fe+Peng_ionic_FF_integer_ionicity(s2,Z,Zfloor,cutoff_)*(1-frac)

@@ -2,6 +2,9 @@
 !
 !  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
 !
+!  modified:
+!    2019-Dec-13, J. Barthel, added calls to plasmon scattering Monte-Carlo code
+!
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
 !  the Free Software Foundation, either version 3 of the License, or
@@ -20,6 +23,8 @@
 module m_multislice
     
     use m_precision, only: fp_kind
+	use global_variables, only: plasmonmc ! for plasmon trigger JB-191213
+	use plasmon ! for plasmon code calls
     
     implicit none
 
@@ -51,6 +56,10 @@ module m_multislice
 
     interface load_save_add_grates
         module procedure load_save_add_grates_qep,load_save_add_grates_abs
+    end interface
+    
+    interface multislice_iteration
+        module procedure multislice_iteration_new,multislice_iteration_old
     end interface
     
     contains
@@ -90,20 +99,62 @@ module m_multislice
     
     !This subroutine performs one iteration of the multislice algorithm (called in CPU versions only)
     !Probe (psi) input and output is in real space
-    subroutine multislice_iteration(psi,propagator,transmission,nopiy,nopix)
+    subroutine multislice_iteration_old(psi,propagator,transmission,nopiy,nopix)
 	    use cufft_wrapper
         complex(fp_kind),intent(inout)::psi(nopiy,nopix)
         complex(fp_kind),intent(in)::propagator(nopiy,nopix),transmission(nopiy,nopix)
         integer*4,intent(in)::nopiy,nopix
+		integer(4):: iexc,isx,isy ! local plasmon scatter results added here, JB-191213
+        complex(fp_kind)::psi_tmp(nopiy,nopix) ! temporary wave function for plasmon scattering, JB-191213
         
         ! Transmit through slice potential
 		psi = psi*transmission
-                
         ! Propagate to next slice
 		call fft2(nopiy,nopix,psi,nopiy,psi,nopiy)
+		! plasmon trigger, JB-191213
+		if (plasmonmc) then
+			call pl_scatt_slc(pl_tslc,pl_grid_sqx,pl_grid_sqx,iexc,isx,isy,pl_idum)
+			if (iexc>0 .and. (isx/=0 .or. isy/=0)) then ! scattering happened and shift is needed
+				psi_tmp = psi
+				psi = cshift(cshift(psi_tmp(:,:),isy,dim=1),isy,dim=2)
+			endif
+		endif
 		psi = psi*propagator
 		call ifft2(nopiy,nopix,psi,nopiy,psi,nopiy)
     
+    end subroutine
+    
+    !This subroutine performs one iteration of the multislice algorithm (called in CPU versions only)
+    !Probe (psi) input and output is in real space
+    subroutine multislice_iteration_new(psi,propagator,transmission,prop_distance,even_slicing,nopiy,nopix)
+	    use cufft_wrapper
+        complex(fp_kind),intent(inout)::psi(nopiy,nopix)
+        complex(fp_kind),intent(in)::propagator(nopiy,nopix),transmission(nopiy,nopix)
+        integer*4,intent(in)::nopiy,nopix
+        real(fp_kind),intent(in)::prop_distance
+        logical,intent(in)::even_slicing
+		integer(4):: iexc,isx,isy ! local plasmon scatter results added here, JB-191213
+        complex(fp_kind)::psi_tmp(nopiy,nopix) ! temporary wave function for plasmon scattering, JB-191213
+		
+        ! Transmit through slice potential
+		psi = psi*transmission
+        ! Propagate to next slice
+		call fft2(nopiy,nopix,psi,nopiy,psi,nopiy)
+		! plasmon trigger, JB-191213
+		if (plasmonmc) then
+			call pl_scatt_slc(pl_tslc,pl_grid_sqx,pl_grid_sqx,iexc,isx,isy,pl_idum)
+			if (iexc>0 .and. (isx/=0 .or. isy/=0)) then ! scattering happened and shift is needed
+				psi_tmp = psi
+				psi = cshift(cshift(psi_tmp(:,:),isy,dim=1),isy,dim=2)
+			endif
+		endif
+		if(even_slicing) then
+            psi = psi*propagator
+        else
+            psi = psi*exp(prop_distance*propagator)
+        endif
+		call ifft2(nopiy,nopix,psi,nopiy,psi,nopiy)
+		return
     end subroutine
     
     subroutine prompt_output_probe_intensity
@@ -319,8 +370,9 @@ module m_multislice
         write(*,*) '<2> Load transmission functions'
         write(*,*) '<3> Add additional transmission function '
         write(*,*) '    (eg. from magnetic structure) from file'
-        call get_input('<0> continue <1> save <2> load', i_save_load)
-        write(*,*)
+       
+		call get_input('<0> continue <1> save <2> load', i_save_load)
+        
 323     format( '  - The xtl file',/,'  - The slicing of the unit cell',/,&
                &'  - The choice of thermal scattering model (QEP vs. absorptive)',/,&
                &'  - The tiling of the unit cell',/,'  - The number of pixels',/,&
@@ -615,6 +667,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
         write(6,*) 'Enter the starting position of the random number sequence:'
         call get_input("Number of ran1 discarded", nran )
         write(*,*)       
+		!nran=1
 
         end subroutine
     
@@ -746,24 +799,54 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
         write(*,*)
         
     end subroutine
+
+	function calculate_nat_slice( depths, tau, nm, nt, nat, n_slices, ifactorx, ifactory ) result(nat_slice)
+   !Calculate the number of atoms within each slice 
+    implicit none
+
+	real(fp_kind),intent(in):: depths(n_slices), tau(3,nt,nm)
+	integer(4),intent(in):: nm, nt, ifactorx, ifactory, n_slices,nat(nt)
+	
+	integer(4) nat_slice(nt,n_slices)
+	integer(4) i,kk
+	real(fp_kind) diff, tol
+	real(fp_kind) factorx, factory
+
+	tol = 1.0d-4
+	
+	do i = 1, nt !Loop over atom types
+		!Calculate atoms in all slices bar the final one
+		do kk=1,n_slices-1;
+			nat_slice(i,kk) = count((tau(3,i,1:nat(i)) .lt. (depths(kk+1)-tol)) &
+							&.and.(tau(3,i,1:nat(i)) .ge. (depths(kk)-tol))  )&
+							&*ifactory*ifactorx
+		enddo
+		!Calculate the number of atoms in the final slice
+		nat_slice(i,n_slices) = count(tau(3,i,1:nat(i)) .ge. (depths(n_slices)-tol))*ifactory*ifactorx
+
+	enddo
+    end function
     
     subroutine calculate_slices
-        use global_variables, only: nat, ifactory, ifactorx, nt, a0, deg, tau, nm
+        use global_variables, only: nat, ifactory, ifactorx, nt, a0, deg, tau, nm,even_slicing
         use m_crystallography, only: cryst
         
         implicit none
         
-        integer :: j
+        integer :: j,jj,kk,maxnat_slice_uc
         
-        maxnat_slice = maxval(nat) * ifactory * ifactorx
+        allocate(nat_slice(nt,n_slices),nat_slice_unitcell(nt,n_slices))
+        nat_slice = calculate_nat_slice( depths,tau,nm,nt,nat,n_slices,ifactorx,ifactory )
+		nat_slice_unitcell = nat_slice / dfloat(ifactorx*ifactory)
+		maxnat_slice=maxval(nat_slice)
+		maxnat_slice_uc=maxnat_slice / dfloat(ifactorx*ifactory)
         
-        allocate(nat_slice(nt,n_slices),tau_slice(3,nt,maxnat_slice,n_slices),&
+        allocate(tau_slice(3,nt,maxnat_slice,n_slices),&
                 &a0_slice(3,n_slices),ss_slice(7,n_slices),prop_distance(n_slices),&
-                 nat_slice_unitcell(nt,n_slices),tau_slice_unitcell(3,nt,nm,n_slices))
-        
+                 tau_slice_unitcell(3,nt,maxnat_slice_uc,n_slices))
+
         do j = 1, n_slices
-          a0_slice(1,j) = a0(1)*ifactorx	
-          a0_slice(2,j) = a0(2)*ifactory		
+          a0_slice(1:2,j) = a0(1:2)*[ifactorx,ifactory]
           
           if (j .eq. n_slices) then				
                 a0_slice(3,j) = (1.0_fp_kind-depths(j))*a0(3)
@@ -774,25 +857,27 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
           call cryst(a0_slice(:,j),deg,ss_slice(:,j))
           
           ! Make supercell cell subsliced
-          call calculate_tau_nat_slice( depths(j),depths(j+1),tau,tau_slice(:,:,:,j),nm,nt,nat,nat_slice(:,j),ifactorx,ifactory )
+          call calculate_tau_nat_slice( depths(j),depths(j+1),tau,tau_slice(:,:,:,j),nm,nt,nat,nat_slice(:,j),ifactorx,ifactory,&
+		  &                             maxnat_slice )
 	                
           ! Make unit cell subsliced
           call make_mod_tau_unitcell( depths(j),depths(j+1),tau,tau_slice_unitcell(:,:,:,j),nm,nt,nat,nat_slice_unitcell(:,j) )
         enddo
-        
+
         prop_distance = a0_slice(3,:)
+		 even_slicing = all(abs(prop_distance - sum(prop_distance)/n_slices)<1e-3)
         
     end subroutine
     
-	subroutine calculate_tau_nat_slice( depth1, depth2, tau, tau_slice, nm, nt, nat, nat_slice, ifactorx, ifactory )
+	subroutine calculate_tau_nat_slice( depth1, depth2, tau, tau_slice, nm, nt, nat, nat_slice, ifactorx, ifactory, maxnat_slice )
    
     implicit none
 
-	integer(4) nm, nt, ifactorx, ifactory
+	integer(4) nm, nt, ifactorx, ifactory, maxnat_slice
 	integer(4) nat(nt)
 	integer(4) nat_slice(nt)
 	real(fp_kind) depth2, depth1, tau(3,nt,nm)
-	real(fp_kind) tau_slice(3,nt,nm*ifactorx*ifactory)
+	real(fp_kind) tau_slice(3,nt,maxnat_slice)
 	integer(4) i,j,jj, mm, nn
 	real(fp_kind) diff, tol
 	real(fp_kind) factorx, factory
@@ -829,10 +914,10 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
 	    enddo
         
 	    nat_slice(i) = jj-1
-        
+		
 	enddo
 
-    end subroutine
+    end subroutine 
     
 !--------------------------------------------------------------------------------------
 	subroutine make_mod_tau_unitcell( depth1, depth2, tau, mod_tau, nm, nt, nat, nat2)
@@ -860,13 +945,11 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
 	    jj=1
 	    do j=1,nat(i)
 	        if( (tau(3,i,j) .lt. (depth2-tol)) .and.(tau(3,i,j) .ge. (depth1-tol)) ) then
-	            mod_tau(1,i,jj) = tau(1,i,j)
-	            mod_tau(2,i,jj) = tau(2,i,j)
+	            mod_tau(1:2,i,jj) = tau(1:2,i,j)
 			    mod_tau(3,i,jj) = (tau(3,i,j)-depth1)/diff
 			    jj = jj+1
 	        elseif(diff.eq.1.0) then
-	            mod_tau(1,i,jj) = tau(1,i,j)
-	            mod_tau(2,i,jj) = tau(2,i,j)
+	            mod_tau(1:2,i,jj) = tau(1:2,i,j)
 			    mod_tau(3,i,jj) = (tau(3,i,j)-depth1)/diff  
 	        endif
 	    enddo
@@ -875,7 +958,139 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
     
 	end subroutine        
         
- 
-	    
+    subroutine get_cbed_detector_info(ndet,k,outer,inner)
+    
+        use m_precision, only: fp_kind
+        use m_user_input, only: get_input
+        use m_string, only: to_string
+        
+        implicit none
+    
+        integer(4)   ndet,ichoice,i,mrad
+        real(fp_kind),dimension(ndet) :: outer,inner,inner_mrad,outer_mrad
+		optional::inner
+        real(fp_kind) :: k,dummy
+		logical::getinner
+
+		getinner = present(inner)
+
+        write(*,*) 'Select a method for choosing detector angles:'
+        write(*,*) '<1> Manual',char(10),' <2> Automatic'
+    
+        call get_input("manual detector <1> auto <2>",ichoice)
+        write(*,*)
+        mrad =-1
+		do while(.not.((mrad==1).or.(mrad==2)))
+			write(*,*) 'Select how angles will be specified:'
+			write(*,*) '<1> mrad',char(10),' <2> inverse Angstroms'
+			call get_input("<1> mrad <2> inv A", mrad)
+			write(*,*)
+		enddo
+    
+        if(ichoice.eq.1) then
+              do i = 1, ndet
+                    write(*,*) char(10),' Detector ', to_string(i)
+					if(getinner) then
+						write(*,*)' Inner angle:'
+						call get_input("inner",dummy)
+						if(mrad.eq.1) inner_mrad(i) = dummy
+						if(mrad.eq.2) inner(i) =  dummy
+					endif
+					write(*,*) "Outer angle:"
+                    call get_input("outer",dummy)
+                    if(mrad.eq.1) outer_mrad(i) = dummy
+					if(mrad.eq.2) outer(i) =  dummy 
+              enddo
+        else	
+			  if(getinner) then
+				  write(*,*) "Initial inner angle:"
+				  call get_input("initial inner angle", dummy)
+				  if(mrad.eq.1) inner_mrad(1) = dummy
+				  if(mrad.eq.2) inner(1) = dummy
+			  endif
+
+              write(*,*) "Initial outer angle:"
+              call get_input("initial outer angle", dummy)
+			  if(mrad.eq.1) outer_mrad(1) = dummy
+			  if(mrad.eq.2) outer(1) = dummy
+			  
+              if(getinner) write(*,*) "Increment (both angles incremented by this amount):"
+			  if(.not.getinner)  write(*,*) "Increment:"
+              call get_input("increment", dummy)
+              write(*,*)
+
+			  if(mrad.eq.1) then
+				if(getinner) inner_mrad(2:) = (/((i-1)*dummy+inner_mrad(1), i=2,ndet,1)/)
+				outer_mrad(2:) = (/((i-1)*dummy+outer_mrad(1), i=2,ndet)/)
+			  else
+				if(getinner) inner(2:) = (/((i-1)*dummy+inner(1), i=2,ndet)/)
+				outer(2:) = (/((i-1)*dummy+outer(1), i=2,ndet)/)
+			  endif
+
+        endif
+		if(mrad.eq.2) then
+			outer_mrad = 1000*atan(outer/k)
+			if(getinner) inner_mrad = 1000*atan(inner/k)
+		else
+			if(getinner) inner = k*tan(inner_mrad/1000.0_fp_kind)
+			outer = k*tan(outer_mrad/1000.0_fp_kind)
+		endif
+        
+        write(*,*) 'Summary of diffraction plane detectors:'
+        write(*,*)
+        
+        if(getinner) write(*,*) '         inner    outer'
+		if(.not.getinner) write(*,*) ' outer angle'
+        write(*,*) '  --------------------------------'
+        if(getinner) then
+		do i = 1, ndet
+            write(*,50) i, inner_mrad(i), outer_mrad(i)
+            write(*,55) inner(i), outer(i), char(143)
+            write(*,60) 
+        enddo
+		else
+		do i = 1, ndet
+            write(*,65) i, outer_mrad(i)
+            write(*,70) outer(i), char(143)
+            write(*,60) 
+        enddo
+		endif
+
+50          format(1x, i5, ' | ', f6.2, ' | ', f6.2, '   (mrad)')
+55          format(1x, 5x, ' | ', f6.2, ' | ', f6.2, '   (', a1, '^-1)')        
+60          format(1x, 5x, ' | ', 6x, ' | ')
+65          format(1x, i5, ' | ', f6.2,  '   (mrad)')
+70          format(1x, 5x, ' | ', f6.2, '   (', a1, '^-1)')        
+
+        write(*,*)
+		
+
+        
+    end subroutine
+	
+
+	function make_image(nopiy,nopix,psi,ctf,rspacein) result(image)
+		use CUFFT_wrapper
+		implicit none
+		integer*4,intent(in)::nopiy,nopix
+		complex(fp_kind),dimension(nopiy,nopix),intent(in)::ctf,psi
+		logical,intent(in),optional::rspacein
+		real(fp_kind)::image(nopiy,nopix)
+
+		complex(fp_kind),dimension(nopiy,nopix)::psi_temp2,psi_temp
+
+		if(present(rspacein)) then
+			if(rspacein)call fft2(nopiy,nopix,psi,nopiy,psi_temp,nopiy)
+			if(.not.rspacein) psi_temp = psi
+		else
+			call fft2(nopiy,nopix,psi,nopiy,psi_temp,nopiy)
+		endif
+
+		psi_temp = psi_temp*ctf
+		call ifft2(nopiy,nopix,psi_temp,nopiy,psi_temp2,nopiy)
+		image = abs(psi_temp2)**2
+
+	end function
+
 end module
 

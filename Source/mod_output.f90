@@ -541,7 +541,7 @@ module output
 		if (make_montage) allocate(montage(output_nopiy*n_df,output_nopix*nz))
 
 		length = ceiling(log10(maxval(zarray)))
-		lengthdf = ceiling(log10(maxval(abs(defoci))))
+		lengthdf = ceiling(log10(maxval(abs(defoci))+1))
 		if(any(defoci<0)) lengthdf = lengthdf+1
         if (many_y .and. many_x) then
             ! y, x, df
@@ -660,8 +660,8 @@ module output
     if (present(realimag)) realimag_ = realimag
     
     if (realimag_) then
-        call binary_out(nopiy_temp,nopix_temp,real(array_),trim(adjustl(fnam))//'_real.bin')    
-        call binary_out(nopiy_temp,nopix_temp,imag(array_),trim(adjustl(fnam))//'_imag.bin')    
+        call binary_out(nopiy_temp,nopix_temp,real(array_),trim(adjustl(fnam))//'_real')    
+        call binary_out(nopiy_temp,nopix_temp,imag(array_),trim(adjustl(fnam))//'_imag')    
     else
         if(allocated(obj_ret)) deallocate(obj_ret)
         allocate(obj_ret(nopiy_temp,nopix_temp))
@@ -671,16 +671,63 @@ module output
         else
             mask = obj_ret/maxval(obj_ret) > 1e-8
         endif
-        fnam1=trim(adjustl(fnam))//'_inten.bin'
+        fnam1=trim(adjustl(fnam))//'_inten'
         call binary_out(nopiy_temp,nopix_temp,obj_ret,fnam1)
         obj_ret = 0
         forall(i=1:nopiy_temp,j=1:nopix_temp,mask(i,j)) obj_ret(i,j) = atan2(imag(array_(i,j)),real(array_(i,j)))
-        fnam1=trim(adjustl(fnam))//'_phase.bin'
+        fnam1=trim(adjustl(fnam))//'_phase'
         call binary_out(nopiy_temp,nopix_temp,obj_ret,fnam1)
     endif
     
     return
     end subroutine
 
-    
+
+	subroutine output_TEM_result(filename,arrayin,tag,nopiy,nopix,doz,dodf,dotilts,z,df,lengthz,&
+								&lengthdf,tiltstring,nopiyout,nopixout,pp,write_to_screen)
+		use m_string
+		implicit none
+		character*(*),intent(in)::filename,tiltstring,tag
+		real(fp_kind),intent(in)::arrayin(nopiy,nopix),z,df
+		integer*4,intent(in)::nopiy,nopix,nopiyout,nopixout,pp(2),lengthz,lengthdf
+		logical,intent(in)::doz,dodf,dotilts,write_to_screen
+		optional::z,df,tiltstring,nopiyout,nopixout,write_to_screen,lengthz,lengthdf,pp
+
+		integer*4::nopiy_,nopix_
+		logical::write_to_screen_
+		character*(100)::fnam
+
+
+		write_to_screen_ = .true.
+		if(present(write_to_screen)) write_to_screen_ = write_to_screen
+
+		nopiy_ = nopiy
+		if(present(nopiyout)) nopiy_ = nopiyout
+		nopix_ = nopix
+		if(present(nopixout)) nopix_ = nopixout
+		
+		fnam = trim(adjustl(filename))//'_'//trim(adjustl(tag))
+		if (doz) fnam = trim(adjustl(fnam))//'_z='//zero_padded_int(nint(z),lengthz)//'_A'
+		if(dodf) fnam = trim(adjustl(fnam)) // '_df='//zero_padded_int(nint(df),lengthdf)//'_A'
+        if (dotilts) fnam = trim(adjustl(fnam))//trim(adjustl(tiltstring))
+		if(present(pp)) fnam = trim(adjustl(fnam))//'_pp_'//to_string(pp(2))//'_'//to_string(pp(1))
+		if(nopiy==nopiy_.and.nopix==nopix_) then
+			call binary_out(nopiy, nopix, arrayin, fnam,write_to_screen=write_to_screen_)
+		else
+			call binary_out_unwrap(nopiy, nopix, arrayin, fnam,write_to_screen=write_to_screen_,nopiyout=nopiy_,nopixout=nopix_)
+		endif
+
+     end subroutine
+
+	 
+	 function calculate_padded_string_length(arrayin,n)
+		implicit none
+		real(fp_kind),intent(in)::arrayin(n)
+		integer*4,intent(in)::n
+		integer*4::calculate_padded_string_length
+
+
+		calculate_padded_string_length = ceiling(log10(maxval(abs(arrayin)+1)))
+		if(any(arrayin<0)) calculate_padded_string_length = calculate_padded_string_length+1
+	end function
 	end module

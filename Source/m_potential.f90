@@ -32,7 +32,7 @@ module m_potential
       real(fp_kind),    allocatable :: adf_potential(:,:,:,:)
       real(fp_kind),    allocatable :: ionization_potential(:,:,:,:)
       real(fp_kind),    allocatable :: eels_correction_detector(:,:)
-	 complex(fp_kind), allocatable :: inverse_sinc_new(:,:)
+	 !complex(fp_kind), allocatable :: inverse_sinc_new(:,:)
     
     integer(4) :: n_qep_grates,n_qep_passes,nran ! Start of random number sequence
     
@@ -105,21 +105,16 @@ module m_potential
 	    implicit none
     
         integer(4) :: i, j, k,Z
-        real(fp_kind) :: el_scat,ax,ay,g2,s2,sky,skx
-        real(fp_kind) :: xkstep, temp
+        real(fp_kind) :: xkstep, temp,el_scat,ax,ay,g2,s2,sky,skx
         real(fp_kind),allocatable :: xdata(:),tdsbrc(:,:,:) 
         real(fp_kind) :: factor, eps, g_vec_array(3,nopiy,nopix)
 
-        if(allocated(sinc)) deallocate(sinc)
         if(allocated(inverse_sinc)) deallocate(inverse_sinc)
-        if(allocated(inverse_sinc_new)) deallocate(inverse_sinc_new)
         if(allocated(fz)) deallocate(fz)
         if(allocated(fz_DWF)) deallocate(fz_DWF)
     
         allocate(fz(nopiy,nopix,nt))
-        allocate(sinc(nopiy,nopix))
         allocate(inverse_sinc(nopiy,nopix))
-        allocate(inverse_sinc_new(nopiy,nopix))
         allocate(fz_DWF(nopiy,nopix,nt))
     
         ax = (a0(1)*float(ifactorx))/(float(nopix)*2.0_fp_kind)
@@ -146,16 +141,13 @@ module m_potential
             enddo
             
             !Sinc 
-            sinc(i,j) = cmplx((sin(tp*skx*ax)+eps)/(tp*skx*ax+eps)*((sin(tp*sky*ay)+eps)/(tp*sky*ay+eps)),0.0_fp_kind,fp_kind)
             inverse_sinc(i,j) = cmplx((tp*skx*ax+eps)/(sin(tp*skx*ax)+eps)*(tp*sky*ay+eps)/(sin(tp*sky*ay)+eps),0.0_fp_kind,fp_kind)
-            inverse_sinc_new(i,j) = cmplx((tp*skx*ax+eps)/(sin(tp*skx*ax)+eps)*(tp*sky*ay+eps)/(sin(tp*sky*ay)+eps),0.0_fp_kind,fp_kind)            
         enddo; enddo
         ! Currently have U(g)/2K, so multiply by 2K
         fz = 2*ak*fz
         
-        ! Normalise the sinc functions
+        ! Normalise the sinc function
         inverse_sinc = inverse_sinc*float(nopiy)*float(nopix)
-        sinc = sinc / (float(nopiy)*float(nopix))
     end subroutine precalculate_scattering_factors
     
     subroutine make_site_factor_matmul(site_factor, tau)
@@ -225,7 +217,7 @@ module m_potential
     subroutine make_site_factor_hybrid(site_factor, tau)
 
         use m_precision, only: fp_kind
-        use global_variables, only: nopiy, nopix
+        use global_variables, only: nopiy, nopix,inverse_sinc
         use CUFFT_wrapper, only: fft2
         
         implicit none
@@ -303,7 +295,7 @@ module m_potential
         site_factor = cshift(site_factor,SHIFT = -1,DIM=2)
 
         call fft2(nopiy, nopix, site_factor, nopiy, site_factor, nopiy)
-        site_factor = site_factor * inverse_sinc_new * sqrt(float(nopiy)*float(nopix))
+        site_factor = site_factor * inverse_sinc/sqrt(float(nopiy)*float(nopix))!_new * sqrt(float(nopiy)*float(nopix))
         
         contains
         
@@ -411,9 +403,14 @@ module m_potential
 
 		m = 5
 		if(EDX) m=1
+		
+		!write(*,*) 'reading inelastic scattering parameterization:'
+		!write(*,*) '- file: '//'ionization_data\EELS_EDX_'//shell//'.dat'
         
-        n = str2int(shell(1:2))
+        n = str2int(shell(1:1))
         lineno = get_ionization_shell_line(shell,atno)
+		!write(*,*) '- shell: '//shell//' - id = '//to_string(n)
+		!write(*,*) '- from line: '//to_string(lineno)
 		
 		!open the pertinent data files and read to relevant line        
 		open(unit=16,file='ionization_data\EELS_EDX_'//shell//'.dat',status='old',err=970)
@@ -423,11 +420,13 @@ module m_potential
         p = 0
         !Later parametrizations only contain 28 datapoints
         mm=29;if (n>2) mm=28
+		!write(*,*) '- number of items per line: '//to_string(mm)
         !Read parameters
 		do i=1,8 !Loop over accelerating voltages
 		  read(16,*) junk ! E=xx kev header
 		  do ii=1,6 !Loop over energy loss above threshhold (EELS) and EDX 
 			   read(16,*) p(1:mm)
+			   !write(*,*) '--- #'//to_string(ii)//': '//to_string(p(1))
 			   if((.not.EDX).and.(ii<6)) params(:,i,ii) = p(:) !EELS is the first 5 lines
 			   if(EDX.and.(ii==6)) params(:,i,1) = p(:) !EDX is the last line
 		  enddo
@@ -476,6 +475,11 @@ module m_potential
       !     subroutine EELS_local_potential()
       !     reads in the scattering factors and performs the interpolation
       !     necessary to accommodate arbitrary geometries and energy windows
+      !     
+      !     2020-11-26 / JB / support for more orbitals added (4f, 5s, 5p)
+      !                       now 12 files named 'EELS_EDX_{orb}.dat
+      !                       are expected in the ionization_data folder
+      !     
       !********************************************************************************
       subroutine local_potential(EDX)
 
@@ -493,14 +497,14 @@ module m_potential
 
       real(fp_kind),allocatable:: DE(:)
       real(fp_kind) eels_inner,eels_outer
-      character(2) shell_name_EELS(9),orb
-      character(3) shells(9)!(9)
+      character(2) shell_name_EELS(12),orb
+      character(3) shells(12)!(9)
       character(13):: contributions(4)
       logical,allocatable::choices(:)
       logical::k_shell,l_shell,EDXpresent(nt,4)
 
-      shell_name_EELS = ['1s','2s','2p','3s','3p','3d','4s','4p','4d']
-      shells = ['K','L1','L23','M1','M23','M45','N1','N23','N45']
+      shell_name_EELS = [ '1s', '2s', '2p', '3s', '3p', '3d', '4s', '4p', '4d', '4f', '5s', '5p']
+      shells =          [  'K', 'L1','L23', 'M1','M23','M45', 'N1','N23','N45','N67', 'O1','O23']
       contributions = ['1s','2s and 2p','3s, 3p and 3d','4s, 4p and 4d']
       norbitals = size(shell_name_EELS)
       nshells = size(shells)
@@ -508,7 +512,7 @@ module m_potential
 	  if(.not.EDX) then
 			write(6,91)
 	   91 format(1x,'The EELS calculations assume the local approximation, which', /, &
-				&1x,'may be inappropriate when the the EELS detector does not', /, &
+				&1x,'may be inappropriate when the EELS detector does not', /, &
 				&1x,'have a very large acceptance angle. To account for the', /, &
 				&1x,'finite detector size, a correction is applied.', /, &
 				&1x,'For more details see Y. Zhu et al. APL 103 (2013) 141908.', /)
@@ -606,7 +610,7 @@ module m_potential
  
     end subroutine
       
-    !Subrotuine to make the Fz_mu needs to have prefactors accounted for (volume fo the unit cell etc.)
+    !Subroutine to make the Fz_mu needs to have prefactors accounted for (volume fo the unit cell etc.)
     !needs to be multiplied by the DWF for the pertinent atom type
     function make_fz_EELS_EDX(orbital,zz,DE,EDX) result(fz_mu)
 	use m_precision
@@ -725,6 +729,7 @@ module m_potential
     function potential_from_scattering_factors(scattering_factor,atom_posn,nat_layer,nopiy,nopix,high_accuracy) result(slice_potential)
     use m_precision
     use cufft_wrapper
+	use output
     
     implicit none
     
@@ -753,6 +758,9 @@ module m_potential
         else
             call make_site_factor_hybrid(site_term, atom_posn)        
         endif
+		!call ifft2(nopiy,nopix,site_term,nopiy,site_term,nopiy)
+		!call binary_out(nopiy,nopix,site_term,'site_term')
+		!stop
         slice_potential = site_term*scattering_factor
         ! Get realspace potential
         call ifft2(nopiy,nopix,slice_potential,nopiy,slice_potential,nopiy)
@@ -766,13 +774,13 @@ module m_potential
 	    use cufft_wrapper, only: fft2, ifft2
         use global_variables, only: ig1,ig2,ifactory,ifactorx,nt, relm, tp, ak, atf, high_accuracy, ci, pi, bwl_mat,fz,fz_DWF,ss,a0,nat,orthog
         use m_absorption!, only: transf_absorptive,fz_abs
-        use m_multislice, only: nat_slice, ss_slice, tau_slice
+        use m_multislice, only: nat_slice, ss_slice, tau_slice ! JB 2022-08-03 error fixed for ifort compile
         use m_string, only: to_string
         use output
         
         implicit none
         
-        integer(4),intent(in)::nopiy,nopix,n_slices
+        integer*4,intent(in)::nopiy,nopix,n_slices
         complex(fp_kind)::projected_potential(nopiy,nopix,n_slices)
         
         integer(4) :: j, m, n,nat_layer
@@ -836,7 +844,7 @@ module m_potential
         end function seed_rng
 
       
-    subroutine make_propagator(nopiy,nopix,prop,dz,ak1,ss,ig1,ig2,claue,ifactorx,ifactory)
+    subroutine make_propagator(nopiy,nopix,prop,dz,ak1,ss,ig1,ig2,claue,ifactorx,ifactory,exponentiate)
 
         use m_precision, only: fp_kind
         use m_crystallography, only: trimr,make_g_vec_array
@@ -847,6 +855,36 @@ module m_potential
         complex(fp_kind) :: prop(nopiy,nopix)        
         real(fp_kind) :: ak1, ss(7), claue(3), dz, g_vec_array(3,nopiy,nopix)
         integer(4) :: ifactorx, ifactory, ig1(3), ig2(3)
+		logical,intent(in),optional::exponentiate
+		
+		logical::exp_
+        real(fp_kind),parameter :: pi = atan(1.0d0)*4.0d0
+        integer(4) :: ny, nx
+        
+		exp_=.true.
+		if(present(exponentiate)) exp_ = exponentiate
+        
+        call make_g_vec_array(g_vec_array,ifactory,ifactorx)
+
+        do ny = 1, nopiy;do nx = 1, nopix
+            prop(ny,nx) = cmplx(0.0d0, -pi*dz*trimr(g_vec_array(:,ny,nx)-claue,ss)**2/ak1, fp_kind )
+        enddo;enddo
+
+		if(exp_) prop = exp(prop)
+
+    end subroutine
+	      
+    subroutine make_propagator_components(nopiy,nopix,propy,propx,dz,ak1,ss,ig1,ig2,ifactorx,ifactory)
+
+        use m_precision, only: fp_kind
+        use m_crystallography, only: trimr,make_g_vec_array
+            
+        implicit none
+
+        integer(4) :: nopiy,nopix
+        complex(fp_kind) :: propy(nopiy),propx(nopix)
+        real(fp_kind) :: ak1, ss(7), dz, g_vec_array(3,nopiy,nopix)
+        integer(4) :: ifactorx, ifactory, ig1(3), ig2(3)
 
         real(fp_kind),parameter :: pi = atan(1.0d0)*4.0d0
         integer(4) :: ny, nx
@@ -854,9 +892,13 @@ module m_potential
         
         call make_g_vec_array(g_vec_array,ifactory,ifactorx)
 
-        do ny = 1, nopiy;do nx = 1, nopix
-            prop(ny,nx) = exp(cmplx(0.0d0, -pi*dz*trimr(g_vec_array(:,ny,nx)-claue,ss)**2/ak1, fp_kind ))
-        enddo;enddo
+        do ny = 1, nopiy;
+            propy(ny) = exp(cmplx(0.0_fp_kind,-pi*dz*trimr(g_vec_array(:,ny,1),ss)**2/ak1))
+        enddo
+
+		do nx = 1, nopix
+			propx(nx) = exp(cmplx(0.0_fp_kind,-pi*dz*trimr(g_vec_array(:,1,nx),ss)**2/ak1))
+		enddo
 
     end subroutine
        

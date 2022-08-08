@@ -1,5 +1,6 @@
 !--------------------------------------------------------------------------------
-!   Program: MU_STEM (GPU VERSION)
+!   Program: MU_STEM (GPU VERSION by GPU preprocessor flag with PGI fortran)
+!                    (CPU VERSION by CPU preprocessor flag with Intel fortran)
 !    
 !   Description:    Calculate (S)TEM images and diffraction patterns using the
 !                   multislice approach.
@@ -17,9 +18,11 @@
 !   Date:           August 2017
 !   Requirements:   PGI Fortran
 !
-!   version:        5.1  
+!   version:        5.3  
 !  
 !  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
+!
+!  Includes modifications by J. Barthel and L. J. Allen (2019 - 2021)
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -52,10 +55,11 @@
         use m_multislice
         use m_string
         use m_electron
+		use m_Hn0
         
         implicit none
         
-        integer :: i_illum, i_tds_model, i_cb_menu, i_cb_calc_type,ifile,nfiles,i_arg,idum,i
+        integer :: i_illum, i_tds_model, i_cb_menu, i_cb_calc_type,ifile,nfiles,i_arg,idum,i,ieftem
         
         logical :: nopause = .false.,there,ionization,stem,pacbed
         character(512)::command_argument
@@ -88,7 +92,11 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 5.3                                                      |',/,&
+       &1x,'|       GPU Version 5.3 (20210906-0852)                                      |',/,&
+       &1x,'|             modified by J. Barthel and L. J. Allen to include              |',/,&
+       &1x,'|             plasmon scattering, additional subshells for ionization,       |',/,&
+	   &1x,'|             and some other minor correction                                |',/,&
+	   &1x,'|           ! absorptive model calculations are known to crash occasionally  |',/,&
 #else
        &1x,'|       CPU only Version 5.3                                                 |',/,&
 #endif
@@ -106,10 +114,10 @@
             select case (trim(adjustl(command_argument)))
             case ('nopause')
                 nopause = .true.
-			case ('timing')
-				timing = .true.
-			case ('ionic')
-				ionic = .true.
+			      case ('timing')
+				        timing = .true.
+			      case ('ionic')
+				        ionic = .true.
             end select
         enddo
         
@@ -137,12 +145,14 @@
                 endif
             endif
         ! Set up CPU multithreading
-        call setup_threading 
+        call setup_threading
 #ifdef GPU
         ! Set up GPU
         call setup_GPU
+		double_channeling =.true. !Double channeling possible with GPU calculation
 #else
         open(6,carriagecontrol ='fortran')
+		double_channeling =.false. !Double channeling not possible with CPU calculation
 #endif
         
         call command_line_title_box('Dataset output')
@@ -217,7 +227,7 @@
         if((complex_absorption.and.include_absorption).or.qep) then
         write(*,*) ' Options for output of inelastically and elastically scattered components'
         write(*,*) ' <1> Only output total signal (ie that measured in experiment)'
-        write(*,*) ' <2> Seperately output elastic, inelastic and total signal'
+        write(*,*) ' <2> Separately output elastic, inelastic and total signal'
         if(complex_absorption.and.include_absorption) write(*,*) 'Note: option <2> only applies to STEM imaging'
         write(*,*)
         call get_input('Elastic and inelastic scattering output choice', i_tds_model)
@@ -240,6 +250,9 @@
         
         ! Ask for QEP parameters
         if (qep) call setup_qep_parameters(n_qep_grates,n_qep_passes,nran,quick_shift,ifactory,ifactorx)
+		
+		! Ask plasmon scattering parameters
+		if (qep) call setup_plasmon_parameters(ekv*1000.0_fp_kind, thickness, plasmonmc)
         
         ! Save/load transmission functions
         call prompt_save_load_grates
@@ -247,6 +260,12 @@
         ! Set up the imaging lens
         if (pw_illum) then
 			 call setup_lens_parameters('Image',imaging_aberrations,imaging_cutoff)
+#ifdef GPU
+			write(*,*) 'Calculate an energy-filtered TEM (EFTEM) image? <1> Yes <2> No'
+			call get_input('Do EFTEM? <1> Yes <2> No',ieftem)
+			double_channeling = ieftem == 1
+			if(double_channeling) call ionizer_init(.false.)
+#endif
 		else
 			imaging_ndf = 1
 		endif
@@ -266,19 +285,22 @@
                 case (1)
                     ! CBED pattern
                     call place_probe(probe_initial_position)
+					double_channeling=.false.
                 case (2)
                     ! STEM images
-                    call STEM_options(STEM,ionization,PACBED)
+                    call STEM_options(STEM,ionization,PACBED,istem,double_channeling)
                     fourdSTEM= .false.
                     if(pacbed) call fourD_STEM_options(fourdSTEM,nopiyout,nopixout,nopiy,nopix)
                     call setup_probe_scan(PACBED.and.(.not.(ionization.or.STEM)))
                     call prompt_output_probe_intensity
                     if(STEM) call setup_integration_measurements
                     adf = STEM.and.(.not.qep)
+					if(istem) call setup_lens_parameters('Image',imaging_aberrations,imaging_cutoff)
                     
                     ! Precalculate the scattering factors on a grid
                     call precalculate_scattering_factors()
                     if(ionization) call setup_inelastic_ionization_types
+					if(double_channeling) call ionizer_init(.true.)
                     
                 case default
                     goto 115
@@ -335,18 +357,24 @@
     
         implicit none
       
-        integer*4 :: num_threads
+        integer*4 :: num_cpu, num_threads
         integer*4 :: omp_get_max_threads, omp_get_num_procs
     
-        num_threads = omp_get_num_procs() 
+        num_cpu = omp_get_num_procs()
+        num_threads = max(1, int(num_cpu / 2))
         
         call omp_set_num_threads(num_threads)
         
+        call dfftw_init_threads()
+        call dfftw_plan_with_nthreads(num_threads)
+        
         call command_line_title_box('CPU multithreading')
+        write(*,*) 'The number of available logical CPUs is: ' // to_string(num_cpu)
         write(*,*) 'The number of threads being used on the CPU is: ' // to_string(num_threads)
         write(*,*)
     
-    end subroutine         
+    end subroutine
+  
 	  subroutine reset_allocatable_variables()
       
 		!The downside of using global variables... :(
@@ -369,7 +397,7 @@
 		if(allocated(ncells)                  ) deallocate(ncells)   
 		if(allocated(fz    )                  ) deallocate(fz)   
 		if(allocated(fz_DWF)                  ) deallocate(fz_DWF)   
-		if(allocated(sinc)                    ) deallocate(sinc)   
+		!if(allocated(sinc)                    ) deallocate(sinc)   
 		if(allocated(inverse_sinc)            ) deallocate(inverse_sinc)   
 		if(allocated(substance_atom_types    )) deallocate(substance_atom_types)   
 		if(allocated(outer                   )) deallocate(outer)   

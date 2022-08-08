@@ -15,14 +15,26 @@ implicit none
 		if (.not.input) str = 'n'
     end function
     
-		 function is_numeric(string)
+		function is_numeric(string)
 			  character(len=*), intent(in) :: string
 			  logical :: is_numeric
 			  real :: x
 			  integer :: e
 			  read(string,*,iostat=e) x
-			  is_numeric = e == 0
-			end function is_numeric
+			  is_numeric = (e == 0)
+		end function is_numeric
+		
+		! this returns .TRUE. if string can be converted to integer
+		! should work more reliably in some cases as is_numeric
+		! added on 2021-Aug-06 by J.B.
+		function is_integer(string)
+			  character(len=*), intent(in) :: string
+			  logical :: is_integer
+			  integer :: x
+			  integer :: e
+			  read(string,'(i)',iostat=e) x
+			  is_integer = (e == 0)
+		end function is_integer
 			
         function to_string_integer(i) result(s)
             implicit none
@@ -70,6 +82,17 @@ implicit none
     read(str,*,iostat=stat_)  int
   end function str2int
     
+	subroutine Series_prompt(tag)
+	character*(*),intent(in):: tag
+
+		write(*,*)
+		write(*,*) 'A ',trim(adjustl(tag)),' series can be performed by inputting a comma seperated list:'
+        write(*,*) 'eg. 5,10,15'
+        write(*,*) 'or a sequence:'
+        write(*,*) 'eg. 5:15:5 (start:stop:step)',char(10)
+	end subroutine
+
+
 	!Allows thickness to be read in via:
 	!Single value in  the format: [z1]
 	!List of values in the format: [z1],[z2],[z3]
@@ -114,7 +137,7 @@ implicit none
 			!Read final value into array
 			if (is_numeric(string(i:))) then
 				read(string(i:),*) zseq(ii)
-				if(present(minstep)) zseq(ii) = max(minstep,zseq(ii))
+				!if(present(minstep)) zseq(ii) = max(minstep,zseq(ii))
 			else
 				write(*,*) "Expected numeric input of the kind [start]:[stop]:[step], got: "//string(i:)
 				stop
@@ -135,6 +158,7 @@ implicit none
 				nsteps = nsteps+1
 				z = z+zseq(3)
 			enddo
+
 			!nsteps = nint((zseq(2)-zseq(1)/zseq(3)))+1
 
 			if (present(zarray)) then
@@ -203,6 +227,7 @@ implicit none
         write(zero_padded_int, fmt) num
         
       end function
+
 
 	function to_upper(strIn) result(strOut)
 		! Adapted from http://www.star.le.ac.uk/~cgp/fortran.html (25 May 2012)

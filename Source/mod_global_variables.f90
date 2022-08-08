@@ -2,6 +2,9 @@
 !
 !  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
 !
+!  modified:
+!  - J. Barthel, 2019-12-12 - added plasmonmc switch
+!
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
 !  the Free Software Foundation, either version 3 of the License, or
@@ -29,6 +32,7 @@
     integer(4) :: ifactorx,ifactory             !unit cell tilings
     real(fp_kind) :: deltay,deltax              !real space spacing between pixels in x and y
     real(fp_kind) :: normalisation
+	
     
     real(fp_kind), allocatable :: bwl_mat(:,:)            !bandwidth limiting matrix
                                           
@@ -51,10 +55,11 @@
 	integer(4),allocatable::ncells(:)
 	integer(4)::nz
     integer(4) :: n_cells  
+	logical::even_slicing
 
     complex(fp_kind), allocatable :: fz(:,:,:)            !the scattering factors, in reciprocal space, calculated on the grid (supercell)
     complex(fp_kind), allocatable :: fz_DWF(:,:,:)        !the DWF smear_array, in reciprocal space, calculated on the grid (supercell)
-    complex(fp_kind), allocatable :: sinc(:,:)            !sinc function to correct for pixelation in the potential construction
+    !complex(fp_kind), allocatable :: sinc(:,:)            !sinc function to correct for pixelation in the potential construction
     complex(fp_kind), allocatable :: inverse_sinc(:,:)    !1/sinc function to correct for pixelation in the potential construction
 
     real(fp_kind)  :: uvw1(3),uvw2(3)                     !real space scan vectors that are parallel 
@@ -97,7 +102,8 @@
     logical :: on_the_fly = .false.
     logical :: high_accuracy
 	logical :: ionic = .false.
-    
+    logical :: double_channeling,istem
+	logical :: plasmonmc = .false.
 	contains
      
     

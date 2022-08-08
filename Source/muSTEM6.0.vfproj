@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VisualStudioProject ProjectCreator="Intel Fortran" Keyword="Console Application" Version="11.0" ProjectIdGuid="{A1DA2EB1-6F04-4380-B1F4-67DCDAAF81BA}">
+	<Platforms>
+		<Platform Name="Win32"/>
+		<Platform Name="x64"/></Platforms>
+	<Configurations>
+		<Configuration Name="Debug|Win32" OutputDirectory="$(PlatformName)\$(ConfigurationName)" IntermediateDirectory="$(PlatformName)\$(ConfigurationName)">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" AdditionalIncludeDirectories="$(MKL_ROOT)\include\fftw" PreprocessorDefinitions="CPU;single_precision" FixedFormLineLength="fixedLength132" WarnInterfaces="true" ByteRECL="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" GenerateDebugInformation="true" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Debug|x64">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT)\include\fftw" PreprocessorDefinitions="CPU;single_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" WarnInterfaces="true" ByteRECL="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" GenerateDebugInformation="true" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Release|Win32" OutputDirectory="$(PlatformName)\$(ConfigurationName)" IntermediateDirectory="$(PlatformName)\$(ConfigurationName)">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" AdditionalIncludeDirectories="$(MKL_ROOT)\include\fftw" PreprocessorDefinitions="CPU;single_precision" FixedFormLineLength="fixedLength132" ByteRECL="true" UseMkl="mklParallel"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Release|x64">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT)\include\fftw" PreprocessorDefinitions="CPU;single_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" ByteRECL="true" UseMkl="mklParallel"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration></Configurations>
+	<Files>
+		<Filter Name="Header Files" Filter="fi;fd;h;inc"/>
+		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
+		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+		<File RelativePath=".\m_absorption.f90"/>
+		<File RelativePath=".\m_crystallography.f90"/>
+		<File RelativePath=".\m_electron.f90"/>
+		<File RelativePath=".\m_lens.f90"/>
+		<File RelativePath=".\m_multislice.f90"/>
+		<File RelativePath=".\m_numerical_tools.f90"/>
+		<File RelativePath=".\m_plasmon.f90"/>
+		<File RelativePath=".\m_potential.f90"/>
+		<File RelativePath=".\m_precision.f90"/>
+		<File RelativePath=".\m_string.f90"/>
+		<File RelativePath=".\m_tilt.f90"/>
+		<File RelativePath=".\m_user_input.f90"/>
+		<File RelativePath=".\mod_CUFFT_wrapper.f90"/>
+		<File RelativePath=".\mod_global_variables.f90"/>
+		<File RelativePath=".\mod_Hn0.f90"/>
+		<File RelativePath=".\mod_output.f90"/>
+		<File RelativePath=".\MS_utilities.f90"/>
+		<File RelativePath=".\muSTEM.f90"/>
+		<File RelativePath=".\quadpack.f90"/>
+		<File RelativePath=".\s_absorptive_stem.f90"/>
+		<File RelativePath=".\s_absorptive_tem.f90"/>
+		<File RelativePath=".\s_qep_stem.f90"/>
+		<File RelativePath=".\s_qep_tem.f90"/></Filter>
+		<Filter Name="Test">
+		<File RelativePath=".\Test\user_input.txt"/></Filter></Files>
+	<Globals/></VisualStudioProject>

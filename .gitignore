@@ -11,3 +11,6 @@ WaasmeierKohl.f90
 *.out
 *.synctex.gz
 *.toc
+/Source/x64
+/Source/.vs/muSTEM6.0/v16
+/.vs

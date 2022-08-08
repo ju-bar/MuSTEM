@@ -1,0 +1,7 @@
+inelastic scattering factors up to 5p orbitals for some atoms
+
+2020-Nov-26 / JB
+Additional tables for Sr, Ti, Si and O have been added, corresponding to a collection range of 0 to 3141.5 mrad.
+The additional tables are at the begin of the files and will therefore be applied.
+2020-Dec-11 / JB
+More tables were added for B and N, corresponding to a collection range of 0 to 3141.5 mrad.

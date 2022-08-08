@@ -200,10 +200,10 @@ module m_absorption
 
             ! Status
 #ifdef GPU            
-        131 format(a1,' Calculating absorptive scattering factor ', i4, ' of ', i4, '...' )
+        131 format(a1,' Calculating absorptive scattering factor ', i5, ' of ', i5, '...' )
             write(6,131, advance='no') achar(13),ipa, max_int
 #else
-        131 format(1h+,' Calculating absorptive scattering factor ', i4, ' of ', i4, '...' )
+        131 format(1h+,' Calculating absorptive scattering factor ', i5, ' of ', i5, '...' )
             write(6,131) ipa, max_int
 #endif
             !flush(unit=6)
@@ -230,7 +230,6 @@ module m_absorption
 
                 ! Store result (not yet in correct units)
                 tdsbr_t(ipa,i_species) = sum1
-                !write(16+i_species,*) sqrt(g2),',',imag(FSCATT(real(sqrt(g2)*2*pi,kind=4),sqrt(atf(3,i_species)),Z,element(Z),300.0_4,1,.false.,.false.))/(16*2*pi*pi)**2,',',sum1 
                 ! Accumulate mu_0)
                 if (all(g.eq.0.0_fp_kind)) then
                     mu_0 = mu_0 + sum1*nat(i_species) 
