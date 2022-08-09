@@ -2,6 +2,11 @@
 !
 !  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
 !
+!  modified 2022-June-10 by J. Barthel, replaced stack by heap allocations
+!    to fix crashes on large scale problems. However, this may not be needed
+!    when forcing the compiler to do heap allocation always using
+!    Properties/Optimization/Heap Arrays = 0
+!
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
 !  the Free Software Foundation, either version 3 of the License, or
