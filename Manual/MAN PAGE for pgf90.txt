@@ -1,0 +1,2052 @@
+
+
+pgf90(1)                                                              pgf90(1)
+
+
+
+NAME
+       pgf90 - The Portland Group Fortran 90/95 compiler
+
+SYNOPSIS
+       pgf90 [ -flag ]...  sourcefile...
+
+DESCRIPTION
+       pgf90  is  the  interface to The PGI Fortran 90/95 compiler for AMD and
+       Intel processors.  pgf90 invokes the Fortran compiler,  assembler,  and
+       linker  with options derived from its command line arguments.  pgf90 is
+       an alias for pgfortran.
+
+       Suffixes of source file names indicate the type  of  processing  to  be
+       done:
+
+
+       .f, .for, .ftn
+              fixed-format Fortran source; compile
+
+       .f90, .f95, .f03
+              free-format Fortran source; compile
+
+       .F, .FOR, .FTN, .fpp, .FPP
+              fixed-format Fortran source; preprocess, compile
+
+       .F90, .F95, .F03
+              free-format Fortran source; preprocess, compile
+
+       .cuf   free-format CUDA Fortran source; compile
+
+       .CUF   free-format CUDA Fortran source; preprocess, compile
+
+       .s     assembler source; assemble
+
+       .S     assembler source; preprocess, assemble
+
+       .o     object file; passed to linker
+
+       .a     library archive file; passed to linker
+
+
+       If  coinstalled with pgcc, C file suffixes are also recognized and com-
+       piled with the pgcc compiler; see pgcc and  PGI  User’s  Guide.   Other
+       files are passed to the linker (if linking is requested) with a warning
+       message.
+
+       Unless one overrides the default action using  a  command-line  option,
+       pgf90  deletes  the  intermediate preprocessor and assembler files (see
+       the options -c, -E, -F, and -Mkeepasm); if a single Fortran program  is
+       compiled  and  linked  with  one pgf90 command, the intermediate object
+       file is also deleted.  Linking is the last stage of  the  compile  pro-
+       cess,  unless  you  use one of the -c, -E, -F, or -S options, or unless
+       compilation errors stop the whole process.
+
+OPTIONS
+       Options must be separate; -cs is different from -c -s.  Here is a  list
+       of  all  options,  grouped  by type.  More detailed explanations are in
+       following sections.
+
+       Overall Options
+              -- -# -### -c -[no]defaultoptions -dryrun -drystdinc -echo
+              --flagcheck -flags -help[=option] -Manno -Minform=level
+              -Mkeepasm -M[no]list -noswitcherror -o file -rc rcfile -S -show
+              -silent -time -V -V<ver> -v --version -w -Wpass,option
+              -Ypass,directory
+
+       Optimization Options
+              -fast -fastsse -fPIC -fpic -KPIC -Kpic -Mcache_align
+              -Mconcur=option -M[no]depchk -M[no]dse -Mextract=option
+              -M[no]fma -M[no]frame -Minfo=option -Minline=option
+              -Minstrument=option -M[no]ipa=option -M[no]lre[=assoc|noassoc]
+              -M[no]movnt -Mneginfo=option -Mnoopenmp -Mnosgimp -Mnovintr
+              -Mpfi[=option] -Mpfo[=option] -M[no]pre -M[no]prefetch=option
+              -Mprof=option -M[no]propcond -Mquad -Msafe_lastval -M[no]smart
+              -M[no]smartalloc[=option] -M[no]stride0 -M[no]unroll=option
+              -M[no]unsafe_par_align -M[no]vect=option -M[no]zerotrip
+              -mp[=option] -Olevel -pg
+
+       Debugging Options
+              -C -g -gopt -M[no]bounds -Mchkfpstk -Mchkptr -Mchkstk -Mcoff
+              -Mdwarf1 -Mdwarf2 -Mdwarf3 -Melf -Mnodwarf -M[no]pgicoff
+              -[no]traceback
+
+       Preprocessor Options
+              -Dmacro -E -F -Idirectory
+              -Mcpp=[[no]comment|m|md|mm|mmd|mq:target|mt:target|suffix:suff]
+              -Mnostddef -Mnostdinc -Mpreprocess -Umacro -Yi,directory
+              -Yp,directory
+
+       Assembler Options
+              -Wa,argument[,argument]...  -Ya,directory
+
+       Linker Options
+              -acclibs --[no-]as-needed -Bdynamic -Bstatic -Bstatic_pgi
+              -cudalibs -g77libs -Ldirectory -llibrary -m -Mcudalib=libname
+              -M[no]eh_frame -Mlfs -Mmpi=option -Mnostartup -Mnostdlib
+              -M[no]rpath -Mscalapack -pgc++libs -pgcpplibs -pgf77libs
+              -pgf90libs -Rdirectory -r -rpath directory -s -shared -soname
+              name -uname --[no-]whole-archive -Wl,argument[,argument]...
+              -YC,directory -Yl,directory -Yl,directory -YS,directory
+              -YU,directory
+
+       Language Options
+              -asmsuffix=suffix -byteswapio -csuffix=suffix -fsuffix=suffix
+              -FSUFFIX=suffix -i2 -i4 -i8 -i8storage -Mallocatable[=95|03]
+              -M[no]backslash -Mbyteswapio -Mcray=pointer -Mcuda=option
+              -M[no]dalign -M[no]dclchk -M[no]defaultunit -M[no]dlines
+              -Mdollar=char -Mextend -Mfixed -M[no]free[form] -M[no]i4
+              -M[no]iomutex -Mlibsuffix=suffix -M[no]llalign -Mnomain
+              -Mobjsuffix=suffix -M[no]onetrip -M[no]r8
+              -M[no]r8intrinsics=float -M[no]recursive -M[no]ref_externals
+              -M[no]save -M[no]signextend -M[no]stack_arrays -Mstandard
+              -M[no]unixlogical -M[no]upcase -module directory -r4 -r8
+              -Wh,argument[,argument]...
+
+       Target-specific Options
+              -acc -K[no]ieee -Ktrap=option -M[no]daz -M[no]flushz
+              -M[no]fpapprox=option -M[no]fpmisalign -M[no]fprelaxed=option
+              -M[no]func32 -M[no]large_arrays -M[no]longbranch -M[no]loop32
+              -M[no]second_underscore -M[no]varargs -Mwritable-strings -m32
+              -m64 -mcmodel=small|medium -pc=val -ta=target -tp=target
+
+       When source files are compiled using any of the -g, -mp, -Mconcur,
+       -Mipa, or -Mprof options, the same option(s) should be passed when
+       using pgf90 to link the objects.
+
+
+Overall Options
+       --        Anything after this switch is treated as a filename.  Note
+                 that most tools will not allow a filename starting with a
+                 dash, so these should be avoided.
+
+       -#        Display the invocations of the compiler, assembler, and
+                 linker.  These invocations are the command lines created by
+                 pgf90.
+
+       -###      Display invocations of the compiler, assembler and linker,
+                 but do not execute them.
+
+       -c        Skip the link step; compile and assemble only.
+
+       -defaultoptions (default) -nodefaultoptions
+                 Use (don’t use) the default options set in site-specific or
+                 user-specific PREOPTIONS or POSTOPTIONS driver variables.
+
+       -dryrun   Use this option to display the invocations of the compiler,
+                 assembler, and linker but do not execute them.
+
+       -drystdinc
+                 Display the standard include directories without invoking the
+                 compiler.
+
+       -echo     Echo the command line flags and stop.  This is useful when
+                 the compiler is invoked by a script.
+
+       --flagcheck
+                 Don’t compile anything; just emit any messages for command-
+                 line switch errors.  Return a success error code if there are
+                 no command-line switch errors.
+
+       -flags    Display all valid pgf90 command-line options in alphabetical
+                 order.
+
+       -help[=option]
+                 Displays command-line options recognized by pgf90 on the
+                 standard output.  pgf90 -help -otherswitch will give help
+                 about -otherswitch.  The default is to list pgf90 command
+                 line options by group; options are:
+
+                 groups   Print out the groups into which the switches are
+                          organized.
+
+                 asm      Print help for assembler command-line options.
+
+                 debug    Print help for debugging command-line options.
+
+                 language Print help for language-specific command-line
+                          options.
+
+                 linker   Print help for linker options.
+
+                 opt      Print help for optimization command-line options.
+
+                 other    Print help for any other command-line options.
+
+                 overall  Print help for overall command-line options.
+
+                 phase    Print help for the known compiler phases.
+
+                 prepro   Print help for preprocessor command-line options.
+
+                 suffix   Describe the known file suffixes.
+
+                 switch   Print all switches in alphabetical order.
+
+                 target   Print help for target-specific command-line options.
+
+                 variable Show the pgf90 configuration; this is the same as
+                          -show.
+
+       -Manno    Produce annotated assembly files, where source code is
+                 intermixed with assembly language; implies -Mkeepasm.
+
+       -Minform=level
+                 Specify the minimum level of error severity that the compiler
+                 displays during compilation.
+
+                 fatal     Instructs the compiler to display fatal error
+                           messages.
+
+                 file (default) nofile
+                           Print out (don’t print out) the names of files as
+                           they are compiled; this is only active when there
+                           is more than one file on the command line.
+
+                 severe    Instructs the compiler to display severe and fatal
+                           error messages.
+
+                 warn      Instructs the compiler to display warning, severe
+                           and fatal error messages.
+
+                 inform
+                           Instructs the compiler to display all error
+                           messages (inform, warn, severe and fatal).
+
+                 The default is -Minform=warn.
+
+       -Mkeepasm Keep the assembly file for each source file, but continue to
+                 assemble and link the program. This is mainly for use in
+                 compiler performance analysis and debugging.
+
+       -Mlist -Mnolist (default)
+                 Create (don’t create) a listing file.
+
+       -noswitcherror
+                 Ignore unknown command line switches after printing an
+                 warning message; the default behavior is to print an error
+                 message and halt.
+
+       -o file   Use file as the name of the executable program, rather than
+                 the default a.out.  If used with -c or -S and a single input
+                 file, file is used as the name of the object or assembler
+                 output file.
+
+       -rc rcfile
+                 Specifies the name of a pgf90 startup configuration file.  If
+                 rcfile is a full pathname, then use the specified file.  If
+                 rcfile is a relative pathname, use the file name as found in
+                 the $DRIVER directory.
+
+       -S        Skip the assembly and link steps. Leave the output from the
+                 compile step in a file named file.s for each file named, for
+                 instance, file.f.  See also -o.
+
+       -show     Produce help information describing the current pgf90
+                 configuration.
+
+       -silent   Do not print warning messages. Same as -Minform=severe.
+
+       -time     Print execution times for the various steps in the compiler
+                 itself.
+
+       -V        Display version messages and other information.
+
+       -V<ver>   If the specified version of the compiler is installed, that
+                 version of the compiler is invoked.
+
+       -v        Verbose mode; print out the command line for each tool before
+                 it is executed.
+
+       --version Display version messages and other information.
+
+       -w        Do not print warning messages.
+
+       -Wpass,option[,option...]
+                 Pass option to the specified pass.  Each comma-delimited
+                 option is passed as a separate argument.  The passes are:
+
+                 h         for the Fortran 90/95 front end,
+
+                 0         for the compiler back end,
+
+                 a         for the assembler,
+
+                 i         for the interprocedural analyzer, and
+
+                 l         for the linker.
+
+       -Ypass,directory
+                 Look in directory for pass pass, rather than in the standard
+                 area. The passes are:
+
+                 h         Search for the Fortran 90/95 front end executable
+                           in directory.
+
+                 0         Search for the compiler back end executable in
+                           directory.
+
+                 a         Search for the assembler executable in directory.
+
+                 C         Search for the compiler library in directory.
+
+                 i         Search for the InterProcedural Analyzer (IPA) in
+                           directory.
+
+                 l         Search for the linker in directory.
+
+                 I         Set the compiler’s standard include directory to
+                           directory.  The standard include directory is set
+                           to a default value by the driver and can be
+                           overridden by this option.
+
+                 L         If the linker supports the -YL option, then pass
+                           the option -YL,directory to the linker. Otherwise,
+                           use directory as the standard library location.
+
+                 S         Search for the startup object files in directory.
+
+                 U         If the linker supports the -YU option, then pass
+                           the option -YU,directory to the linker. Otherwise
+                           this option is ignored.
+
+
+Optimization Options
+       -fast  Chooses generally optimal flags for the target platform.  Use
+              pgf90 -fast -help to see the equivalent switches.  Note this
+              sets the optimization level to a minimum of 2; see -O.
+
+       -fastsse
+              Chooses generally optimal flags for a processor that supports to
+              vectorize for the SSE/AVX instructions.  Use pgf90 -fastsse
+              -help to see the equivalent switches.
+
+       -fPIC  Equivalent to -fpic; provided for compatibility with other
+              compilers.
+
+       -fpic  (Linux only) Instructs the compiler to generate position-
+              independent code which can be used to create shared object files
+              (dynamically linked libraries).
+
+       -KPIC  Equivalent to -fpic; provided for compatibility with other
+              compilers.
+
+       -Kpic  Equivalent to -fpic; provided for compatibility with other
+              compilers.
+
+       -Mcache_align
+              Align unconstrained data objects of size greater than or equal
+              to 16 bytes on cache-line boundaries.  An unconstrained object
+              is a variable or array that is not a member of an aggregate
+              structure or common block, is not allocatable, and is not an
+              automatic array.
+
+       -Mconcur[=option[,option,...]]
+              Instructs the compiler to enable auto-concurrentization of
+              loops.  This also sets the optimization level to a minimum of 2;
+              see -O.  If -Mconcur is specified, multiple processors will be
+              used to execute loops which the compiler determines to be
+              parallelizable.  When linking, the -Mconcur switch must be
+              specified or unresolved references will occur. The
+              OMP_NUM_THREADS or NCPUS environment variables control how many
+              processors will be used to execute parallelized loops.  The
+              options can be one or more of the following:
+
+              allcores  Use all available cores when the environment variables
+                        OMP_NUM_THREADS and NCPUS are not set.  This must be
+                        specified at link time.
+
+              bind      Bind threads to cores or processors.  This must be
+                        specified at link time.
+
+              altcode:n noaltcode
+                        Generate (don’t generate) alternate scalar code for
+                        parallelized loops.  The parallelizer generates scalar
+                        code to be executed whenever the loop count is less
+                        than or equal to n.  If noaltcode is specified, the
+                        parallelized version of the loop is always executed
+                        regardless of the loop count.
+
+              altreduction[:n]
+                        Generate alternate scalar code for parallelized loops
+                        containing a reduction.  If a parallelized loop
+                        contains a reduction, the parallelizer generates
+                        scalar code to be executed whenever the loop count is
+                        less than or equal to n.
+
+              assoc (default) noassoc
+                        Enable (disable) parallelization of loops with
+                        reductions.
+
+              cncall nocncall (default)
+                        Assume (don’t assume) that loops containing calls are
+                        safe to parallelize. Also, no minimum loop count
+                        threshold must be satisfied before parallelization
+                        will occur, and last values of scalars are assumed to
+                        be safe.
+
+              dist:block
+                        Parallelize with block distribution. Contiguous blocks
+                        of iterations of a parallelizable loop are assigned to
+                        the available processors.
+
+              dist:cyclic
+                        Parallelize with cyclic distribution. The outermost
+                        parallelizable loop in any loop nest is parallelized.
+                        If a parallelized loop is innermost, its iterations
+                        are allocated to processors cyclically. For example,
+                        if there are 3 processors executing a loop, processor
+                        0 performs iterations 0, 3, 6, etc; processor 1
+                        performs iterations 1, 4, 7, etc; and processor 2
+                        performs iterations 2, 5, 8, etc.
+
+              innermost noinnermost (default)
+                        Enable (disable) parallelization of innermost loops.
+
+              levels:n  Parallelize loops nested at most n levels deep; the
+                        default is 3.
+
+              numa nonuma
+                        (Linux only) Use (don’t use) thread/processor affinity
+                        for NUMA architectures; use this option when linking
+                        the program.  -Mconcur=numa will link in a numa
+                        library and objects to prevent the operating system
+                        from migrating threads from one processor to another.
+
+       -Mdepchk (default) -Mnodepchk
+              Assume (don’t assume) that potential data dependencies exist.
+              -Mnodepchk may result in incorrect code.
+
+       -Mdse -Mnodse (default)
+              Enable (disable) the dead store elimination optimization.
+
+       -Mextract=[option[,option,...]]
+              Run the subprogram extraction phase to prepare for inlining.
+              The =lib:filename option must be used with this switch to name
+              an extract library.  See -Minline for more details on inlining.
+
+              subprogram[,subprogram]
+                     A non-numeric option not containing a period is assumed
+                     to be the name of a subprogram to be extracted.
+
+              name:subprogram[,subprogram]
+                     Specifies the name of a subprogram or subprograms to be
+                     extracted.
+
+              lib:directory
+                     Specifies the name of a directory to contain the
+                     extracted subprograms; this directory will be created if
+                     it does not exist.
+
+              [size:]number
+                     A numeric option is assumed to be a size.  Functions
+                     containing number or less statements are extracted.  If
+                     both number and function are specified, then functions
+                     matching the given name(s) or meeting the size
+                     requirements, are extracted.
+
+       -Mfma -Mnofma (default)
+              Generate (don’t generate) fused multiply-add (FMA) instructions
+              for targets that support it.  FMA instructions are generally
+              faster than separate multiply-add instructions, and can generate
+              higher precision results since the multiply result is not
+              rounded before the addition.  However, because of this, the
+              result may be different than the unfused multiply and add
+              instructions.  FMA instructions are enabled with higher
+              optimization levels.
+
+       -Mframe -Mnoframe (default)
+              Set up (don’t set up) a true stack frame pointer for functions;
+              -Mnoframe allows slightly more efficient operation when a stack
+              frame is not needed, but some options override -Mnoframe.
+
+       -Minfo[=option[,option,...]]
+              Emit useful information to stderr. The options are:
+
+              all       Includes options accel, inline, ipa, loop, lre, mp,
+                        opt, par, unified, vect.
+
+              accel     Emit information about accelerator region targeting.
+
+              ccff      Append complete CCFF information to the object files.
+
+              ftn       Emit Fortran-specific information.
+
+              inline    Emit information about functions extracted and
+                        inlined.
+
+              intensity Emit compute intensity information about loops.
+
+              ipa       Emit information about the optimizations enabled by
+                        interprocedural analysis (IPA).
+
+              loop | opt
+                        Emit information about loop optimizations.  This
+                        includes information about vectorization and loop
+                        unrolling.
+
+              lre       Emit information about loop-carried redundancy
+                        elimination.
+
+              mp        Emit information about OpenMP parallel regions.
+
+              par       Emit information about loop parallelization.
+
+              pfo       Emit profile feedback information
+
+              time | stat
+                        Emit compilation statistics.
+
+              unified   Emit information about which routines are selected for
+                        target-specific optimizations using the PGI Unified
+                        Binary.
+
+              vect      Emit information about automatic loop vectorization.
+       With no options, -Minfo is the same as
+       -Minfo=accel,inline,ipa,loop,lre,mp,opt,par,unified,vect.
+
+       -Minline[=option[,option,...]]
+              Pass options to the function inliner. The options are:
+
+              lib:filename.ext
+                        Specify an inline library created by a previous
+                        -Mextract option.  Functions from the specified
+                        library are inlined.  If no library is specified,
+                        functions are extracted from a temporary library
+                        created during an extract prepass.
+
+              except:func
+                        Specifies which functions should not be inlined.
+
+              [name:]function
+                        A non-numeric option is assumed to be a function name.
+                        If name: is specified, what follows is always the name
+                        of a function.
+
+              [size:]number
+                        A numeric option is assumed to be a size.  Functions
+                        containing number or less statements are inlined.  If
+                        both number and function are specified, then functions
+                        matching the given name(s) or meeting the size
+                        requirements, are inlined.
+
+              levels:number
+                        number of levels of inlining are performed.  The
+                        default is 1.
+
+              reshape   For Fortran, the default is to not inline subprograms
+                        with array arguments if the array shape does not match
+                        the shape in the caller. This overrides the default.
+
+       -Minstrument [=option]
+              (linux86-64 only) Generate additional code to enable function-
+              level instrumentation.  This option implies -Minfo=ccff and
+              -Mframe.  The option is
+
+              functions (default)
+
+       -Mipa [=option[,option,...]] -Mnoipa (default)
+              Enable and specify options for InterProcedural Analysis (IPA).
+              Note: IPA is not compatible with parallel make environments
+              (e.g., pmake).  IPA also sets the optimization level to a
+              minimum of 2; see -O.  If no option list is specified, then it
+              is equivalent to -Mipa=const.  The options are:
+
+              align noalign (default)
+                        Enable (disable) recognition when pointer targets are
+                        all cache-line aligned, allowing better SSE code
+                        generation.
+
+              arg noarg (default)
+                        Remove (don’t remove) arguments replaced by
+                        -Mipa=ptr,const.  -Mipa=noarg implies
+                        -Mipa=nolocalarg.
+
+              cg nocg (default)
+                        Generate information for the pgicg call graph display
+                        tool.  Run pgicgexecutable to see the call graph
+                        information.
+
+              const (default) noconst
+                        Enable (disable) propagation of constants across
+                        procedure calls.
+
+              f90ptr nof90ptr (default)
+                        Enable (disable) Fortran 90 pointer disambiguation
+                        across procedure calls.
+
+              fast      Chooses generally optimal -Mipa flags for the target
+                        platform; use pgf90 -Mipa -help to see the equivalent
+                        options.
+
+              force     Force all objects to recompile regardless of whether
+                        IPA information has changed.
+
+              globals noglobals (default)
+                        Analyze (don’t analyze) which globals are modified by
+                        procedure calls.
+
+              inline:n  Determine additional functions to inline, allowing up
+                        to n levels of inlining.  Additional suboptions are:
+
+                        except:proc
+                            Disables inlining of procedure proc.
+
+                        nopfo
+                            Ignore any profile frequency information from
+                            -Mpfo when choosing which functions to inline.
+
+                        reshape noreshape (default)
+                            Enable (disable) Fortran inlining with mismatched
+                            array shapes.
+
+              ipofile   Save IPA information in a .ipo file instead of the
+                        default of appending the information to the object
+                        file.
+
+              jobs:n    Use up to n jobs in parallel to reoptimize object
+                        files.
+
+              keepobj (default) nokeepobj
+                        Keep (don’t keep) the optimized object files, using
+                        file name mangling, to reduce recompile time in
+                        subsequent application builds.
+
+              libc nolibc (default)
+                        Optimize calls to certain standard C library routines.
+
+              libinline nolibinline (default)
+                        Allow (don’t allow) inlining from routines in
+                        libraries; -Mipa=libinline implies -Mipa=inline.
+
+              libopt nolibopt (default)
+                        Allow (don’t allow) recompiling and reoptimizing
+                        routines from libraries with IPA information.
+
+              localarg nolocalarg (default)
+                        Enable (disable) feature to externalize local
+                        variables to allow arguments to be replaced by
+                        -Mipa=ptr.  -Mipa=localarg implies -Mipa=arg.
+
+              main:func Specify a function to serve as a global entry point;
+                        may appear multiple times; disables linking.
+
+              ptr noptr (default)
+                        Enable (disable) pointer disambiguation across
+                        procedure calls.
+
+              pure nopure (default)
+                        Detect (don’t detect) pure functions.
+
+              quiet     Don’t print out messages about which files are
+                        recompiled at link time.
+
+              reaggregation noreaggregation (default)
+                        Enable (disable) global struct reaggregation.  This
+                        can change the order of struct members, or split
+                        structs into multiple structs, to improve memory
+                        locality and cache utilization.
+
+              required  Return an error condition if IPA is inhibited for any
+                        reason, rather than the default behavior of linking
+                        without IPA optimization.
+
+              safe:[function|library]
+                        Declares that the named function, or all functions in
+                        the named library are safe; a safe procedure does not
+                        call back into the known procedures and does not
+                        change any known global variables.  Without
+                        -Mipa=safe, any unknown procedures will cause IPA to
+                        fail.
+
+              safeall nosafeall (default)
+                        Declares that all unknown functions are safe (not
+                        safe); see -Mipa=safe.
+
+              shape noshape (default)
+                        Perform (don’t perform) Fortran 90 shape propagation.
+
+              summary   Only collect IPA summary information when compiling;
+                        this prevents IPA optimization of this file, but
+                        allows optimization for other files linked with this
+                        file.
+
+              vestigial novestigial (default)
+                        Remove (don’t remove) functions that are not called.
+
+       -Mlre[=assoc|noassoc] -Mnolre
+              Enable (disable) loop-carried redundancy elimination.  The assoc
+              option allows expression reassociation, and the noassoc option
+              disallows expression reassociation.
+
+       -Mmovnt -Mnomovnt
+              Force (disable) generation of nontemporal moves.  -Mmovnt used
+              with -fastsse can sometimes be faster than -fastsse alone.  By
+              default nontemporal moves are generated for loops with large
+              loop counts.
+
+       -Mneginfo=option[,option...]
+              Instructs the compiler to produce information on why certain
+              optimizations are not performed.  Use the -Minfo flag instead.
+
+       -Mnoopenmp
+              When -mp is present, ignore the OpenMP pragmas.
+
+       -Mnosgimp
+              When -mp is present, ignore the SGI parallelization pragmas.
+
+       -Mnovintr
+              Do not generate vector intrinsic calls.
+
+       -Mpfi[=option]
+              Generate profile feedback instrumentation; this includes extra
+              code to collect run-time statistics to be used in a subsequent
+              compile; -Mpfi must also appear when the program is linked.
+              When the program is run, a profile feedback file pgfi.out will
+              be generated; see -Mpfo.  The allowed options are:
+
+              indirect noindirect (default)
+                        Enable (disable) collection of indirect function call
+                        targets, which can be used for indirect function call
+                        inlining.
+
+       -Mpfo[=option[,option,...]]
+              Enable profile feedback optimizations; there must be a profile
+              feedback file pgfi.out in the current directory, which contains
+              the result of an execution of the program compiled with -Mpfi.
+              The options are:
+
+              indirect noindirect (default)
+                        Enable (disable) indirect function call inlining; this
+                        requires a pgfi.out file generated from a binary built
+                        with -Mpfi=indirect.
+
+              layout (default) nolayout
+                        Enable (disable) basic block layout to take advantage
+                        of instruction cache locality by keeping hot paths
+                        close together.
+
+              dir=directory
+                        Specify the directory containing the pgfi.out profile
+                        feedback information file; the default is the current
+                        directory.
+
+       -Mpre -Mnopre (default)
+              Enable (disable) the partial redundancy elimination
+              optimization.
+
+       -Mprefetch[=option:n] -Mnoprefetch
+              Add (don’t add) prefetch instructions for those processors that
+              support them (Pentium 4, Opteron); -Mprefetch is default on
+              Opteron; -Mnoprefetch is default on other processors.  The
+              options are:
+
+              distance:d
+                        Set the fetch-ahead distance for prefetch instructions
+                        to d cache lines.
+
+              n:n       Set the maximum number of prefetch instructions to
+                        generate in a loop to n.
+
+              nta       Use the prefetchnta instruction.
+
+              plain     Use the prefetch instruction.
+
+              t0        Use the prefetcht0 instruction.
+
+              w         Allow the AMD-specific prefetchw instruction.
+
+       -Mprof[=option[,option,...]]
+              Set performance profiling options.  Use of these options will
+              cause the resulting executable to create a performance profile
+              that can be viewed and analyzed with the PGPROF performance
+              profiler.  In the descriptions below, PGI-style profiling
+              implies compiler-generated source instrumentation.  MPICH-style
+              profiling implies the use of instrumented wrappers for MPI
+              library routines.  The -Mprof options are:
+
+              ccff
+
+              dwarf     Generate limited DWARF symbol information sufficient
+                        for most performance profilers.
+
+              func      Perform PGI-style function level profiling.
+
+              hwcts     Generate a profile using event-based sampling of
+                        hardware counters via the PAPI interface (linux86-64
+                        only, PAPI must be installed).
+
+              lines     Perform PGI-style line level profiling.
+
+              mpich1    (PGI CDK only) Perform MPICH-style profiling for
+                        MPICH-1.  Implies -Mmpi=mpich1.  Use MPIDIR to point
+                        to the MPICH-1 libraries.  This flag is no longer
+                        fully supported.
+
+              mpich2    (PGI CDK only) Perform MPICH-style profiling for
+                        MPICH-2.  Implies -Mmpi=mpich2.  Use MPIDIR to point
+                        to the MPICH-1 libraries.  This flag is no longer
+                        fully supported.
+
+              mvapich1  (PGI CDK only) Perform MPICH-style profiling for
+                        MVAPICH.  Implies -Mmpi=mvapich1.  Use MPIDIR to point
+                        to the MPICH-1 libraries.  This flag is no longer
+                        fully supported.
+
+              sgimpi    (PGI CDK only) Perform MPICH-style profiling for the
+                        SGI MPI library.  Implies -Mmpi=sgimpi.
+
+              time      Generate a profile using time-based instruction-level
+                        statistical sampling. This is equivalent to -pg,
+                        except that the profile is saved in a file named
+                        pgprof.out instead of gmon.out.
+
+              On Linux systems that have OProfile installed, PGPROF supports
+              collection of performance data without recompilation. Use of
+              -Mprof=dwarf is useful for this mode of profiling.
+
+       -Mpropcond (default) -Mnopropcond
+              Enable (disable) propagation of constant values derived from
+              conditional branches with equality tests.
+
+       -Mquad Align large objects on quad-word boundaries.
+
+       -Msafe_lastval
+              In the case where a scalar is used after a loop, but is not
+              defined on every iteration of the loop, the compiler does not by
+              default parallelize the loop. However, this option tells the
+              compiler it is safe to parallelize the loop.
+
+       -Msmart -Mnosmart (default)
+              Enable (disable) optional AMD64-specific post-pass instruction
+              scheduling.
+
+       -Msmartalloc=option[,...] -Mnosmartalloc (default)
+              Add (don’t add) a call to the routine mallopt in the main
+              routine; this can have a dramatic impact on the performance of
+              programs that dynamically allocate memory.  To be effective,
+              this switch must be specified when compiling the file containing
+              the Fortran, C, or C++ main routine.  This is currently only
+              available on 64-bit Linux systems.  The behavior of -Msmartalloc
+              can be modified with the following options:
+
+              huge      Link in the huge page runtime library, so dynamic
+                        memory will be allocated in huge pages.
+
+              huge:n    Link in the huge page runtime library and allocate n
+                        huge pages.
+
+              hugebss   (x86-64 only) Link in the huge page runtime library
+                        and allocate the BSS section (containing uninitialized
+                        static symbols) in huge pages.  This requires that the
+                        huge page runtime library be linked dynamically, so
+                        the -rpath option for that directory will be added
+                        regardless of the setting of -Mnorpath.
+
+              nohuge    Override any previous -Msmartalloc=huge or
+                        -Msmartalloc=hugebss switches; do not link in the huge
+                        page runtime library.
+
+       -Mstride0 -Mnostride0 (default)
+              Generate (don’t generate) alternate code for a loop that
+              contains an induction variable whose increment may be zero.
+
+       -Munroll[=option[,option...]] -Mnounroll (default)
+              Invoke (don’t invoke) the loop unroller.  This also sets the
+              optimization level to a minimum of 2; see -O.  The option is one
+              of the following:
+
+              c:m       Instructs the compiler to completely unroll loops with
+                        a constant loop count less than or equal to m, a
+                        supplied constant.  If this value is not supplied, the
+                        m count is set to 4.  If m is set to 1, a compiler
+                        heuristic determines the maximum loop count at which
+                        such loops will be completely unrolled.
+
+              n:u       Instructs the compiler to unroll u times, a single-
+                        block loop which is not completely unrolled, or has a
+                        non-constant loop count.  If u is not supplied, the
+                        unroller computes the number of times a candidate loop
+                        is unrolled.
+
+              m:u       Instructs the compiler to unroll u times, a multi-
+                        block loop which is not completely unrolled, or has a
+                        non-constant loop count.  If u is not supplied, the
+                        unroller computes the number of times a candidate loop
+                        is unrolled.
+
+              -Mnounroll instructs the compiler not to unroll loops.
+
+       -Munsafe_par_align -Mnounsafe_par_align
+              Use (don’t use) aligned moves for array loads in parallelized
+              loops as long as the first element of the array is aligned; this
+              is only effective with -Mvect=simd.  It is unsafe because there
+              are situations where the array elements allocated to some
+              processors are not aligned.
+
+       -Mvect [=option[,option,...]] -Mnovect (default)
+              Pass options to the internal vectorizer.  This also sets the
+              optimization level to a minimum of 2, the equivalent of -O; for
+              more information see optimization levels under -O.  If no option
+              list is specified, then the following vector optimizations are
+              used: assoc,cachesize:c,nosimd, where c is the actual cache size
+              of the machine.  The -Mvect options are:
+
+              altcode (default) noaltcode
+                        Enable (disable) alternate code generation for vector
+                        loops, depending on such characteristics as array
+                        alignments and loop counts.
+
+              fuse nofuse (default)
+                        Enable (disable) loop fusion to combine adjacent loops
+                        into a single loop.
+
+              prefetch  Use prefetch instructions in loops where profitable.
+
+              simd[:128|256] nosimd (default)
+                        Use vector SIMD instructions (SSE, AVX) instructions.
+                        The argument may be used to limit usage to 128-bit
+                        SIMD instructions.  Specifying 256-bit SIMD
+                        instructions is only possible for target processors
+                        that support AVX.
+
+              uniform nouniform (default)
+                        Perform the same optimizations in the vectorized and
+                        residual loops.  This may affect the performance of
+                        the residual loop.
+
+              These options are also supported, but are not recommended for
+              use in new development, except by experienced users, and may be
+              phased out in future releases:
+
+              assoc (default) noassoc
+                        Enable (disable) certain associativity conversions
+                        that can change the results of a computation due to
+                        floating point roundoff error differences.  A typical
+                        optimization is to change the order of additions,
+                        which is mathematically correct, but can be
+                        computationally different, due to roundoff error.
+
+              cachesize:number (default=automatic)
+                        Instructs the vectorizer, when performing cache tiling
+                        optimizations, to assume a cache size of number.
+
+              gather (default) nogather
+                        Enable (disable) vectorization of loops with indirect
+                        array references.
+
+              idiom noidiom (default)
+                        Enable idiom recognition; this currently has no
+                        effect.
+
+              levels:n  Set maximum nest level of loops to optimize.
+
+              partial   Enable partial loop vectorization via innermost loop
+                        distribution.
+
+              short noshort (default)
+                        Enable (disable) recognition of short vector
+                        operations that arise from scalar code outside of
+                        loops or within the body of loops.
+
+              sizelimit[:number] nosizelimit (default)
+                        Limit the size of loops that are vectorized; the
+                        default is to attempt to vectorize all loops.
+
+              sse nosse (default)
+                        Use (don’t use) SSE, SSE2, 3Dnow, and prefetch
+                        instructions in loops where possible. The sse option
+                        is now deprecated, and the simd option should be used
+                        instead.
+
+              tile notile (default)
+                        Enable (disable) loop tiling to optimize for cache
+                        locality.
+
+       -Mnovect disables the vectorizer, and is the default.
+
+       -Mzerotrip (default) -Mnozerotrip
+              Include (don’t include) a zero-trip test for loops.  Use
+              -Mnozerotrip only when all loops are known to execute at least
+              once.
+
+       -mp[=option]
+              Interpret OpenMP directives to explicitly parallelize regions of
+              code for execution by multiple threads on a multi-processor
+              system. Most OpenMP directives as well as the SGI
+              parallelization directives are supported. See Chapters 5 and 6
+              of the PGI User’s Guide for more information on these
+              directives.  The options allowed are:
+
+              align noalign (default)
+                        Modify (don’t modify) default loop iteration
+                        scheduling to align iterations with array references.
+                        The default is to use simple static scheduling.
+
+              allcores  Use all available cores when the environment variables
+                        OMP_NUM_THREADS and NCPUS are not set.  This must be
+                        specified at link time.
+
+              bind      Bind threads to cores or processors.  This must be
+                        specified at link time.
+
+              numa nonuma
+                        Use (don’t use) libraries to give affinity between
+                        threads and processors; this is useful with NUMA (non-
+                        uniform memory access) parallel architectures, so
+                        memory allocated by a particular thread will be
+                        allocated close to that processor, and will remain
+                        close to that thread.  The default depends on the host
+                        machine.
+
+       -O[level]
+              Set the optimization level.  If -O is not specified, then the
+              default level is 1 if -g is not specified, and 0 if -g is
+              specified.  If a number is not supplied with -O then the
+              optimization level is set to 2.  The optimization levels and
+              their meanings are as follows:
+
+              -O0       Sets the optimization level to 0. A basic block is
+                        generated for each statement. No scheduling is done
+                        between statements. No global optimizations are
+                        performed.
+
+              -O1       Sets the optimization level to 1. Scheduling within
+                        extended basic blocks is performed. No global
+                        optimizations are performed.
+
+              -O        Sets the optimization level to 2, with no SIMD
+                        vectorization enabled.  All level 1 optimizations are
+                        performed. In addition, traditional scalar
+                        optimizations such as induction recognition and loop
+                        invariant motion are performed by the global
+                        optimizer.
+
+              -O2       All -O optimizations are performed. In addition, more
+                        advanced optimizations such as SIMD code generation,
+                        cache alignment and partial redundancy elimination are
+                        enabled.
+
+              -O3       All -O1 and -O2 optimizations are performed. In
+                        addition, this level enables more aggressive code
+                        hoisting and scalar replacement optimizations that may
+                        or may not be profitable.
+
+              -O4       All -O1, -O2, and -O3 optimizations are performed. In
+                        addition, hoisting of guarded invariant floating point
+                        expressions is enabled.
+
+       -pg    (Linux only) Enable gprof-style sample-based profiling; implies
+              -Mframe.
+
+
+Debugging Options
+       -C     Add array bounds checking; the same as -Mbounds.
+
+       -g     Generate symbolic debug information. This also sets the
+              optimization level to zero, unless a -O switch is present on the
+              command line. Symbolic debugging may give confusing results if
+              an optimization level other than zero is selected.  Using -O0
+              the generated code will be slower than code generated at other
+              optimization levels.
+
+       -gopt  Generate symbolic debug information, without affecting
+              optimizations.  This may give confusing results when debugging
+              with optimizations; it is intended for use with other tools that
+              use the debug information.
+
+       -Mbounds -Mnobounds (default)
+              Add (don’t add) array bound checking.
+
+       -Mchkfpstk
+              Check for internal consistency of the IA-32 floating point stack
+              in the prologue of a function and after returning from a
+              function or subroutine call. If the PGI_CONTINUE environment
+              variable is set, the stack will be automatically cleaned up and
+              execution will continue. There is a performance penalty
+              associated with the stack cleanup. If PGI_CONTINUE is set to
+              verbose, the stack will be automatically cleaned up and
+              execution will continue after a warning message is printed.
+
+       -Mchkptr
+              Check for unintended de-referencing of NULL pointers.
+
+       -Mchkstk
+              Check the stack for available space upon entry to and before the
+              start of a parallel region. Useful when many private variables
+              are declared.
+
+       -Mcoff Generate a COFF formatted object.
+
+       -Mdwarf1
+              (IA-32 only) Generate DWARF1 debug information with -g.
+
+       -Mdwarf2
+              Generate DWARF2 debug information with -g.
+
+       -Mdwarf3
+              Generate DWARF3 debug information with -g.
+
+       -Melf  Generate an ELF formatted object.
+
+       -Mnodwarf
+              Don’t add the default dwarf information.
+
+       -Mpgicoff -Mnopgicoff
+              Generate additional symbolic debug information.
+
+       -traceback (default) -notraceback
+              Add debug information for runtime traceback
+
+
+Preprocessor Options
+       -Dname[=def]
+              Define name to be def in the preprocessor. If def is missing, it
+              is assumed to be empty. If the = sign is missing, then name is
+              defined to be the string 1.
+
+       -E     Preprocess each .c file and send the result to standard output.
+              No compilation, assembly, or linking is performed.
+
+       -F     Stop after preprocessing.
+
+       -Idirectory
+              Add directory to the compiler’s search path for include files.
+              For include files surrounded by < >, each -I directory is
+              searched followed by the standard area. For include files
+              surrounded by " ", the directory containing the file containing
+              the #include directive is searched, followed by the -I
+              directories, followed by the standard area.
+
+       -Mcpp=[[no]comment|m|md|mm|mmd|mq:target|mt:target|suffix:suff]
+              Only runs the preprocessor on the input file(s); by default, the
+              output is written to file.i, unless renamed with the -o switch.
+              The options are:
+
+              comment nocomment
+                       Keep (don’t keep) C-style comments in the preprocessed
+                       output.
+
+              include:file
+                       Include this file before processing the source file.
+
+              m        Print makefile dependencies to stdout, a la -M.
+
+              md       Print makefile dependencies to file.d, a la -MD.
+
+              mm       Print makefile dependencies to stdout, ignoring system
+                       includes (includes with angle braces), a la -MM.
+
+              mmd      Print makefile dependencies to file.d, ignoring system
+                       includes (includes with angle braces), a la -MMD.
+
+              mq:’target’
+                       Print makefile dependencies to stdout, a la -MQ.
+
+              mt:target
+                       Print makefile dependencies to stdout, a la -MT.
+
+              line     Include line numbers into the preprocessed output.
+
+              suffix:suff
+                       When generating makefile dependencies, name the
+                       dependent file file.suff; the default is to name the
+                       dependent file file.o.
+
+       -Mnostddef
+              Do not predefine any macros to the preprocessor.
+
+       -Mnostdinc
+              Do not search in the standard location for include files when
+              those files are not found elsewhere.
+
+       -Mpreprocess
+              Run the preprocessor on Fortran or assembler source files.  By
+              default, the preprocessor is run when the source’s suffix is
+              .fpp, .F, .F90, .F95, or .HPF.
+
+       -Uname Remove the definition of the name macro in the preprocessor.
+
+       -Yi,directory
+              Look in directory for the interprocedural analyzer.
+
+       -Yp,directory
+              Look in directory for the preprocessor executable.
+
+
+Assembler Options
+       -Wa,option[,option...]
+              Pass each comma-delimited option to the assembler.
+
+       -Ya,directory
+              Look in directory for the assembler executable.
+
+
+Linker Options
+       -acclibs
+              Link-time option to add the accelerator libraries to the link
+              line.
+
+       --as-needed --no-as-needed
+              (Linux only; not supported by all linkers) Passed to the linker.
+              Instructs the linker to only set the DT_NEEDED flag for
+              subsequent shared libraries, requiring those libraries at run
+              time, if they are used to satisfy references.  --no-as-needed
+              restores the default behavior.
+
+       -Bdynamic
+              (Linux only) Passed to the linker to specify dynamic binding.
+
+       -Bstatic
+              (Linux only) Passed to the linker to specify static binding.
+
+       -Bstatic_pgi
+              (Linux only) Statically link in the PGI libraries, while using
+              dynamic linking for the system libraries; implies -Mnorpath.
+
+       -cudalibs
+              Link-time option to add the CUDA runtime API library.
+
+       -g77libs
+              (Linux only) Link-time option which allows object files
+              generated by GNU g77 (or gcc) to be linked in to pgf90 main
+              programs.
+
+       -Ldirectory
+              Passed to the linker; add directory to the list of directories
+              in which the linker searches for libraries.
+
+       -llibrary
+              Passed to the linker; load the library liblibrary.a from the
+              standard library directory.  See also the -L option.
+
+       -m     Cause the linker to display a link map.
+
+       -Mcudalib[=libname[,libname...]
+              Add the names CUDA libraries to the link line.  -Mcudalib will
+              use the version of the library appropriate to the CUDA version
+              being used.  The libraries recognized are:
+
+              cublas
+
+              cufft
+
+              curand
+
+              cusparse
+
+       -Meh_frame -Mnoeh_frame
+              Add (don’t add) arguments to the link line to preserve the stack
+              frame information for zero-cost exception handling frames.  The
+              default is -Mnoeh_frame unless changed in a site or user rcfile.
+
+       -Mlfs  (32-bit Linux only) Link in the Large File Support routines
+              available on Linux versions later than Red Hat 7.0 or SuSE 7.1.
+              This will support files from Fortran I/O that are larger than
+              2GB. Equivalent to -L$PGI/linux86/16.1/liblf.
+
+       -Mmpi=option
+              (PGI CDK only) -Mmpi adds the include and library options to the
+              compile and link commands necessary to build an MPI application
+              using MPI libraries installed with the PGI Cluster Development
+              Kit (CDK). -Mmpi inserts -I$MPIDIR/include into the compile
+              line, and -L$MPIDIR/lib -lfmpich -lmpich into the link line.
+              The specified option is used to determine whether to select
+              MPICH-1 or MPICH-2 headers and libraries. The base directories
+              for MPICH-1 and MPICH-2 are set in localrc.  The -Mmpi options
+              are:
+
+              mpich     Use the MPICH v3.0 libraries; if MPIDIR is set, the
+                        MPI libraries in that directory are used.  mpich1 Use
+                        the MPICH-1 libraries.  Deprecated; requires that
+                        MPIDIR be set to the MPICH v1 directory.
+
+              mpich2    Use the MPICH-2 libraries.  Deprecated; requires that
+                        MPIDIR be set to the MPICH v2 directory.
+
+              mvapich1  Use the MVAPICH libraries.  Deprecated; requires that
+                        MPIDIR be set to the MVAPICH directory.
+
+              sgimpi    Use the SGI MPI libraries.
+
+              The user can set the environment variables MPIDIR and MPILIBNAME
+              to override the default values for the MPI directory and library
+              name.
+
+       -Mnostartup
+              Do not link in the usual startup routine. This routine contains
+              the entry point for the program.
+
+       -Mnostdlib
+              Do not link in the standard libraries when linking a program.
+
+       -Mrpath (default) -Mnorpath
+              The default is to add -rpath to the link line giving the
+              directories containing the PGI shared objects.  Use -Mnorpath to
+              instruct the driver not to add any -rpath switches to the link
+              line.
+
+       -Mscalapack
+              (PGI CDK only) Add the Scalapack libraries.
+
+       -pgc++libs
+              Link-time option to add the C++ runtime libraries, allowing
+              mixed-language programming.
+
+       -pgcpplibs
+              Link-time option to add the C++ runtime libraries, allowing
+              mixed-language programming.
+
+       -pgf77libs
+              Link-time option to add the pgf77 runtime libraries, allowing
+              mixed-language programming.
+
+       -pgf90libs
+              Link-time option to add the pgf90 runtime libraries, allowing
+              mixed-language programming.
+
+       -Rdirectory
+              Passed to the linker; instructs the linker to hard-code the
+              pathname directory into the search path for generated shared
+              object files. Note that there cannot be a space between R and
+              directory .
+
+       -r     Passed to the linker; generate a re-linkable object file.
+
+       -rpath directory
+              Passed to the linker to add the directory to the runtime shared
+              library search path.
+
+       -s     Passed to the linker; strip symbol table information.
+
+       -shared
+              (Linux only) Passed to the linker. Instructs the linker to
+              generate a shared object file (dynamically linked library).
+              Implies -fpic.
+
+       -soname name
+              (Linux only) Passed to the linker. When creating a shared
+              object, instructs the linker to set the internal DT_SONAME field
+              to the specified name.
+
+       -uname Passed to the linker; generate undefined reference.
+
+       --whole-archive --no-whole-archive
+              (Linux only) Passed to the linker.  Instructs the linker to
+              include all objects in subsequent archive files.
+              --no-whole-archive restores the default behavior.
+
+       -Wl,option[,option...]
+              Pass each comma-delimited option to the linker.
+
+       -YC,directory
+              Look in directory for the standard compiler library files.
+
+       -Yl,directory
+              Look in directory for the linker.
+
+       -Yl,directory
+              Look in directory for the linker.
+
+       -YS,directory
+              Look in directory for the standard system startup object files.
+
+       -YU,directory
+              Passed to the linker; change library search path.
+
+
+Language Options
+       -asmsuffix=suffix
+              Define that a file with the given suffix is an assembly language
+              file.
+
+       -byteswapio
+              Swap bytes from big-endian to little-endian or vice versa on
+              input/output of unformatted Fortran data. Use of this option
+              enables reading/writing of Fortran unformatted data files
+              compatible with those produced on Sun or SGI systems.
+
+       -csuffix=suffix
+              Define that a file with the given suffix is a C source file.
+
+       -fsuffix=suffix
+              Define that a file with the given suffix is a Fortran source
+              file.
+
+       -FSUFFIX=suffix
+              Define that a file with the given suffix is a Fortran source
+              file.
+
+       -i2    Treat INTEGER variables as two bytes.
+
+       -i4    Treat INTEGER variables as four bytes.
+
+       -i8    Treat default INTEGER and LOGICAL variables as eight bytes.  For
+              operations involving integers, use 64-bits for computations.
+
+       -i8storage
+              Allocates 8 bytes for INTEGER and LOGICAL.
+
+       -Mallocatable[=95|03]
+              Select whether to use Fortran 1995 or Fortran 2003 semantics for
+              assignments to allocatable objects and allocatable components of
+              derived types.  Fortran 1995 semantics require the user to
+              allocate the object or component and that an array object or
+              component be conformant before the assignment.  Fortran 2003
+              semantics require the compiler to add code to check whether the
+              object or component is allocated and whether an array object is
+              conformant before the assignment, and to allocate or reallocate
+              if not.
+
+       -Mbackslash -Mnobackslash (default)
+              Treat (don’t treat) backslash as a normal (non-escape) character
+              in strings.  -Mnobackslash causes the standard C backslash
+              escape sequences to be recognized in quoted strings; -Mbackslash
+              causes the backslash to be treated like any other character.
+
+       -Mbyteswapio
+              Swap bytes from big-endian to little-endian or vice versa on
+              input/output of unformatted Fortran data. Use of this option
+              enables reading/writing of Fortran unformatted data files
+              compatible with those produced on Sun or SGI systems.
+
+       -Mcray=pointer
+              Force Cray Fortran (CF77) compatibility with respect to the
+              listed options.  Possible options include:
+
+              pointer   For purposes of optimization, assume that pointer-
+                        based variables do not overlap the storage of any
+                        other variable.
+
+       -Mcuda[=option[,option...]
+              Enable CUDA Fortran extensions, and link with the CUDA Fortran
+              libraries.  -Mcuda is required on the link line if there are no
+              CUDA Fortran source files specified on the command line.  The
+              options are:
+
+              emu       Enable emulation mode; in emulation mode, all code is
+                        executed on the host processor, allowing host-level
+                        debugging.
+
+              cc20 cc30 cc35 cc50
+                        Generate code for a device with compute capability
+                        2.0, 3.0, 3.5 or 5.0.
+
+              fermi kepler maxwell
+                        Generate code for a Fermi (compute capability 2.0),
+                        Kepler (compute capability 3.x) or Maxwell (compute
+                        capability 5.x) device.
+
+              cuda7.0 (default) cuda7.5
+                        Use the CUDA 7.0 (default) or 7.5 toolkit to build the
+                        GPU code.
+
+              7.0 7.5   Aliases for -Mcuda=cuda7.0 and -Mcuda=cuda7.5.
+
+              fastmath  Use the faster (but lower precision) versions of math
+                        library routines.
+
+              flushz noflushz (default)
+                        Enable (disable) flush-to-zero mode on the GPU.
+
+              fma nofma Generate (do not) fused multiply-add operations.  This
+                        is enabled by default at optimization level -O3.
+
+              keepbin   Keep the generated CUDA binary files, with a .bin
+                        suffix.
+
+              keepgpu   Keep the generated CUDA GPU source files, with a .gpu
+                        suffix.
+
+              keepptx   Keep the generated portable assembly files, with a
+                        .ptx suffix.
+
+              lineinfo nolineinfo (default)
+                        Generate debugging line information.
+
+              loadcache:[L1|L2]
+                        Generate code to cache global memory loads in the L1
+                        or L2 hardware cache.
+
+              madconst  Generate code so that module array descriptors are
+                        placed in CUDA constant memory.  The array descriptor
+                        holds the bounds for allocatable arrays and array
+                        pointers.  Putting these in CUDA constant memory makes
+                        accesses much faster, but prevents any modifications
+                        from device code.
+
+              maxregcount:n
+                        Set the maximum number of registers to use in the
+                        generated GPU code.
+
+              ptxinfo   Print the resource usage for each kernel routine from
+                        the PTX assembler.
+
+              rdc (default) nordc
+                        Generate relocatable device code for separate
+                        compilation, and invoke the device linker before the
+                        host linker at the link step.
+
+              unroll nounroll
+                        Automatically (do not) unroll inner loops.  This is
+                        enabled by default at optimization level -O3.
+       Note that multiple compute capabilities can be specified, and one
+       version will be generated for each capability specified.
+
+       -Mdalign (default) -Mnodalign
+              Align (don’t align) doubles in structures on 8-byte boundaries.
+              -Mnodalign may lead to data alignment exceptions.
+
+       -Mdclchk -Mnodclchk (default)
+              Require (don’t require) that all variables be declared.
+
+       -Mdefaultunit -Mnodefaultunit (default)
+              Treat (don’t treat) ’*’ as stdout/stdin regardless of the status
+              of units 6/5.  -Mnodefaultunit causes * to be a synonym for 5 on
+              input and 6 on output; -Mdefaultunit causes * to be a synonym
+              for stdin on input and stdout on output.
+
+       -Mdlines -Mnodlines (default)
+              Treat (don’t treat) lines beginning with D in column 1 as
+              executable statements, ignoring the D.
+
+       -Mdollar=char
+              Set the character used to replace dollar signs in names to be
+              char.  Default is an underscore (_).
+
+       -Mextend
+              Allow 132-column source lines.
+
+       -Mfixed
+              Process Fortran source using fixed form specifications.  The
+              -Mfree options specify free form formatting.  By default files
+              with a .f or .F extension use fixed form formatting.
+
+       -Mfree -Mfreeform -Mnofree -Mnofreeform
+              Process Fortran source using free form specifications.  The
+              -Mnofree and -Mfixed options specify fixed form formatting.  By
+              default files with a .f90, .F90, .f95 or .F95 extension use
+              freeform formatting.
+
+       -Mi4 (default) -Mnoi4
+              Treat (don’t treat) INTEGER as INTEGER*4.  -Mnoi4 treats INTEGER
+              as INTEGER*2.
+
+       -Miomutex -Mnoiomutex (default)
+              Generate (don’t generate) critical section calls around Fortran
+              I/O statements.
+
+       -Mlibsuffix=suffix
+              Define that a file with the given suffix is an object library
+              file.
+
+       -Mllalign -Mnollalign (default)
+              Align (don’t align) long longs or INTEGER*8 in structures or
+              common blocks on 8-byte boundaries.  -Mnollalign is the default,
+              and this is a change beginning with release 4.0. Releases prior
+              to 4.0 aligned long longs on 8-byte boundaries.
+
+       -Mnomain
+              When the link step is called, don’t include the object file
+              which calls the Fortran main program. Useful for using the pgf90
+              driver to link programs with the main program written in C or
+              C++ and one or more subroutines written in Fortran.
+
+       -Mobjsuffix=suffix
+              Define that a file with the given suffix is a binary object
+              file.
+
+       -Monetrip -Mnoonetrip (default)
+              Force (don’t force) each DO loop to be iterated at least once.
+
+       -Mr8 -Mnor8 (default)
+              Treat (don’t treat) REAL as DOUBLE PRECISION and real constants
+              as double precision constants.
+
+       -Mr8intrinsics [=float]-Mnor8intrinsics (default)
+              Treat (don’t treat) the intrinsics CMPLX as DCMPLX and REAL as
+              DBLE.
+
+              float     Also treat the FLOAT intrinsic as DBLE.
+
+       -Mrecursive -Mnorecursive (default)
+              Allocate (don’t allocate) local variables on the stack, thus
+              allowing recursion. SAVEd, data-initialized, or namelist members
+              are always allocated statically, regardless of the setting of
+              this switch.
+
+       -Mref_externals -Mnoref_externals (default)
+              Force (don’t force) references to names appearing in EXTERNAL
+              statements.
+
+       -Msave -Mnosave (default)
+              Assume (don’t assume) that all local variables are subject to
+              the SAVE statement.  -Msave may allow many older Fortran
+              programs to run but can greatly reduce performance.
+
+       -Msignextend (default) -Mnosignextend
+              Sign extend (don’t sign extend) when a narrowing conversion
+              overflows.  For example, when -Msignextend is in effect and an
+              integer containing the value 65535 is converted to a short, the
+              value of the short will be -1.  ANSI C specifies that the result
+              of such conversions are undefined.
+
+       -Mstack_arrays -Mnostack_arrays (default)
+              Allocate automatic arrays on the stack (on the heap).
+
+       -Mstandard
+              Flag non-ANSI-Fortran usage.
+
+       -Munixlogical -Mnounixlogical (default)
+              When -Munixlogical is in effect, a logical is considered to be
+              .TRUE.  if its value is non-zero and .FALSE.  otherwise.  When
+              -Mnounixlogical is in effect (the default), a logical considered
+              to be .TRUE.  if its value is odd and .FALSE.  if its value is
+              even.
+
+       -Mupcase -Mnoupcase (default)
+              Preserve (don’t preserve) case in names.  -Mnoupcase causes all
+              names to be converted to lower case. Note that, if -Mupcase is
+              used, then variable name ’X’ is different than variable name
+              ’x’, and keywords must be in lower case.
+
+       -module directory
+              Save/search for module files in directory
+
+       -r4    Interpret DOUBLE PRECISION variables as REAL.
+
+       -r8    Interpret REAL variables as DOUBLE PRECISION.  Equivalent to
+              using the options -Mr8 and -Mr8intrinsics.
+
+       -Wh,option[,option...]
+              Pass each comma-delimited option to the Fortran 90/95 front end.
+
+
+Target-specific Options
+       -acc   Enable OpenACC pragmas and directives to explicitly parallelize
+              regions of code for execution by accelerator devices.  See the
+              -ta flag to select target accelerators for which to compile.
+              The options are:
+
+              autopar (default) noautopar
+                        Enable loop autoparallelization within parallel
+                        constructs.
+
+              routineseq noroutineseq (default)
+                        Compile every routine for the device, as if it had a
+                        routine seq directive.
+
+              sync      Ignore async clauses, and run every data transfer and
+                        kernel launch on the default sync queue.
+
+              wait nowait (default)
+                        Wait for each compute kernel to finish.
+
+       -Kieee -Knoieee (default)
+              Perform floating-point operations in strict conformance with the
+              IEEE 754 standard.  Some optimizations are disabled with -Kieee,
+              and a more accurate math library is used.  The default -Knoieee
+              uses faster but very slightly less accurate methods.
+
+       -Ktrap=[option,[option]...]
+              Controls the behavior of the processor when exceptions occur.
+              Possible options include
+
+              align   Trap on memory alignment errors, currently ignored.
+
+              denorm  Trap on denormalized operands.
+
+              divz    Trap on divide by zero.
+
+              fp      Trap on floating point exceptions.
+
+              inexact Trap on inexact result.
+
+              inv     Trap on invalid operation.
+
+              none (default)
+                      Disable all traps.
+
+              ovf     Trap on floating point overflow.
+
+              unf     Trap on floating point underflow.
+       -Ktrap is only processed when compiling a main function/program.
+       -Ktrap=fp is equivalent to -Ktrap=divz,inv,ovf.  These options
+       correspond to the processor’s exception mask bits.  Normally, the
+       processor’s exception mask bits are on, meaning floating-point
+       exceptions are masked; the processor recovers from the exception and
+       continues.  If a mask bit is off (unmasked) and the corresponding
+       exception occurs, execution terminates with floating point exception
+       (Linux FPE signal).
+
+       -Mdaz -Mnodaz
+              Enable (disable) mode to treat denormalized floating point
+              numbers as zero.  -Mdaz is default for -tp p7 -m64 targets;
+              -Mnodaz is default otherwise.
+
+       -Mflushz -Mnoflushz
+              Set floating point operations to flush-to-zero mode; -Mflushz is
+              set at optimization level -O2 and higher.
+
+       -Mfpapprox [=option[,option,...]] -Mnofpapprox (default)
+              Perform (don’t perform) certain single-precision floating point
+              operations using low-precision approximation.  This can be very
+              dangerous; the low-precision approximations are much faster than
+              the full precision computation, but the results will be
+              different.  This option should be used only with the utmost
+              care.  The options are
+
+              div       Approximate single precision floating point division.
+
+              rsqrt     Approximate single precision floating point reciprocal
+                        square root.
+
+              sqrt      Approximate single precision floating point square
+                        root.
+       With no options, -Mfpapprox will approximate all three operations.
+
+       -Mfpmisalign -Mnofpmisalign
+              Allow (don’t allow) vector arithmetic instructions with memory
+              operands that are not aligned on 16-byte boundaries.
+
+       -Mfprelaxed [=option[,option,...]] -Mnofprelaxed (default)
+              Perform (don’t perform) certain floating point operations using
+              relaxed precision when it improves speed.  The options are
+
+              div       Perform divide using relaxed precision.
+
+              intrinsic Perform certain intrinsic functions using relaxed
+                        precision.
+
+              order noorder
+                        Allow (don’t allow) expression reordering, including
+                        factoring such as computing a*b+a*c as a*(b+c).
+
+              recip     Perform reciprocal operations using relaxed precision.
+
+              rsqrt     Perform reciprocal square root (1/sqrt) using relaxed
+                        precision.
+
+              sqrt      Perform square root using relaxed precision.
+       With no options, -Mfprelaxed will choose to generate relaxed precision
+       code for those operations that generate a significant performance
+       improvement, depending on the target processor.
+
+       -Mfunc32 (default) -Mnofunc32
+              Align (don’t align) functions on 32 byte boundaries.
+
+       -Mlarge_arrays -Mnolarge_arrays (default)
+              (linux86-64 only). Allow (don’t allow) arrays larger than 2GB;
+              -Mlarge_arrays is default with -mcmodel=medium.
+
+       -Mlongbranch -Mnolongbranch (default)
+              Enable (disable) long branches.
+
+       -Mloop32 -Mnoloop32 (default)
+              Align (don’t align) innermost loops on 32 byte boundaries for
+              -tp barcelona.
+
+       -Msecond_underscore -Mnosecond_underscore (default)
+              Add (don’t add) a second underscore to the name of a Fortran
+              global if its name already contains an underscore. This option
+              is useful for maintaining compatibility with g77, which adds a
+              second underscore to such symbols by default.
+
+       -Mvarargs -Mnovarargs (default)
+              (x86-64 only) Generate code for calls made from Fortran to C
+              routines to use varargs calling sequence.
+
+       -Mwritable-strings
+              Store string constants in the writable data segment.
+
+       -m32   Compile for 32-bit target.
+
+       -m64   Compile for 64-bit target.
+
+       -mcmodel=small|medium
+              (AMD64 and Intel 64 only) Use the memory model that limits
+              objects to less than 2GB (small) or allows data sections to be
+              larger than 2GB (medium); implies -Mlarge_arrays
+
+       -pc=val
+              The IA-32 architecture implements a floating-point stack using 8
+              80-bit registers. Each register uses bits 0-63 as the
+              significand, bits 64-78 for the exponent, and bit 79 is the sign
+              bit. This 80-bit real format is the default format (called the
+              extended format).  When values are loaded into the floating
+              point stack they are automatically converted into extended real
+              format.  The precision of the floating point stack can be
+              controlled, however, by setting the precision control bits (bits
+              8 and 9) of the floating control word appropriately. In this
+              way, the programmer can explicitly set the precision to standard
+              IEEE double using 64 bits, or to single precision using 32 bits.
+              The default precision setting is system dependent.  If you use
+              -pc to alter the precision setting for a routine, the main
+              program must be compiled with the same value for -pc.  The
+              command line option -pc val lets the programmer set the
+              compiler’s precision preference. Valid values for val are:
+                  32 single precision
+                  64 double precision
+                  80 extended precision
+              Operations performed exclusively on the floating point stack
+              using extended precision, without storing into or loading from
+              memory, can cause problems with accumulated values within the
+              extra 16 bits of extended precision values.  This can lead to
+              answers, when rounded, that do not match expected results.
+
+       -ta=target
+              Specify the type of the accelerator to which to target
+              accelerator regions; accepted values are
+
+              -ta=tesla
+                      Compile the accelerator regions for a CUDA-enabled
+                      NVIDIA GPU.  Additional suboptions valid after -ta=tesla
+                      are:
+
+                      cc20 cc30 cc35 cc50
+                          Generate code for a device with compute capability
+                          2.0, 3.0, 3.5 or 5.0.
+
+                      fermi kepler maxwell
+                          Generate code for a Fermi (compute capability 2.0),
+                          Kepler (compute capability 3.x) or Maxwell (compute
+                          capability 5.x) device.
+
+                      cuda7.0 (default) cuda7.5
+                          Use the CUDA 7.0 (default) or 7.5 toolkit to build
+                          the GPU code.
+
+                      7.0 7.5
+                          Aliases for -Mcuda=cuda7.0 and -Mcuda=cuda7.5.
+
+                      fastmath
+                          Enable the fast math library, which includes faster,
+                          but lower precision, implementations of certain math
+                          and intrinsic functions.
+
+                      flushz noflushz (default)
+                          Enable (disable) flush-to-zero mode on the GPU.
+
+                      fma nofma
+                          Generate (do not) fused multiply-add operations.
+                          This is enabled by default at optimization level
+                          -O3.
+
+                      keepbin
+                          Keep the generated CUDA binary, with a .bin suffix.
+
+                      keepgpu
+                          Keep the generated CUDA GPU source files, with a
+                          .gpu suffix.
+
+                      keepptx
+                          Keep the generated portable assembly files, with a
+                          .ptx suffix.
+
+                      lineinfo nolineinfo (default)
+                          Generate debugging line information.
+
+                      llvm (default) nollvm
+                          Compile using the LLVM device code generator or the
+                          CUDA C code generator.
+
+                      loadcache:[L1|L2]
+                          Generate code to cache global memory loads in the L1
+                          or L2 hardware cache.
+
+                      maxregcount:n
+                          Set the maximum number of registers to use in the
+                          generated GPU code.
+
+                      managed (Beta feature)
+                          Allocate any dynamically allocated data in CUDA
+                          Unified (managed) memory.  This option must appear
+                          in both the compile and link lines.  This may not be
+                          used with -ta=tesla:pinned.
+
+                      pinned
+                          Allocate any dynamically allocated data in CUDA
+                          Pinned host memory.  This option must appear in both
+                          the compile and link lines.  This may not be used
+                          with -ta=tesla:managed.
+
+                      rdc (default) nordc
+                          Generate (do not generate) relocatable device code
+                          for separate compilation, and invoke the device
+                          linker before the host linker at the link step.
+
+                      unroll nounroll
+                          Automatically (do not) unroll inner loops.  This is
+                          enabled by default at optimization level -O3.
+              Note that multiple compute capabilities can be specified, and
+              one version will be generated for each capability specified.
+              The default is equivalent to -ta=tesla:fermi+.
+
+              -ta=multicore (beta feature)
+                      Compile the OpenACC compute regions for parallel
+                      execution across the cores of the host multicore CPU.
+
+              -ta=nvidia
+                      This flag is equivalent to -ta=tesla, and has all the
+                      same suboptions.
+
+              -ta=radeon
+                      Compile the accelerator regions for an AMD Radeon GPU.
+                      Additional suboptions valid after -ta=radeon are:
+
+                      tahiti
+                          Generate code for AMD Tahiti architecture GPUs.
+
+                      capeverde
+                          Generate code for AMD Cape Verde architecture GPUs.
+
+                      spectre
+                          Generate code for AMD Spectre architecture APUs.
+
+                      buffercount:n
+                          Specify the number of OpenCL buffers to use for the
+                          device; the same value must be used on all OpenACC
+                          source files to generate useful code.  The default
+                          value is 3.
+
+                      keep
+                          Keep the generated OpenCL source files.
+              Multiple AMD GPU architectures can be specified.  The default is
+              -ta=radeon:tahiti.
+
+              -ta=host
+                      Compile the accelerator regions to run sequentially on
+                      the host processor.
+
+              The default in the absence of the -ta flag is to ignore the
+              accelerator directives and compile for the host.  Multiple
+              targets are allowed, such as -ta=tesla,host, in which case code
+              is generated for the NVIDIA GPU as well as the host for each
+              accelerator region.
+
+       -tp=target
+              Specify the type of the target processor; possibilities are
+
+              -tp=k8  AMD Opteron or Athlon-64
+
+              -tp=barcelona
+                      AMD Barcelona processor
+
+              -tp=shanghai
+                      AMD Shanghai architecture Opteron processor
+
+              -tp=istanbul
+                      AMD Istanbul architecture Opteron processor
+
+              -tp=bulldozer
+                      AMD Bulldozer processor
+
+              -tp=piledriver
+                      AMD Piledriver architecture Opteron processor
+
+              -tp=p7  Intel 64 processor
+
+              -tp=core2
+                      Intel core2 processor
+
+              -tp=penryn
+                      Intel Penryn architecture Pentium processor
+
+              -tp=nehalem
+                      Intel Nehalem architecture Core processor
+
+              -tp=sandybridge
+                      Intel SandyBridge architecture Core processor
+
+              -tp=haswell
+                      Intel Haswell architecture processor
+
+              -tp=px  Blended code generation that will work on any
+                      x86-compatible processor
+
+              -tp=x64 Equivalent to -tp=k8,p7.
+
+              The default in the absence of the -tp flag is to compile for the
+              type of CPU on which the compiler is running.  Where available,
+              -tp=target-64 is equivalent to -m64 -tp=target, and
+              -tp=target-32 is equivalent to -m32 -tp=target.  When 32- and
+              64-bit targets are available for a target, -tp=target by itself
+              will compile for a 32-bit or 64-bit target depending on whether
+              the 32-bit or 64-bit compiler is invoked from your command line
+              path.
+
+FILES
+       a.out       executable output file
+       pgpf.out    Profile feedback data file; see -Mpfi
+       pgprof.out  PGPROF output file; see -Mprof
+       file.a      library of object files
+       file.f      fixed-format Fortran source file
+       file.F      fixed-format Fortran source file that requires
+                   preprocessing
+       file.f90    free-format Fortran source file
+       file.F90    free-format Fortran source file that requires preprocessing
+       file.f95    free-format Fortran source file
+       file.F95    free-format Fortran source file that requires preprocessing
+       file.f03    free-format Fortran source file
+       file.F03    free-format Fortran source file that requires preprocessing
+       file.for    fixed-format Fortran source file
+       file.fpp    fixed-format Fortran source file that requires
+                   preprocessing
+       file.cuf    free-format CUDA Fortran source file
+       file.CUF    free-format CUDA Fortran source file that requires
+                   preprocessing
+       file.ipa    InterProcedural Analyzer (IPA) file
+       file.ipo    InterProcedural Analyzer (IPA) file
+       file.o      object file
+       file.s      assembler source file
+       .mypgf90rc  You may add custom switches or make other additions to
+                   pgf90 by creating a file named .mypgf90rc in your home
+                   directory.
+
+       The installation of this version of the compiler resides in
+       $PGI/target/16.1/; other versions may coexist in $PGI/target/release/.
+       $PGI is an environment variable that points to the root of the compiler
+       installation directory. If $PGI is not set, the default is /usr/pgi.
+       The target is one of the following:
+       linux86     for 32-bit IA32 Linux targets
+       linux86-64  for 64-bit AMD64 or Intel 64 Linux targets
+
+       The compiler installation subdirectories are:
+       bin/        compiler and tool executables and configuration (rc) files
+       include/    compiler include files
+       lib/        libraries and object files
+       liblf/      libraries and object files
+
+SEE ALSO
+       pgcc (1), pgCC (1), pgf77 (1), pghpf (1), pgprof (1), pgdbg (1), and
+       the PGI User’s Guide.
+
+DIAGNOSTICS
+       The compiler produces information and error messages as it translates
+       the input program. The linker and assembler may issue their own error
+       messages.
+
+
+
+                                 January 2016                         pgf90(1)
+
+Generation:
+
+mantohtml pgf90
+

@@ -4,8 +4,7 @@ set PGICUDA=C:\Program Files\PGI\win64\2019\cuda\9.2
 set INCL="-I%PGILIB%\include" "-I%PGICUDALIB%\include"
 set LIBDIRS="-Wl,/libpath:%PGILIB%\lib" "-Wl,/libpath:%PGICUDALIB%\lib\x64"
 set LIBS=cufft.lib
-REM set OPTS=-Mpreprocess -DGPU -Dsingle_precision -Bstatic -Mlarge_arrays -Mbackslash -Mfree -mp -Mcuda=cuda9.2,ccall -tp=px-64 -Minform=warn -fast
-set OPTS=-Mpreprocess -DGPU -Dsingle_precision -Bstatic -Mlarge_arrays -Mbackslash -Mfree -mp -Mcuda=cuda9.2,ccall -fast
+set OPTS=-Mpreprocess -DGPU -Dsingle_precision -Bstatic -Mbackslash -Mfree -mp -Mcuda=cuda9.2,ccall -fast -tp=px-64 
 set OBJDIR=x64\objgpu
 set OUTDIR=x64\Release
 set OUTNAME=muSTEM_GPU
