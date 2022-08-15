@@ -18,11 +18,11 @@
 !   Date:           August 2017
 !   Requirements:   PGI Fortran
 !
-!   version:        5.3  
+!   version:        6.0  
 !  
-!  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
+!  Copyright (C) 2022  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes, J. Barthel
 !
-!  Includes modifications by J. Barthel and L. J. Allen (2019 - 2022)
+!  v6.0 includes modifications by J. Barthel and L. J. Allen (2019 - 2022)
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -82,23 +82,20 @@
        &1x,'|     | $$  \$ | $$ \$$    $$ \$$    $$  | $$   | $$     \| $$  \$ | $$      |',/,&
        &1x,'|      \$$      \$$  \$$$$$$   \$$$$$$    \$$    \$$$$$$$$ \$$      \$$      |',/,&
        &1x,'|                                                                            |',/,&
-       &1x,"|       Copyright (C) 2017 L.J. Allen, H.G. Brown, A.J. D'Alfonso,           |",/,&
-       &1x,'|              S.D. Findlay, B.D. Forbes                                     |',/,&
-	   &1x,'|       email: hamish.brown@monash.edu                                       |',/,&
+       &1x,"|       Copyright (C) 2022 L.J. Allen, H.G. Brown, A.J. D'Alfonso,           |",/,&
+       &1x,'|              S.D. Findlay, B.D. Forbes, J. Barthel                         |',/,&
+	     &1x,'|       email: hamish.brown@monash.edu                                       |',/,&
        &1x,'|       This program comes with ABSOLUTELY NO WARRANTY;                      |',/,&
        &1x,'|                                                                            |',/,&
        &1x,'|       This program is licensed to you under the terms of the GNU           |',/,&
-	   &1x,'|       General Public License Version 3 as published by the Free            |',/,&
-	   &1x,'|       Software Foundation.                                                 |',/,&
+	     &1x,'|       General Public License Version 3 as published by the Free            |',/,&
+	     &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 5.3 (20210906-0852)                                      |',/,&
-       &1x,'|             modified by J. Barthel and L. J. Allen to include              |',/,&
-       &1x,'|             plasmon scattering, additional subshells for ionization,       |',/,&
-	   &1x,'|             and some other minor correction                                |',/,&
-	   &1x,'|           ! absorptive model calculations are known to crash occasionally  |',/,&
+       &1x,'|       GPU Version 6.0 (20220815)                                           |',/,&
+  	   &1x,'|           ! absorptive model calculations are known to crash occasionally  |',/,&
 #else
-       &1x,'|       CPU only Version 5.3                                                 |',/,&
+       &1x,'|       CPU only Version 6.0                                                 |',/,&
 #endif
        &1x,'|                                                                            |',/,&
        &1x,'|       Note: pass the argument "nopause" (without quotation marks)          |',/,&
