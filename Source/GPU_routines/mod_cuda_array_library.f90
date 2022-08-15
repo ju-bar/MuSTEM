@@ -33,6 +33,8 @@ module cuda_array_library
     interface cuda_multiplication
 	    module procedure cuda_complex_multiplication
 	    module procedure cuda_real_multiplication
+		module procedure cuda_complex_factorized_multiplication
+		module procedure cuda_cshifted_complex_multiplication
 	end interface cuda_multiplication
 
     interface cuda_addition
@@ -130,6 +132,26 @@ module cuda_array_library
     end subroutine cuda_real_scale
     
     
+    attributes(global) subroutine cuda_complex_factorized_multiplication(dTemp, e1Temp, e2Temp,fTemp, scale, n, m)
+    
+        implicit none
+     
+        integer(4),value :: n, m, ix, iy
+        real(fp_kind),value :: scale
+        complex(fp_kind),dimension(n,m) :: dTemp, fTemp
+		complex(fp_kind)::e1Temp(n),e2Temp(m)
+    
+        ix = (blockIdx%y-1)*blockDim%y + threadIdx%y
+        iy = (blockIdx%x-1)*blockDim%x + threadIdx%x
+
+        if (ix <= m) then
+             if (iy <= n) then
+                fTemp(iy,ix) = dTemp(iy,ix) * e1Temp(iy)*e2Temp(ix) * scale      
+            endif
+        endif   
+    
+    end subroutine cuda_complex_factorized_multiplication
+    
     
     attributes(global) subroutine cuda_complex_multiplication(dTemp, eTemp, fTemp, scale, n, m)
     
@@ -149,6 +171,25 @@ module cuda_array_library
         endif   
     
     end subroutine cuda_complex_multiplication
+
+    attributes(global) subroutine cuda_cshifted_complex_multiplication(dTemp, eTemp, fTemp, scale, n, m,nshifty,nshiftx)
+    
+        implicit none
+     
+        integer(4),value :: n, m, ix, iy,nshifty,nshiftx
+        real(fp_kind),value :: scale
+        complex(fp_kind),dimension(n,m) :: dTemp, eTemp, fTemp
+    
+        ix = (blockIdx%y-1)*blockDim%y + threadIdx%y
+        iy = (blockIdx%x-1)*blockDim%x + threadIdx%x
+
+        if (ix <= m) then
+             if (iy <= n) then
+                fTemp(iy,ix) = dTemp(iy,ix) * eTemp(modulo(iy-1+nshifty,n)+1,modulo(ix-1+nshiftx,m)+1) * scale      
+            endif
+        endif   
+    
+    end subroutine cuda_cshifted_complex_multiplication
     
     
 
