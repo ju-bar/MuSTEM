@@ -1,10 +1,10 @@
 @echo off
 set PGILIB=C:\Program Files\PGI\win64\19.4
-set PGICUDA=C:\Program Files\PGI\win64\2019\cuda\9.2
+set PGICUDA=C:\Program Files\PGI\win64\2019\cuda\10.1
 set INCL="-I%PGILIB%\include" "-I%PGICUDALIB%\include"
 set LIBDIRS="-Wl,/libpath:%PGILIB%\lib" "-Wl,/libpath:%PGICUDALIB%\lib\x64"
 set LIBS=cufft.lib
-set OPTS=-Mpreprocess -DGPU -Dsingle_precision -Bstatic -Mbackslash -Mfree -mp -Mcuda=cuda9.2,ccall -fast -tp=px-64 
+set OPTS=-Mpreprocess -DGPU -Dsingle_precision -Bstatic -Mbackslash -Mfree -mp -Mcuda=cuda10.1,ccall -fast -tp=px-64 -Minform=warn -O3
 set OBJDIR=x64\objgpu
 set OUTDIR=x64\Release
 set OUTNAME=muSTEM_GPU

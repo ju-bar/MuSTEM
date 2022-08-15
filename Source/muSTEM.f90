@@ -364,10 +364,11 @@
         num_threads = max(1, int(num_cpu / 2))
         
         call omp_set_num_threads(num_threads)
-        
+#ifdef GPU
+#else
         call dfftw_init_threads()
         call dfftw_plan_with_nthreads(num_threads)
-        
+#endif
         call command_line_title_box('CPU multithreading')
         write(*,*) 'The number of available logical CPUs is: ' // to_string(num_cpu)
         write(*,*) 'The number of threads being used on the CPU is: ' // to_string(num_threads)
