@@ -1,24 +1,30 @@
-#  μSTEM <img src="https://raw.githubusercontent.com/HamishGBrown/MuSTEM/master/Manual/Figures/350x350_inelastic_cbed.png" width="64" height="64" />
+#  μSTEM <img src="https://github.com/ju-bar/MuSTEM/blob/master/Manual/Figures/350x350_inelastic_cbed.png" width="64" height="64" />
 
 μSTEM is a transmission electron microscopy (TEM) simulation suite, in particular for scanning transmission electron microscopy (STEM) images, that was developed mainly at the University of Melbourne. The computing suite is based on the multislice
-method. More detail can be found in the [manual](https://github.com/HamishGBrown/MuSTEM/raw/master/Manual/muSTEM_manual.pdf) and the following scientific paper:
+method. More detail can be found in the [manual](https://github.com/ju-bar/MuSTEM/blob/master/Manual/muSTEM_manual.pdf) and the following scientific paper:
 
 [Modelling the inelastic scattering of fast electrons,
 L.J. Allen, A.J. D'Alfonso and S.D. Findlay,
 Ultramicroscopy, Vol. 151, pp. 11-22, (2015).](http://www.sciencedirect.com/science/article/pii/S0304399114002034)
 
-<img src="https://raw.githubusercontent.com/HamishGBrown/MuSTEM/master/Manual/Figures/512x512_out_PACBED.png" width="512" height="512" />
+<img src="https://github.com/ju-bar/MuSTEM/blob/master/Manual/Figures/512x512_out_PACBED.png" width="512" height="512" />
+
+This is a fork of the [original µSTEM repository](https://github.com/HamishGBrown/MuSTEM).
+
 ## Prerequisites
 
 ### GPU version
 
 * 64 bit windows OS
 * A CUDA enabled GPU with compute class 3.0 or greater
-* Version 9.0 of the [Nvidia CUDA toolkit](https://developer.nvidia.com/cuda-toolkit-archive), this installs the .dll files necessary to run the GPU versions of μSTEM. Future versions of μSTEM will likely use later versions (9.1 and above) of the CUDA toolkit so this is a site you might have to revisit in future.
+* Version 10.1 of the [Nvidia CUDA toolkit](https://developer.nvidia.com/cuda-toolkit-archive), this installs the .dll files necessary to run the GPU versions of μSTEM.
 
 #### To compile source code
 
 * [PGI Visual Fortran and Microsoft Visual Studio](https://www.pgroup.com/products/pvf.htm)
+* [Intel oneAPI Fortran Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html)
+* [Intel Math Kernel Library](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html)
+* [Microsoft Visual Studio (Community)](https://visualstudio.microsoft.com/de/vs/community/)
 
 ### CPU version
 
@@ -26,26 +32,27 @@ Ultramicroscopy, Vol. 151, pp. 11-22, (2015).](http://www.sciencedirect.com/scie
 
 #### To compile source code
 
-* Any Fortran 90 compiler and FFTW libraries
+* Any Fortran 90 compiler, FFTW libraries, or the Intel MKL
 
 ## Precompiled executables
 
-Precompiled executables can be found in the [Executables](https://github.com/HamishGBrown/MuSTEM/raw/master/Executables) folder of the repository or by clicking the links below:
+Precompiled executables can be found in the [Executables](https://github.com/ju-bar/MuSTEM/tree/master/Executables) folder of the repository or by clicking the links below:
 
-* [**CPU** single precision](https://github.com/HamishGBrown/MuSTEM/raw/master/Executables/CPU_muSTEM_x64_v5.3_single_precision.zip)
-* [**CPU** double precision](https://github.com/HamishGBrown/MuSTEM/raw/master/Executables/CPU_muSTEM_x64_v5.3_double_precision.zip)
-* [**GPU** single precision](https://github.com/HamishGBrown/MuSTEM/raw/master/Executables/CUDA_muSTEM_x64_v5.3_single_precision.zip)
-* [**GPU** single precision for legacy graphics cards](https://github.com/HamishGBrown/MuSTEM/raw/master/Executables/CUDA_muSTEM_x64_v5.3_single_precision_legacy.zip)
-* [**GPU** double precision](https://github.com/HamishGBrown/MuSTEM/raw/master/Executables/CUDA_muSTEM_x64_v5.3_double_precision.zip)
+### Current versions
+
+* [**CPU** single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CPU_muSTEM_x64_v6.0_single_precision.zip)
+* [**GPU** single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CUDA_muSTEM_x64_v6.0_single_precision.zip)
+
+**Remark:** The GPU version is distributed without the CUDA dynamic link libraries. The executable links to cudart64_101.dll and to cufft64_10.dll, which are distributed with the [NVIDIA CUDA Toolit Version 10.1](https://developer.nvidia.com/cuda-10.1-download-archive-base).
 
 ## Tutorial
 
-Click [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/HamishGBrown/MuSTEM/tree/master/Tutorial) to download the μSTEM tutorial calculations, powerpoint and activity sheet.
+Click [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/ju-bar/MuSTEM/tree/master/Tutorial) to download the μSTEM tutorial calculations, powerpoint and activity sheet.
 
 ### Compiling source code
 
 
-MuSTEM is built using the [PGI Fortran compiler and Microsoft Visual Studio 2015](https://www.pgroup.com/products/pvf.htm), please make sure that this software is correctly installed before proceeding. Create a new Visual Studio project and add the source code contained in this repository. The GPU version of the code requires the source files in the GPU_routines folder and the CPU only version of the code requires the source files in the CPU_routines folder. Modify the project properties so that Microsoft Visual Studio passes the following commands to the PGI compiler:
+The GPU version of MuSTEM is built using the [PGI Fortran compiler and Microsoft Visual Studio 2015](https://www.pgroup.com/products/pvf.htm), please make sure that this software is correctly installed before proceeding. Create a new Visual Studio project and add the source code contained in this repository. The GPU version of the code requires the source files in the GPU_routines folder and the CPU only version of the code requires the source files in the CPU_routines folder. Modify the project properties so that Microsoft Visual Studio passes the following commands to the PGI compiler:
 
 Build commands:
 
@@ -61,6 +68,11 @@ The links to the PGI CUDA libraries and Windows kits may need to be modified dep
 
 Some example simulations are included on the [MuSTEM website](http://tcmp.ph.unimelb.edu.au/mustem/download.php).
 
+The CPU version of MuSTEM can also be built using the
+* [Intel oneAPI Fortran Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html)
+* [Intel Math Kernel Library](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html)
+* [Microsoft Visual Studio (Community)](https://visualstudio.microsoft.com/de/vs/community/)
+Solution and project files are contained in this fork repository, ready to compile.
 
 ## Contributing
 
@@ -72,6 +84,7 @@ Please contact [Dr. Hamish Brown](https://github.com/HamishGBrown) with project 
 * **Dr. Adrian J D'Alfonso**
 * **Dr. Scott D Findlay**
 * **Dr. Ben D Forbes**
+* [**Dr. Juri Barthel**](https://github.com/ju-bar) - *Fork Maintainer*
 
 
 ## License
