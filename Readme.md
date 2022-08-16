@@ -40,6 +40,7 @@ Precompiled executables can be found in the [Executables](https://github.com/ju-
 
 ### Current versions
 
+**Version 6.0**
 * [**CPU** single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CPU_muSTEM_x64_v6.0_single_precision.zip)
 * [**GPU** single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CUDA_muSTEM_x64_v6.0_single_precision.zip)
 
