@@ -325,7 +325,195 @@ contains
 		r8_uniform_01 = real ( seed, kind = 8 ) * 4.656612875D-10
 
 		return
-	end function
+  end function
+  
+  
+!*****************************************************************************80
+!
+!! R8_PDF_REJ returns a pseudorandom R8 following a probability distribution
+!             function (PDF) given by samples x, y in arrays of length n.
+!
+!  Discussion:
+!
+!    An R8 is a real ( kind = 8 ) value.
+!
+!    For now, the input quantity SEED is an integer ( kind = 4 ) variable.
+!
+!    This routine implements the rejection sampling method.
+!
+!    It makes use of function R8_UNIFORM_01 to generate uniform random numbers
+!    for the range of samples x and y.
+!
+!    A random is x is accepted as return value if the random y is smaller than
+!    or equal to the value of y at x.
+!
+!    Linear interpolation is used between samples of x.
+!
+!    x is expected to be in ascending order with corresponding y = PDF(x).
+!
+!    It is not required to input a normalized PDF.
+!
+!  Licensing:
+!
+!    This code is distributed under the GNU LGPL license.
+!
+!  Modified:
+!
+!    23 August 2023
+!
+!  Author:
+!
+!    Juri Barthel
+!
+!  Reference:
+!
+!    rejection sampling:  https://en.wikipedia.org/wiki/Rejection_sampling
+!
+!  Parameters:
+!
+!    Input/output, integer ( kind = 4 ) SEED, the "seed" value, which should
+!    NOT be 0. On output, SEED has been updated.
+!
+!    Input, integer ( kind = 4 ) N, number of samples in following input.
+!    N must be greater than 0. N = 1 assumes a delta ditribution.
+!
+!    Input, real ( kind = 8 , dimension = (2,N) ) X,Y samples of Y=PDF(X) corresponding
+!    to the input X.
+!
+!    Output, real ( kind = 8 ) R8_PDF_REJ, a new pseudorandom variate,
+!    strictly in the range of minval(pdf(1,:)) and maxval(pdf(1,:)).
+!
+!
+  function r8_distr_rej ( seed, n, pdf )
+  
+		implicit none
+    
+    integer ( kind = 4 ), parameter :: num_rej_max = 1048576
+
+		integer ( kind = 4 ), intent(in) :: n
+    real ( kind = 8 ), intent(in), dimension(2,n) :: pdf
+		integer ( kind = 4 ), intent(inout) :: seed
+    real ( kind = 8 ) :: r8_distr_rej
+    real ( kind = 8 ) :: x0, x1, y0, y1 ! x and y ranges
+    real ( kind = 8 ) :: urn_x, urn_y ! uniform random numbers
+    real ( kind = 8 ) :: pdf_urn_x ! interpolated PDF value at urn_x
+    integer ( kind = 4 ) :: ip ! interpolation base
+    real ( kind = 8 ) :: frc ! interpolation step
+    integer ( kind = 4 ) :: irej ! rejection count
+    
+    if ( n == 0 ) then
+			write ( *, '(a)' ) ' '
+			write ( *, '(a)' ) 'R8_PDF_REJ - Fatal error!'
+			write ( *, '(a)' ) '  Input value of N = 0.'
+			stop 1
+    end if
+    
+    if ( n == 1 ) then ! delta distribution
+      
+      r8_distr_rej = pdf(1,1)
+      
+    end if
+    
+    if ( n > 1 ) then
+      
+      ! determine range of x samples
+      x0 = minval(pdf(1,:))
+      x1 = maxval(pdf(1,:))
+      ! determine range of y samples
+      y0 = minval(pdf(2,:))
+      y1 = maxval(pdf(2,:))
+      !
+      if (y0 < 0.0D+0 .or. y1 < 0.0D+0 ) then
+        write ( *, '(a)' ) ' '
+			  write ( *, '(a)' ) 'R8_PDF_REJ - Fatal error!'
+			  write ( *, '(a)' ) '  Negative probability input encountered.'
+			  stop 2
+      end if
+      
+      if (x1 > x0) then ! good range in x
+        
+        if (y1 > y0) then ! good range in y
+          
+          ! implement rejection sampling
+          do irej=1, num_rej_max
+            
+            ! get a random x, uniform sample of the x range
+            urn_x = x0 + (x1 - x0) * r8_uniform_01( SEED )
+            ! get a random y, uniform sample of the y range
+            urn_y = y0 * r8_uniform_01( SEED )
+            
+            ! get the value of the PDF a urn_x by linear interpolation
+            ! on the samples (x, y)
+            pdf_urn_x = 0.0D+0 ! init some value of the PDF, use zero to catch problems
+            do ip=1, n
+              
+              ! find first x sample that is bigger then urn_x
+              if ( pdf(1,ip) > urn_x ) then
+                
+                ! handle strange cases first
+                if ( ip == 1 ) then
+                  
+                  pdf_urn_x = pdf(2,1)
+                  
+                  exit ! exit loop over ip
+                  
+                else if ( ip > 1 .and. ip <= n ) then ! in interpolation range
+                  
+                  ! linear interpolation
+                  pdf_urn_x = pdf(2,ip-1) + ( pdf(2,ip) - pdf(2,ip-1) )  &
+                     / ( pdf(1,ip) - pdf(1,ip-1) ) * ( urn_x - pdf(1,ip-1) )
+                  
+                  exit ! exit loop over ip
+                  
+                end if
+                
+              end if
+              
+            end do
+            
+            ! loopexit, check whether this was because none of the if conditions aplied
+            if (ip > n) then
+              
+               pdf_urn_x = pdf(2,n) ! use end value
+               
+            end if
+            
+            ! acceptance ?
+            if ( urn_y <= pdf_urn_x ) then ! yes, accept this random x
+              
+              r8_distr_rej = urn_x
+              
+              return
+              
+            end if
+            
+          end do
+          
+          ! if the code gets to this point the number of rejections
+          ! is too large. Something is fishy here. Report a problem.
+          write ( *, '(a)' ) ' '
+			    write ( *, '(a)' ) 'R8_PDF_REJ - Fatal error!'
+			    write ( *, '(a)' ) '  Too many rejections.'
+			    stop 3
+          
+        else ! invalid range in y, assuming uniform distribution
+          
+          r8_distr_rej = x0 + (x1 - x0) * r8_uniform_01( SEED )
+          
+          return
+          
+        end if
+        
+      else ! invalid range in x, assuming delta distribution
+        
+        r8_distr_rej = pdf(1,1)
+        
+        return
+        
+      end if
+    end if
+  
+  end function
 	
 	
 
@@ -987,6 +1175,49 @@ contains
 		end do
 
 		return
-	end subroutine
+  end subroutine
+  
+  !
+  ! returns the integral of the curve described by points
+  ! calculated by the trapezoidal rule
+  ! https://en.wikipedia.org/wiki/Trapezoidal_rule
+  !
+  ! uses a double precision accumulator but input and
+  ! output is with precision "fp_kind"
+  !
+  ! INPUT
+  !   integer(4) n = number of points
+  !   real(fp_kind) points(2,n) = list of n tuples (x_i,y_i)
+  !
+  ! RETURNS
+  !   real(fp_kind) = the numerical integral for points
+  !
+  function trapz(n, points)
+  
+    implicit none
+    
+    integer(4), intent(in) :: n ! number of data points
+    real(fp_kind), intent(in) :: points(2, n) ! data points (x_i, y_i)
+    
+    real(fp_kind) :: trapz ! the integral
+    
+    integer(4) :: i
+    real(fp_kind) :: ym, dx
+    real(8) :: s
+    
+    s = 0.0D+0
+    
+    if (n > 1) then
+      do i=2, n
+        ym = 0.5_fp_kind * (points(2,i) + points(2,i-1))
+        dx = points(1,i) - points(1,i-1)
+        s = s + real(ym * dx, kind=8)
+      end do
+    end if
+    
+    trapz = real(s, kind=fp_kind)
+  
+  end function
+  
 
 end module

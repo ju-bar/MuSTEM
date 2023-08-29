@@ -905,29 +905,31 @@ module m_potential
     function make_qep_grates(idum) result(projected_potential)
     
         use m_precision, only: fp_kind
-	    use cufft_wrapper, only: fft2, ifft2
+	      use cufft_wrapper, only: fft2, ifft2
         use global_variables, only: nopiy, nopix, nt, relm, tp, ak, ak1, atf, high_accuracy, ci, pi, bwl_mat,fz
         use m_multislice
         use m_string, only: to_string
         use output, only: output_prefix,timing,binary_in
         use m_numerical_tools, only: displace
+        use pdos, only: get_rand_msd ! added with version 6.1 for PDOS Monte-Carlo (230829 J.B.)
 
         implicit none
         
         integer(4),intent(inout) :: idum
     
         complex(fp_kind) :: projected_potential(nopiy,nopix,n_qep_grates,n_slices),temp(nopiy,nopix),scattering_pot(nopiy,nopix,nt)
-		integer(4), allocatable :: handled(:,:)
-		integer(4):: save_list(2,nt),match_count, i, j, m, n,ii,jj,jjj,kk,iii
+		    integer(4), allocatable :: handled(:,:)
+		    integer(4):: save_list(2,nt),match_count, i, j, m, n,ii,jj,jjj,kk,iii, idum2
         real(fp_kind) :: tau_holder(3),tau_holder2(3),ccd_slice,ums,amplitude(nopiy,nopix),phase(nopiy,nopix)
-        real(fp_kind) :: mod_tau(3,nt,maxnat_slice,n_slices,n_qep_grates),t1, delta
+        real(fp_kind) :: mod_tau(3,nt,maxnat_slice,n_slices,n_qep_grates),t1, delta, msd
         logical::fracocc
     
         procedure(make_site_factor_generic),pointer :: make_site_factor
         
+        idum2 = idum ! added with version 6.1 for PDOS Monte-Carlo (230829 J.B.)
 	    
- 	 	!	Search for fractional occupancy
-         fracocc = any(atf(2,:).lt.0.99d0)
+ 	 	    !	Search for fractional occupancy
+        fracocc = any(atf(2,:).lt.0.99d0)
         
         t1 = secnds(0.0_fp_kind)
 
@@ -937,41 +939,54 @@ module m_potential
     198	    write(6,199) to_string(sum(nat_slice(:,j)))
     199     format(1x, 'Number of atoms in this slice: ', a) 
 
-		    ccd_slice = relm / (tp * ak * ss_slice(7,j))
+		      ccd_slice = relm / (tp * ak * ss_slice(7,j))
 
 	        do i = 1, n_qep_grates
-    200	        format(a1, 1x, i3, '/', i3)
-	            write(6,200, advance='no') achar(13), i, n_qep_grates
+    200	    format(a1, 1x, i3, '/', i3)
+	          write(6,200, advance='no') achar(13), i, n_qep_grates
           
-                ! Randomly displace the atoms
-				if (.not.fracocc) then
- 	            do m = 1, nt
-	                do n = 1, nat_slice(m,j)
-			            call displace(tau_slice(1:3,m,n,j),mod_tau(1:3,m,n,j,i),sqrt(atf(3,m)),a0_slice,idum)
-	                enddo
-                enddo
-				else
+        ! Randomly displace the atoms
+				if (.not.fracocc) then ! no fractional occ. displace all atoms
+ 	        do m = 1, nt
+	          do n = 1, nat_slice(m,j)
+              ! MSD <- PDOS Monte-Carlo (230829 J.B.)
+              msd = atf(3,m) ! (default) init from structure model
+              call get_rand_msd(idum2, m, msd) ! update randomly from PDOS module
+              !
+			        call displace(tau_slice(1:3,m,n,j),mod_tau(1:3,m,n,j,i),sqrt(msd),a0_slice,idum) ! "msd" changed (230829 J.B.)
+	          end do
+          end do
+				else ! displace but handle shared sites
 					allocate( handled(nt,maxnat_slice) )
 					handled = 0
 					do ii=1, nt
+           
 					 do jj = 1, nat_slice(ii,j)
-						 if (handled(ii,jj).eq.1) cycle
+						 if (handled(ii,jj).eq.1) cycle ! skip, shared site has been handled
 						 tau_holder(1:3) = tau_slice(1:3,ii,jj,j)
 
 						 save_list = 0
 						 match_count = 0
-						 ums = atf(3,ii)
+             ! MSD <- PDOS Monte-Carlo (230829 J.B.)
+             msd = atf(3,ii) ! (default) init from structure model
+             call get_rand_msd(idum2, ii, msd) ! update randomly from PDOS module
+             !
+						 ums = msd ! atf(3,ii), changed (230829 J.B.)
 						 do iii=ii+1,nt
-						 do jjj=1,nat_slice(iii,j)
-							if (same_site(tau_holder,tau_slice(1:3,iii,jjj,j))) then
-							   match_count = match_count+1
-							   save_list(1,match_count)=iii
-							   save_list(2,match_count)=jjj
-							   ums = ums + atf(3,iii)
-							   cycle
-							endif
-						 enddo
-						 enddo
+              do jjj=1,nat_slice(iii,j)
+						 	  if (same_site(tau_holder,tau_slice(1:3,iii,jjj,j))) then
+						 	    match_count = match_count+1
+							    save_list(1,match_count)=iii
+							    save_list(2,match_count)=jjj
+                  ! MSD <- PDOS Monte-Carlo (230829 J.B.)
+                  msd = atf(3,iii) ! (default) init from structure model
+                  call get_rand_msd(idum2, iii, msd) ! update randomly from PDOS module
+                  !
+							    ums = ums + msd ! atf(3,iii), changed (230829 J.B.)
+							    cycle
+							  end if
+              end do
+						 end do
 
 						 ums = ums / dfloat(match_count+1)
 					   call displace(tau_holder(1:3),tau_holder2(1:3),sqrt(ums),a0_slice,idum)
@@ -983,36 +998,37 @@ module m_potential
 							 handled(save_list(1,kk),save_list(2,kk)) = 1
 						 enddo
 						   
-					 enddo
-					 enddo
+					  enddo
+					enddo
 
-					 deallocate( handled )
+					deallocate( handled )
 				endif
 				
 				projected_potential(:,:,i,j) = 0
 				do m = 1, nt
-					projected_potential(:,:,i,j) = projected_potential(:,:,i,j)+real(potential_from_scattering_factors(CCD_slice*fz(:,:,m)&
-												&,mod_tau(:,m,1:nat_slice(m,j),j,i),nat_slice(m,j),nopiy,nopix,high_accuracy))
-                enddo
-	        enddo ! End loop over grates
+					projected_potential(:,:,i,j) = projected_potential(:,:,i,j) &
+            + real(potential_from_scattering_factors(CCD_slice*fz(:,:,m), &
+                  mod_tau(:,m,1:nat_slice(m,j),j,i),nat_slice(m,j),nopiy,nopix,high_accuracy))
+        enddo
+	    enddo ! End loop over grates
         
-            write(*,*)
-            write(*,*)
+      write(*,*)
+      write(*,*)
         
-	    enddo ! End loop over slices
+	  enddo ! End loop over slices
 	
-	    delta = secnds(t1)
+	  delta = secnds(t1)
         
-        write(*,*) 'The calculation of transmission functions for the QEP model took ', delta, 'seconds.'
-        write(*,*)
+    write(*,*) 'The calculation of transmission functions for the QEP model took ', delta, 'seconds.'
+    write(*,*)
 
-    	if(timing) then
+  	if(timing) then
 			open(unit=9834, file=trim(adjustl(output_prefix))//'_timing.txt', access='append')
 			write(9834, '(a, g, a, /)') 'The calculation of transmission functions for the QEP model took ', delta, 'seconds.'
 			close(9834)
-        endif    
+    endif    
     
-    end function make_qep_grates
+  end function make_qep_grates
 
 	logical(4) function same_site(site1,site2)
       

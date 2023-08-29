@@ -50,13 +50,14 @@
     enddo
     end subroutine
 
-      subroutine set_xtl_global_params()
+    subroutine set_xtl_global_params()
       use m_precision
       use global_variables
       use m_electron
       use m_user_input
-      use m_string, only:is_numeric
+      use m_string, only: is_numeric
       use m_crystallography, only: cryst, zone, subuvw, subhkl, rshkl, angle, trimr, trimi, rsd
+      use pdos
       
       implicit none
       
@@ -96,7 +97,7 @@
       rewind(iunit)
       
       nm = 0
-      ! Determine the maximum number of atoms an types to allocate the
+      ! Determine the maximum number of atoms and types to allocate the
       ! pertinent automatic objects stored in the module
       ! global_variables.	
       read(iunit,*) junk
@@ -111,7 +112,7 @@
                   read(iunit,*) junk5(1:3)
             enddo
       enddo
-      rewind(iunit)
+      rewind(iunit) ! to begin of file
       
       allocate(atf(3,nt),tau(3,nt,nm),nat(nt),atomf(13,nt),substance_atom_types(nt),fx(nt),dz(nt))
 
@@ -259,6 +260,11 @@
      &' Mott formula used for conversion to electron form factors', /)
 
         i_xtl=1     !set the flag ixtl=1 as in the file has been read
+      
+      ! scan the XTL file for PDOS data
+      call pd_scan_xtl(iunit, nt, substance_atom_types)
+      call pd_report(nt, substance_atom_types, atf)
+      
       close(iunit)
       goto 999
 998   write(6,*) 'ERROR: Crystal file ', trim(xtl_fnam), ' does not exist!'

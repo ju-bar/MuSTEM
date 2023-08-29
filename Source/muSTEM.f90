@@ -82,7 +82,7 @@
        &1x,'|     | $$  \$ | $$ \$$    $$ \$$    $$  | $$   | $$     \| $$  \$ | $$      |',/,&
        &1x,'|      \$$      \$$  \$$$$$$   \$$$$$$    \$$    \$$$$$$$$ \$$      \$$      |',/,&
        &1x,'|                                                                            |',/,&
-       &1x,"|       Copyright (C) 2022 L.J. Allen, H.G. Brown, A.J. D'Alfonso,           |",/,&
+       &1x,"|       Copyright (C) 2023 L.J. Allen, H.G. Brown, A.J. D'Alfonso,           |",/,&
        &1x,'|              S.D. Findlay, B.D. Forbes, J. Barthel                         |',/,&
 	     &1x,'|       email: hamish.brown@monash.edu                                       |',/,&
        &1x,'|       This program comes with ABSOLUTELY NO WARRANTY;                      |',/,&
@@ -95,7 +95,7 @@
        &1x,'|       GPU Version 6.0 (20220815)                                           |',/,&
   	   &1x,'|           ! absorptive model calculations are known to crash occasionally  |',/,&
 #else
-       &1x,'|       CPU only Version 6.0                                                 |',/,&
+       &1x,'|       CPU only Version 6.1                                                 |',/,&
 #endif
        &1x,'|                                                                            |',/,&
        &1x,'|       Note: pass the argument "nopause" (without quotation marks)          |',/,&
@@ -358,7 +358,7 @@
         integer*4 :: omp_get_max_threads, omp_get_num_procs
     
         num_cpu = omp_get_num_procs()
-        num_threads = max(1, int(num_cpu / 2))
+        num_threads = max(1, int(num_cpu - 2))
         
         call omp_set_num_threads(num_threads)
 #ifdef GPU

@@ -15,7 +15,7 @@
 				<Tool Name="VFPostBuildEventTool"/>
 				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
 		<Configuration Name="Debug|x64">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT)\include\fftw" PreprocessorDefinitions="single_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" WarnInterfaces="true" ByteRECL="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT)\include\fftw" PreprocessorDefinitions="double_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" WarnInterfaces="true" ByteRECL="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" GenerateDebugInformation="true" SubSystem="subSystemConsole"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -35,7 +35,7 @@
 				<Tool Name="VFPostBuildEventTool"/>
 				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
 		<Configuration Name="Release|x64">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT)\include\fftw" PreprocessorDefinitions="single_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" ByteRECL="true" UseMkl="mklParallel"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT)\include\fftw" PreprocessorDefinitions="double_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" ByteRECL="true" UseMkl="mklParallel"/>
 				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" SubSystem="subSystemConsole"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -54,6 +54,7 @@
 		<File RelativePath=".\m_lens.f90"/>
 		<File RelativePath=".\m_multislice.f90"/>
 		<File RelativePath=".\m_numerical_tools.f90"/>
+		<File RelativePath=".\m_pdos.f90"/>
 		<File RelativePath=".\m_plasmon.f90"/>
 		<File RelativePath=".\m_potential.f90"/>
 		<File RelativePath=".\m_precision.f90"/>

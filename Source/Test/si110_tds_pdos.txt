@@ -1,9 +1,7 @@
-Device used for calculation
-    0
 Output filename
-    si110\si110_pacbed_pl
+    si110\si110_pacbed_tds_pdos
 Input crystal file name
-    Si_110.xtl
+    Si_110_pdos.xtl
 Slice unit cell <1> yes <2> no
     1
 Number of distinct potentials
@@ -11,7 +9,7 @@ Number of distinct potentials
 <1> manual or <2> auto slicing
     2
 Thickness
-    245.72
+    122.86
 Scattering factor accuracy
     1
 Tile supercell x
@@ -39,21 +37,15 @@ Elastic and inelastic scattering output choice
 <0> Continue <1> Beam tilt <2> Specimen tilt
     0
 Number of phase grates calculated
-    100
+    200
 <1> choose more <2> phase ramp <3> no phase ramp
     3
 Number of Monte Carlo calculated
-    7
+    10
 Number of ran1 discarded
-    23829
+    230829
 Plasmon setup: <1> bulk plasmons <2> generic low-loss <3> none.
-    1
-Mean free path for single scattering in Angstroms
-    1100.000
-Bulk plasmon energy [eV]
-    17.00000
-Repeat plasmon setup? <0> No. <1> Yes.
-    0
+    3
 <0> continue <1> save <2> load
     0
 <1> CBED <2> STEM/PACBED
