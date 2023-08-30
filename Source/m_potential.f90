@@ -993,8 +993,7 @@ module m_potential
 						 mod_tau(1:3,ii,jj,j,i) = tau_holder2(1:3)
 						 handled(ii,jj) = 1
 						 do kk=1,match_count
-							 mod_tau(1:3,save_list(1,kk),save_list(2,kk),j,i)&
-				                                              &= tau_holder2(1:3)
+							 mod_tau(1:3,save_list(1,kk),save_list(2,kk),j,i) = tau_holder2(1:3)
 							 handled(save_list(1,kk),save_list(2,kk)) = 1
 						 enddo
 						   
