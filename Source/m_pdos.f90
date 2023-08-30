@@ -87,7 +87,7 @@ module pdos
   
     implicit none
     
-    real(fp_kind),parameter :: f1 = 0.0020900796_fp_kind ! prefactor hbar^2 / ( e u ) [A^2 eV Dalton]
+    real(fp_kind),parameter :: f1 = 0.0020900796_fp_kind ! prefactor hbar^2 / ( 2 e u ) [A^2 eV Dalton]
     real(fp_kind),parameter :: ft = 8.617333262145179e-05_fp_kind ! prefactor for thermal energy [eV K^(-1)]
     
     real(fp_kind), intent(in) :: ep, t, m
