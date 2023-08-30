@@ -62,11 +62,7 @@ module pdos
 	! - module constants
   integer(4),public,parameter :: pd_pdos_maxlen = 32768 ! max. length of the input PDOS
   real(8),public,parameter :: pd_ep_thr = 0.00001 ! phonon energy lower limit [eV]
-  real(fp_kind),public,parameter :: pd_atu = 1.66053906660e-27_fp_kind ! atomic mass unit u (1 Dalton) [kg]
-  real(fp_kind),public,parameter :: pd_hbar = 1.054571818e-34_fp_kind ! reduced Planck's constant [ J s ]
-  real(fp_kind),public,parameter :: pd_qel = 1.602176634e-19_fp_kind ! elementary charge [ C ]
-  real(fp_kind),public,parameter :: pd_kb = 1.380649e-23_fp_kind ! Boltzmann constant [J K^(-1)]
-	! - module parameters (variables)
+  ! - module parameters (variables)
 	integer(4),public :: pd_naty ! max. number of atom types to handle
   integer(4),public,allocatable :: pd_pdos_len(:) ! stores the length of each set of PDOS data (one set per atom type)
   real(fp_kind),public,allocatable :: pd_aty_mass(:) ! stores atomic mass in Dalton
@@ -91,14 +87,17 @@ module pdos
   
     implicit none
     
+    real(fp_kind),parameter :: f1 = 0.0020900796_fp_kind ! prefactor hbar^2 / ( e u ) [A^2 eV Dalton]
+    real(fp_kind),parameter :: ft = 8.617333262145179e-05_fp_kind ! prefactor for thermal energy [eV K^(-1)]
+    
     real(fp_kind), intent(in) :: ep, t, m
     real(fp_kind) :: pd_msd
-    real(fp_kind) :: ma, et, f1
+    real(fp_kind) :: et
     
-    ma = m * pd_atu ! mass in kg
-    et = t * pd_kb / pd_qel ! thermal energy in eV
-    f1 = 0.5e+20_fp_kind * pd_hbar**2 / ( pd_qel * ma ) ! hbar^2 / (2 q_el m), scale for ground state MSD [A^2 eV]
-    pd_msd = f1 / ep / tanh(0.5_fp_kind * ep / et) ! MSD at temperature
+    et = t * ft ! thermal energy in eV
+    !write(*,*) 'ep:', ep, '    et:',et
+    pd_msd = f1 / (ep * m * tanh(0.5_fp_kind * ep / et)) ! MSD at temperature
+    !write(*,*) 'pd_msd:',pd_msd
     return
     
   end function
@@ -315,6 +314,7 @@ module pdos
     real(8) :: ran_ep ! random phonon energy
     real(fp_kind) :: ep
     
+    !write(*,*) 'msd in :' , msd
     ntry = 0
     if (iaty > 0 .and. iaty <= pd_naty) then ! valid atom type index
       n = pd_pdos_len(iaty) ! table length
@@ -325,13 +325,16 @@ module pdos
           if (ntry > ntry_max) return ! infinity loop catch
           ntry = ntry + 1
           ran_ep = r8_distr_rej( seed, n, pd_pdos_samples(1:2, 1:n, iaty) ) ! random phonon energy from PDOS [eV]
+          !write(*,*) 'ran_ep :' , ran_ep
         end do
         ep = real( ran_ep, kind=fp_kind )
+        !write(*,*) 'ep :' , ep
         ! calculate MSD from ran_ep in [A^2] at temperature pd_aty_temp(iaty)
         ! and for mass pd_aty_mass(iaty)
         msd = pd_msd(ep, pd_aty_temp(iaty), pd_aty_mass(iaty))
       end if
     end if
+    !write(*,*) 'msd out:' , msd
     return
   end subroutine get_rand_msd
   
