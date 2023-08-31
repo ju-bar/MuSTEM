@@ -440,7 +440,7 @@ contains
             ! get a random x, uniform sample of the x range
             urn_x = x0 + (x1 - x0) * r8_uniform_01( SEED )
             ! get a random y, uniform sample of the y range
-            urn_y = y0 * r8_uniform_01( SEED )
+            urn_y = y1 * r8_uniform_01( SEED )
             
             ! get the value of the PDF a urn_x by linear interpolation
             ! on the samples (x, y)
@@ -471,7 +471,7 @@ contains
               
             end do
             
-            ! loopexit, check whether this was because none of the if conditions aplied
+            ! loopexit, check whether this was because none of the if conditions applied
             if (ip > n) then
               
                pdf_urn_x = pdf(2,n) ! use end value
