@@ -911,7 +911,6 @@ module m_potential
         use m_string, only: to_string
         use output, only: output_prefix,timing,binary_in
         use m_numerical_tools, only: displace
-        use pdos, only: get_rand_msd ! added with version 6.1 for PDOS Monte-Carlo (230829 J.B.)
 
         implicit none
         
@@ -919,14 +918,13 @@ module m_potential
     
         complex(fp_kind) :: projected_potential(nopiy,nopix,n_qep_grates,n_slices),temp(nopiy,nopix),scattering_pot(nopiy,nopix,nt)
 		    integer(4), allocatable :: handled(:,:)
-		    integer(4):: save_list(2,nt),match_count, i, j, m, n,ii,jj,jjj,kk,iii, idum2
+		    integer(4):: save_list(2,nt),match_count, i, j, m, n,ii,jj,jjj,kk,iii
         real(fp_kind) :: tau_holder(3),tau_holder2(3),ccd_slice,ums,amplitude(nopiy,nopix),phase(nopiy,nopix)
         real(fp_kind) :: mod_tau(3,nt,maxnat_slice,n_slices,n_qep_grates),t1, delta, msd
         logical::fracocc
     
         procedure(make_site_factor_generic),pointer :: make_site_factor
         
-        idum2 = idum ! added with version 6.1 for PDOS Monte-Carlo (230829 J.B.)
 	    
  	 	    !	Search for fractional occupancy
         fracocc = any(atf(2,:).lt.0.99d0)
@@ -949,11 +947,9 @@ module m_potential
 				if (.not.fracocc) then ! no fractional occ. displace all atoms
  	        do m = 1, nt
 	          do n = 1, nat_slice(m,j)
-              ! MSD <- PDOS Monte-Carlo (230829 J.B.)
               msd = atf(3,m) ! (default) init from structure model
-              call get_rand_msd(idum2, m, msd) ! update randomly from PDOS module
               !
-			        call displace(tau_slice(1:3,m,n,j),mod_tau(1:3,m,n,j,i),sqrt(msd),a0_slice,idum) ! "msd" changed (230829 J.B.)
+			        call displace(tau_slice(1:3,m,n,j),mod_tau(1:3,m,n,j,i),sqrt(msd),a0_slice,idum)
 	          end do
           end do
 				else ! displace but handle shared sites
@@ -967,22 +963,18 @@ module m_potential
 
 						 save_list = 0
 						 match_count = 0
-             ! MSD <- PDOS Monte-Carlo (230829 J.B.)
              msd = atf(3,ii) ! (default) init from structure model
-             call get_rand_msd(idum2, ii, msd) ! update randomly from PDOS module
              !
-						 ums = msd ! atf(3,ii), changed (230829 J.B.)
+						 ums = msd ! atf(3,ii)
 						 do iii=ii+1,nt
               do jjj=1,nat_slice(iii,j)
 						 	  if (same_site(tau_holder,tau_slice(1:3,iii,jjj,j))) then
 						 	    match_count = match_count+1
 							    save_list(1,match_count)=iii
 							    save_list(2,match_count)=jjj
-                  ! MSD <- PDOS Monte-Carlo (230829 J.B.)
                   msd = atf(3,iii) ! (default) init from structure model
-                  call get_rand_msd(idum2, iii, msd) ! update randomly from PDOS module
                   !
-							    ums = ums + msd ! atf(3,iii), changed (230829 J.B.)
+							    ums = ums + msd ! atf(3,iii)
 							    cycle
 							  end if
               end do

@@ -57,7 +57,6 @@
       use m_user_input
       use m_string, only: is_numeric
       use m_crystallography, only: cryst, zone, subuvw, subhkl, rshkl, angle, trimr, trimi, rsd
-      use pdos
       
       implicit none
       
@@ -260,10 +259,6 @@
      &' Mott formula used for conversion to electron form factors', /)
 
         i_xtl=1     !set the flag ixtl=1 as in the file has been read
-      
-      ! scan the XTL file for PDOS data
-      call pd_scan_xtl(iunit, nt, substance_atom_types)
-      call pd_report(nt, substance_atom_types, atf)
       
       close(iunit)
       goto 999

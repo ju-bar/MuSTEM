@@ -95,7 +95,7 @@
        &1x,'|       GPU Version 6.0 (20220815)                                           |',/,&
   	   &1x,'|           ! absorptive model calculations are known to crash occasionally  |',/,&
 #else
-       &1x,'|       CPU only Version 6.1                                                 |',/,&
+       &1x,'|       CPU only Version 6.0                                                 |',/,&
 #endif
        &1x,'|                                                                            |',/,&
        &1x,'|       Note: pass the argument "nopause" (without quotation marks)          |',/,&
