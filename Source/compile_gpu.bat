@@ -34,7 +34,6 @@ for %%f in (
 		m_numerical_tools.f90
 		m_crystallography.f90
 		m_plasmon.f90
-		m_pdos.f90
 		m_multislice.f90
 		m_lens.f90
 		m_tilt.f90
@@ -66,7 +65,7 @@ if exist %OUTDIR%\%OUTNAME%.exe (
 )
 REM LINKING ALL OBJECT FILES REQUIRED FOR MUSTEM
 echo - linking %OUTDIR%\%OUTNAME%.exe
-pgfortran %OPTS% %LIBDIRS% -o %OUTDIR%\%OUTNAME% %OBJDIR%\s_absorptive_stem.obj %OBJDIR%\s_absorptive_tem.obj %OBJDIR%\s_qep_stem.obj %OBJDIR%\s_qep_tem.obj %OBJDIR%\MS_utilities.obj %OBJDIR%\mod_cuda_ms.obj %OBJDIR%\m_plasmon.obj %OBJDIR%\m_pdos.obj %OBJDIR%\mod_Hn0.obj %OBJDIR%\m_potential.obj %OBJDIR%\mod_cuda_potential.obj %OBJDIR%\m_absorption.obj %OBJDIR%\m_electron.obj %OBJDIR%\quadpack.obj %OBJDIR%\m_tilt.obj %OBJDIR%\m_lens.obj %OBJDIR%\m_multislice.obj %OBJDIR%\m_crystallography.obj %OBJDIR%\m_numerical_tools.obj %OBJDIR%\mod_output.obj %OBJDIR%\mod_CUFFT_wrapper.obj %OBJDIR%\mod_cuda_array_library.obj %OBJDIR%\mod_cuda_setup.obj %OBJDIR%\mod_cufft.obj %OBJDIR%\mod_global_variables.obj %OBJDIR%\m_user_input.obj %OBJDIR%\m_string.obj %OBJDIR%\m_precision.obj %OBJDIR%\muSTEM.obj %LIBS%
+pgfortran %OPTS% %LIBDIRS% -o %OUTDIR%\%OUTNAME% %OBJDIR%\s_absorptive_stem.obj %OBJDIR%\s_absorptive_tem.obj %OBJDIR%\s_qep_stem.obj %OBJDIR%\s_qep_tem.obj %OBJDIR%\MS_utilities.obj %OBJDIR%\mod_cuda_ms.obj %OBJDIR%\m_plasmon.obj %OBJDIR%\mod_Hn0.obj %OBJDIR%\m_potential.obj %OBJDIR%\mod_cuda_potential.obj %OBJDIR%\m_absorption.obj %OBJDIR%\m_electron.obj %OBJDIR%\quadpack.obj %OBJDIR%\m_tilt.obj %OBJDIR%\m_lens.obj %OBJDIR%\m_multislice.obj %OBJDIR%\m_crystallography.obj %OBJDIR%\m_numerical_tools.obj %OBJDIR%\mod_output.obj %OBJDIR%\mod_CUFFT_wrapper.obj %OBJDIR%\mod_cuda_array_library.obj %OBJDIR%\mod_cuda_setup.obj %OBJDIR%\mod_cufft.obj %OBJDIR%\mod_global_variables.obj %OBJDIR%\m_user_input.obj %OBJDIR%\m_string.obj %OBJDIR%\m_precision.obj %OBJDIR%\muSTEM.obj %LIBS%
 echo Done
 @pause
 exit /b

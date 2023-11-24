@@ -128,8 +128,8 @@
      &' degrees',/)
      
       if(contains_kev) then
-      read(iunit,*) ekv
-      write(6,131) ekv
+        read(iunit,*) ekv
+        write(6,131) ekv
 131   format(' Incident beam energy = ',f12.3,' keV',/)
       endif
 
@@ -138,49 +138,52 @@
 141   format(' Number of atom atom types = ',i2,/)
 
       do i = 1, nt
-            read(iunit,*) substance_atom_types(i)
-            if (ionic) then
-				read(iunit,*) nat(i), atf(1:3,i),dz(i)
-			else
-				read(iunit,*) nat(i), atf(1:3,i)
-			endif
-            if(nat(i).gt.nm.or.nat(i).lt.0) then
-                  write(6,171) i,nat(i)
-171               format(' Type ',i3,2x,' nat = ',i5,' this is wrong - EXIT')
-                  go to 999
-            endif
+        read(iunit,*) substance_atom_types(i)
+        if (ionic) then
+			    read(iunit,*) nat(i), atf(1:3,i),dz(i)
+		    else
+			    read(iunit,*) nat(i), atf(1:3,i)
+			  endif
+        if(nat(i).gt.nm.or.nat(i).lt.0) then
+          write(6,171) i,nat(i)
+171       format(' Type ',i3,2x,' nat = ',i5,' this is wrong - EXIT')
+          go to 999
+        endif
 
-            write(6,181) i,substance_atom_types(i),atf(1:3,i)
-181         format(' Type ',i2,2x,a10,8X,' Z = ',F5.0,/,' Occupancy = ',f6.3,2x,' <us> ** 2 = ',g12.5)
-            jm = nat(i)
-            write(6,191)
-191         format(/,'      x    ',5x,'y',9x,'z',/)
+        write(6,181) i,substance_atom_types(i),atf(1:3,i)
+        if (ionic) write(6,182) dz(i)
+181     format(' Type ',i2,2x,a10,8X,' Z = ',F5.0,/,'   Occupancy = ',f6.3,2x,' <us> ** 2 = ',g12.5)
+182     format('   Charge = ',f6.3)
+        jm = nat(i)
+        write(6,191)
+191     format('      x    ',5x,'y',9x,'z')
 
-            icount = 0
-            do j = 1, jm
-                  icount = icount + 1
-                  read(iunit,*) tau(1:3,i,j)
-                  
-                  if (icount.le.100) then
-                    write(6,201) icount,tau(1:3,i,j)
-201                 format(i5, 3f10.6)
-                  elseif (icount.eq.101) then
-                    write(*,*) 'Number of atoms exceeds 100.'
-                    write(*,*) 'See xtl file for full list.'
-                    write(*,*)
-                  endif
-                    
-                  if (any(tau(:,i,j)<0) .or. any(tau(:,i,j)>1)) then
-                    write(*,*) 'ERROR: fractional coordinates must be between 0 and 1'
-                    write(*,*) 'Program will now halt.'
-                    pause
-                    stop
-                  endif
-                  !if(icount.gt.12) then
-                        !icount = 0
-                        !write(6,191)
-                  !endif
-            enddo
+        icount = 0
+        do j = 1, jm
+          icount = icount + 1
+          read(iunit,*) tau(1:3,i,j)
+
+          if (icount.le.100) then
+            write(6,201) icount,tau(1:3,i,j)
+201         format(i5, 3f10.6)
+          elseif (icount.eq.101) then
+            write(*,*) 'Number of atoms exceeds 100.'
+            write(*,*) 'See xtl file for full list.'
+            write(*,*)
+          endif
+
+          if (any(tau(:,i,j)<0) .or. any(tau(:,i,j)>1)) then
+            write(*,*) 'ERROR: fractional coordinates must be between 0 and 1'
+            write(*,*) 'Program will now halt.'
+            pause
+            stop
+          endif
+          !if(icount.gt.12) then
+            !icount = 0
+            !write(6,191)
+          !endif
+        enddo
+        write(*,*)
       enddo
       call correct_duplicate_atom_labels(substance_atom_types,nt)
       call cryst(a0,deg,ss)   !Establish the triclinic information
