@@ -767,31 +767,31 @@ end subroutine
     
     end subroutine cuda_site_factor
 
-	subroutine cuda_band_width_limit(arrayin,nopiy,nopix,szey,szex,normalisation,fftin,fftout,plan)
-	
+    subroutine cuda_band_width_limit(arrayin,nopiy,nopix,szey,szex,normalisation,fftin,fftout,plan)
+    
         use CUFFT
-	    use cufft_wrapper
-	complex(fp_kind),intent(inout),device::arrayin(nopiy,nopix)
-	integer*4,intent(in)::nopiy,nopix
-	integer,intent(in)::plan
-    real(fp_kind),intent(in) :: szey,szex,normalisation
-	logical,intent(in)::fftin,fftout
+        use cufft_wrapper
+        complex(fp_kind),intent(inout),device::arrayin(nopiy,nopix)
+        integer*4,intent(in)::nopiy,nopix
+        integer,intent(in)::plan
+        real(fp_kind),intent(in) :: szey,szex,normalisation
+        logical,intent(in)::fftin,fftout
 
-	call cufftExec(plan,arrayin,arrayin,CUFFT_FORWARD)
+        call cufftExec(plan,arrayin,arrayin,CUFFT_FORWARD)
         !call cuda_multiplication<<<blocks,threads>>>(arrayin,bwl_mat_d,transf_d,normalisation,nopiy,nopix)  
         call cufftExec(plan,arrayin,arrayin,CUFFT_INVERSE)
     end subroutine
     
-	attributes(global) subroutine cuda_apply_Band_width_limit(arrayin, n,m,scale)
+    attributes(global) subroutine cuda_apply_Band_width_limit(arrayin, n,m,scale)
     
         implicit none
      
         complex(fp_kind),intent(inout),device::arrayin(:,:)
-		integer*4,intent(in), value::n,m
-		real(fp_kind),value,intent(in):: scale
-		
-		integer(4), value :: ix,iy
-		real(fp_kind),value :: iix,iiy
+        integer*4,intent(in), value::n,m
+        real(fp_kind),value,intent(in):: scale
+
+        integer(4), value :: ix,iy
+        real(fp_kind),value :: iix,iiy,ii
     
         ix = (blockIdx%y-1)*blockDim%y + threadIdx%y
         iy = (blockIdx%x-1)*blockDim%x + threadIdx%x
@@ -799,13 +799,13 @@ end subroutine
         if (ix <= m) then
              if (iy <= n) then
                 iix = abs(modulo(ix+m/2,m)-m/2)/(m/2.0_fp_kind)
-				iiy = abs(modulo(iy+n/2,n)-n/2)/(n/2.0_fp_kind)
-				iix = sqrt(iix**2+iiy**2)
-				if(.not.(iix<2.0_fp_kind/3)) then
-					arrayin(iy,ix) = 0
-				else
-					arrayin(iy,ix) = arrayin(iy,ix)*scale
-				endif
+                iiy = abs(modulo(iy+n/2,n)-n/2)/(n/2.0_fp_kind)
+                ii = sqrt(iix**2+iiy**2) * 1.0_fp_kind
+                if(.not.(ii<2.0_fp_kind/3)) then
+                    arrayin(iy,ix) = 0
+                else
+                    arrayin(iy,ix) = arrayin(iy,ix)*scale
+                endif
             endif
         endif   
     
