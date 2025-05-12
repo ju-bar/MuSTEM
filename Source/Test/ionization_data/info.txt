@@ -2,5 +2,8 @@ Inelastic scattering factors up supported to 5p orbitals for a collection range 
 
 History:
 
+2025-MAY-12 / JB
+Updated Li 1s, Si 2s, Si 2p
+
 2022-JUN-24 / JB
 Added Li 1s
