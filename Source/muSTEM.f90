@@ -82,9 +82,10 @@
        &1x,'|     | $$  \$ | $$ \$$    $$ \$$    $$  | $$   | $$     \| $$  \$ | $$      |',/,&
        &1x,'|      \$$      \$$  \$$$$$$   \$$$$$$    \$$    \$$$$$$$$ \$$      \$$      |',/,&
        &1x,'|                                                                            |',/,&
-       &1x,"|       Copyright (C) 2023 L.J. Allen, H.G. Brown, A.J. D'Alfonso,           |",/,&
+       &1x,"|       Copyright (C) 2025 L.J. Allen, H.G. Brown, A.J. D'Alfonso,           |",/,&
        &1x,'|              S.D. Findlay, B.D. Forbes, J. Barthel                         |',/,&
-	     &1x,'|       email: hamish.brown@monash.edu                                       |',/,&
+	     &1x,'|       email: hgbrown@unimelb.edu.au                                        |',/,&
+       &1x,'|              ju.barthel@fz-juelich.de (for this version)                   |',/,&
        &1x,'|       This program comes with ABSOLUTELY NO WARRANTY;                      |',/,&
        &1x,'|                                                                            |',/,&
        &1x,'|       This program is licensed to you under the terms of the GNU           |',/,&
@@ -92,10 +93,10 @@
 	     &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.0 (20220815)                                           |',/,&
+       &1x,'|       GPU Version 6.0 (branch https://github.com/ju-bar 2025-05-12)        |',/,&
   	   &1x,'|           ! absorptive model calculations are known to crash occasionally  |',/,&
 #else
-       &1x,'|       CPU only Version 6.0                                                 |',/,&
+       &1x,'|       CPU only Version 6.0 (branch https://github.com/ju-bar 2025-05-12)   |',/,&
 #endif
        &1x,'|                                                                            |',/,&
        &1x,'|       Note: pass the argument "nopause" (without quotation marks)          |',/,&
@@ -282,7 +283,7 @@
                 case (1)
                     ! CBED pattern
                     call place_probe(probe_initial_position)
-					double_channeling=.false.
+					          double_channeling=.false.
                 case (2)
                     ! STEM images
                     call STEM_options(STEM,ionization,PACBED,istem,double_channeling)
@@ -292,12 +293,12 @@
                     call prompt_output_probe_intensity
                     if(STEM) call setup_integration_measurements
                     adf = STEM.and.(.not.qep)
-					if(istem) call setup_lens_parameters('Image',imaging_aberrations,imaging_cutoff)
+					          if(istem) call setup_lens_parameters('Image',imaging_aberrations,imaging_cutoff)
                     
                     ! Precalculate the scattering factors on a grid
                     call precalculate_scattering_factors()
                     if(ionization) call setup_inelastic_ionization_types
-					if(double_channeling) call ionizer_init(.true.)
+					          if(double_channeling) call ionizer_init(.true.)
                     
                 case default
                     goto 115

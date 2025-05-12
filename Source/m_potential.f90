@@ -320,17 +320,17 @@ module m_potential
         use m_user_input
         use m_string
         implicit none
-		integer*4::i_eels
+		    integer*4::i_eels
       
         call command_line_title_box('Ionization')
-		i_eels = 0
-		do while(i_eels<1.or.i_eels>2)
-			write(*,*) char(10),' <1> EELS',char(10),' <2> EDX',char(10)
-			call get_input('Ionization choice', i_eels)
+		    i_eels = 0
+        do while(i_eels<1.or.i_eels>2)
+			    write(*,*) char(10),' <1> EELS',char(10),' <2> EDX',char(10)
+			    call get_input('Ionization choice', i_eels)
         enddo
         
-		EDX = i_eels.eq.2
-		call local_potential(EDX)
+		    EDX = i_eels.eq.2
+		    call local_potential(EDX)
 
       end subroutine
 	
@@ -377,19 +377,19 @@ module m_potential
         close(35)
         return
 970 write(*,*) 'Problem reading ',filename           
-    end function
+  end function
         
 	function get_ionization_parameters(shell,atno,DE,EDX) result (EELS_EDX_params)
-        !Read ionisation form factor parameters from ionization_data files
-        !shell should be a string describing the orbital ie, '1s', '2s', '2p' etc
-        !atno is the atomic number
-        !DE is the energy window for EELS and is ignored if the EDX parameterization is requested
-        !EDX is a boolean variable, pass .TRUE. for EDX parameterization and .FALSE. for EELS
-        use m_numerical_tools
+  !Read ionisation form factor parameters from ionization_data files
+  !shell should be a string describing the orbital ie, '1s', '2s', '2p' etc
+  !atno is the atomic number
+  !DE is the energy window for EELS and is ignored if the EDX parameterization is requested
+  !EDX is a boolean variable, pass .TRUE. for EDX parameterization and .FALSE. for EELS
+    use m_numerical_tools
 		use m_string
-        use global_variables,only: ekv,ak1,nt,atf,substance_atom_types
+    use global_variables,only: ekv,ak1,nt,atf,substance_atom_types
         
-        character(2),intent(in)::shell
+    character(2),intent(in)::shell
 		integer*4,intent(in)::atno
 		real(fp_kind),intent(in)::DE
 		logical,intent(in):: EDX
@@ -397,7 +397,7 @@ module m_potential
 		real(fp_kind)::params(29,8,5),EELS_PARAM_SET2(5,29),xdata(8),bscoef_(4,8)
 		real(fp_kind) :: dedata(5),bscoef2_(4,5),p(29),EELS_EDX_params(29)
         
-        integer*4::iatom,atno_check,i,ii,m,ishell,iz,lineno,n,mm
+    integer*4::iatom,atno_check,i,ii,m,ishell,iz,lineno,n,mm
 		character(10) junk
 		character(1) cjunk1,cjunk2,cjunk3
 
@@ -407,111 +407,113 @@ module m_potential
 		!write(*,*) 'reading inelastic scattering parameterization:'
 		!write(*,*) '- file: '//'ionization_data\EELS_EDX_'//shell//'.dat'
         
-        n = str2int(shell(1:1))
-        lineno = get_ionization_shell_line(shell,atno)
+    n = str2int(shell(1:1))
+    lineno = get_ionization_shell_line(shell,atno)
 		!write(*,*) '- shell: '//shell//' - id = '//to_string(n)
 		!write(*,*) '- from line: '//to_string(lineno)
 		
 		!open the pertinent data files and read to relevant line        
 		open(unit=16,file='ionization_data\EELS_EDX_'//shell//'.dat',status='old',err=970)
 		do iz = 1,lineno
-		   read(16,*) junk
-        enddo
-        p = 0
-        !Later parametrizations only contain 28 datapoints
-        mm=29;if (n>2) mm=28
+		  read(16,*) junk
+    enddo
+    p = 0
+    !Later parametrizations only contain 28 datapoints
+    mm=29;if (n>2) mm=28
 		!write(*,*) '- number of items per line: '//to_string(mm)
-        !Read parameters
+    !Read parameters
 		do i=1,8 !Loop over accelerating voltages
 		  read(16,*) junk ! E=xx kev header
 		  do ii=1,6 !Loop over energy loss above threshhold (EELS) and EDX 
-			   read(16,*) p(1:mm)
-			   !write(*,*) '--- #'//to_string(ii)//': '//to_string(p(1))
-			   if((.not.EDX).and.(ii<6)) params(:,i,ii) = p(:) !EELS is the first 5 lines
-			   if(EDX.and.(ii==6)) params(:,i,1) = p(:) !EDX is the last line
+			  read(16,*) p(1:mm)
+			  !write(*,*) '--- #'//to_string(ii)//': '//to_string(p(1))
+			  if((.not.EDX).and.(ii<6)) params(:,i,ii) = p(:) !EELS is the first 5 lines
+			  if(EDX.and.(ii==6)) params(:,i,1) = p(:) !EDX is the last line
 		  enddo
-        enddo
-        !Can close parameters file now
-        close(16)
+    enddo
+    !Can close parameters file now
+    close(16)
 	  !Interpolate to accelerating voltage used
-      !data in files is in steps of 50 keV with 8 points
-      !this is stored in xdata
-      xdata =(/(i*50, i=1,8,1)/)
+    !data in files is in steps of 50 keV with 8 points
+    !this is stored in xdata
+    xdata =(/(i*50, i=1,8,1)/)
 
-       do ii=1,m
-          do i=1,mm
-			 bscoef_(1,:) = params(i,1:8,ii)
-			 call cubspl ( xdata, bscoef_(:,:), 8, 0, 0 )
-			 EELS_param_set2(ii,i) = ppvalu(xdata,bscoef_(:,:),7,4,ekv,0)
-          enddo
-       enddo
+    do ii=1,m
+      do i=1,mm
+			  bscoef_(1,:) = params(i,1:8,ii)
+			  call cubspl(xdata, bscoef_(:,:), 8, 0, 0)
+			  EELS_param_set2(ii,i) = ppvalu(xdata,bscoef_(:,:),7,4,ekv,0)
+      enddo
+    enddo
 	   
-	   !If EDX then no energy window interpolation is needed
+	  !If EDX then no energy window interpolation is needed
 	  if (EDX) then
-		EELS_EDX_params = EELS_param_set2(1,:)
-		return
+		  EELS_EDX_params = EELS_param_set2(1,:)
+		  return
 	  endif
 	  
-      ! contained within EELS_param_set2(i,ii) is the 29 data points (first index) intepolated
-      ! to the correct incident energy there are 5 rows Interpolate to energy window desired
-      dedata = real([1,10,25,50,100],kind=fp_kind)
+    ! contained within EELS_param_set2(i,ii) is the 29 data points (first index) interpolated
+    ! to the correct incident energy there are 5 rows Interpolate to energy window desired
+    dedata = real([1,10,25,50,100],kind=fp_kind)
 
-      !f(s)/DE is mostly flat and interpolates more simply
-      EELS_EDX_params=0
-      do i=1,mm
-			do ii=1,5
-				bscoef2_(1,ii) = EELS_param_set2(ii,i) / dedata(ii)
-			enddo
-			call cubspl ( dedata, bscoef2_(:,:), 5, 0, 0 )
-			EELS_EDX_params(i) = DE*ppvalu(dedata,bscoef2_(:,:),4,4,DE,0)
-      enddo
+    !f(s)/DE is mostly flat and interpolates more simply
+    EELS_EDX_params=0
+    do i=1,mm
+		  do ii=1,5
+			  bscoef2_(1,ii) = EELS_param_set2(ii,i) / dedata(ii)
+		  enddo
+		  call cubspl(dedata, bscoef2_(:,:), 5, 0, 0)
+		  EELS_EDX_params(i) = DE*ppvalu(dedata,bscoef2_(:,:),4,4,DE,0)
+    enddo
 		
 		return
-970 	write(*,*) ' Cannot access data file EELS_EDX_'//shell//'.dat'
+970 write(*,*) ' Cannot access data file EELS_EDX_'//shell//'.dat'
 		stop
-	end function
-	
-      !********************************************************************************
-      !     subroutine EELS_local_potential()
-      !     reads in the scattering factors and performs the interpolation
-      !     necessary to accommodate arbitrary geometries and energy windows
-      !     
-      !     2020-11-26 / JB / support for more orbitals added (4f, 5s, 5p)
-      !                       now 12 files named 'EELS_EDX_{orb}.dat
-      !                       are expected in the ionization_data folder
-      !     
-      !********************************************************************************
-      subroutine local_potential(EDX)
+  end function
 
-      use m_string
-      use m_numerical_tools, only: cubspl,ppvalu
-        use m_multislice
-	 use global_variables
-        use m_user_input
+  
+  
+  !********************************************************************************
+  !     subroutine EELS_local_potential()
+  !     reads in the scattering factors and performs the interpolation
+  !     necessary to accommodate arbitrary geometries and energy windows
+  !     
+  !     2020-11-26 / JB / support for more orbitals added (4f, 5s, 5p)
+  !                       now 12 files named 'EELS_EDX_{orb}.dat
+  !                       are expected in the ionization_data folder
+  !     
+  !********************************************************************************
+  subroutine local_potential(EDX)
 
-      implicit none
+    use m_string
+    use m_numerical_tools, only: cubspl,ppvalu
+    use m_multislice
+	  use global_variables
+    use m_user_input
+
+    implicit none
 	  logical,intent(in)::EDX
 
-      integer(4) i,ii,iii,j,kval,m,nchoices,ZZ,nshells,norbitals,k
-      integer(4),allocatable::available_shells(:),available_atoms(:)
+    integer(4) i,ii,iii,j,kval,m,nchoices,ZZ,nshells,norbitals,k
+    integer(4),allocatable::available_shells(:),available_atoms(:)
 
-      real(fp_kind),allocatable:: DE(:)
-      real(fp_kind) eels_inner,eels_outer
-      character(2) shell_name_EELS(12),orb
-      character(3) shells(12)!(9)
-      character(13):: contributions(4)
-      logical,allocatable::choices(:)
-      logical::k_shell,l_shell,EDXpresent(nt,4)
+    real(fp_kind),allocatable:: DE(:)
+    real(fp_kind) eels_inner,eels_outer
+    character(2) shell_name_EELS(12),orb
+    character(3) shells(12)!(9)
+    !character(13):: contributions(4)
+    logical,allocatable::choices(:)
+    logical::k_shell,l_shell,EDXpresent(nt,4)
 
-      shell_name_EELS = [ '1s', '2s', '2p', '3s', '3p', '3d', '4s', '4p', '4d', '4f', '5s', '5p']
-      shells =          [  'K', 'L1','L23', 'M1','M23','M45', 'N1','N23','N45','N67', 'O1','O23']
-      contributions = ['1s','2s and 2p','3s, 3p and 3d','4s, 4p and 4d']
-      norbitals = size(shell_name_EELS)
-      nshells = size(shells)
+    shell_name_EELS = [ '1s', '2s', '2p', '3s', '3p', '3d', '4s', '4p', '4d', '4f', '5s', '5p']
+    shells =          [  'K', 'L1','L23', 'M1','M23','M45', 'N1','N23','N45','N67', 'O1','O23']
+    !contributions = ['1s','2s and 2p','3s, 3p and 3d','4s, 4p and 4d']
+    norbitals = size(shell_name_EELS)
+    nshells = size(shells)
 	  !If EELS, setup detectors
 	  if(.not.EDX) then
 			write(6,91)
-	   91 format(1x,'The EELS calculations assume the local approximation, which', /, &
+91    format(1x,'The EELS calculations assume the local approximation, which', /, &
 				&1x,'may be inappropriate when the EELS detector does not', /, &
 				&1x,'have a very large acceptance angle. To account for the', /, &
 				&1x,'finite detector size, a correction is applied.', /, &
@@ -528,23 +530,23 @@ module m_potential
 		  eels_outer = ak1*tan(eels_outer/1000.0_fp_kind)
 		  if(allocated(eels_correction_detector)) deallocate(eels_correction_detector)
 		  allocate(eels_correction_detector(nopiy,nopix))
-          eels_correction_detector = make_detector(nopiy,nopix,ifactory,ifactorx,ss,eels_inner,eels_outer)
-      endif  
+        eels_correction_detector = make_detector(nopiy,nopix,ifactory,ifactorx,ss,eels_inner,eels_outer)
+    endif  
 !Count available orbitals by checking what is available for the given atoms in
 !the parametrization files
-	ii=0
+	  ii=0
         
     do i = 1, nt; ZZ=nint(ATF(1,i)); do j=1,norbitals
         if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) ii=ii+1
     enddo; enddo
     !endif
     
-	nchoices = ii
-	allocate(choices(ii),DE(ii))
-	DE = 0
+	  nchoices = ii
+	  allocate(choices(ii),DE(ii))
+	  DE = 0
     choices = .false.
 	
-	kval = -1
+	  kval = -1
     write(*,*) char(10),' ',char(230),'STEM calculates EDX and EELS signals for ionization of electrons to the '
     write(*,*) 'continuum, at this point bound->bound (white line) transitions are not taken'
     write(*,*) 'into account.',char(10)
@@ -552,72 +554,71 @@ module m_potential
     write(*,*) 'that quantitative agreement between simulation and theory has only been '
     write(*,*) 'demonstrated for K and L shells (see Y. Zhu and C. Dwyer, Microsc. Microanal.'
     write(*,*) '20 (2014), 1070-1077)',char(10)
-	do while ((kval.ne.0).or.all(.not.choices))
+	  do while ((kval.ne.0).or.all(.not.choices))
 100   format(/,' Ionization choices',/,/,'Index  Atom| Z  |',a,'| Included(y/n)'/&
-			&,'-----------------------------------------------------------')
-	if(EDX) write(*,100) ' Orbital | Shell '
-110 format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,a1,6x)
+			        &,'-----------------------------------------------------------')
+	    if(EDX) write(*,100) ' Orbital | Shell '
+110   format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,a1,6x)
     
-    if(.not.EDX) write(*,100) ' Orbital | Shell | Window (eV)'
-111 format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,f5.1,6x,'|',1x,a1,6x)
-120 format(' < 0> continue')
+      if(.not.EDX) write(*,100) ' Orbital | Shell | Window (eV)'
+111   format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,f5.1,6x,'|',1x,a1,6x)
+120   format(' < 0> continue')
     
     !Display choices for EDX and EELS ionizations
-	ii=1
+	    ii=1
       do i = 1, nt;ZZ=nint(ATF(1,i)); do j=1,norbitals
-        
-            if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) then
-                if(EDX) write(*,110) ii,trim(adjustl(substance_atom_types(i))),int(ZZ),shell_name_EELS(j),shells(j),logical_to_yn(choices(ii))
-                if(.not.EDX) write(*,111) ii,trim(adjustl(substance_atom_types(i))),int(ZZ),shell_name_EELS(j),shells(j),DE(ii),logical_to_yn(choices(ii))
-                ii=ii+1
-            endif
-        enddo;enddo
+        if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) then
+          if(EDX) write(*,110) ii,trim(adjustl(substance_atom_types(i))),int(ZZ),shell_name_EELS(j),shells(j),logical_to_yn(choices(ii))
+          if(.not.EDX) write(*,111) ii,trim(adjustl(substance_atom_types(i))),int(ZZ),shell_name_EELS(j),shells(j),DE(ii),logical_to_yn(choices(ii))
+          ii=ii+1
+        endif
+      enddo;enddo
       
       write(*,120)
 	  
       call get_input('Shell choice <0> continue', kval)
-	  !Update choice
-	  if ((kval.gt.0).and.(kval.le.nchoices)) then
-        choices(kval) = .not.choices(kval)
+	      !Update choice
+	      if ((kval.gt.0).and.(kval.le.nchoices)) then
+          choices(kval) = .not.choices(kval)
         
         !If EELS get energy window
         if (.not.EDX) then
-            DE(kval) =-1
-            do while ((DE(kval).lt.0).or.(DE(kval).gt.100)) 
-                write(*,*) 'Enter EELS energy window above threshold in eV (between 1 and 100 ev):',char(10)
-                call get_input('Energy window', DE(kval))
-            enddo 
+          DE(kval) =-1
+          do while ((DE(kval).lt.1).or.(DE(kval).gt.100)) ! 2025-05-05 lower limit corrected to 1 ev (JB/LJA)
+            write(*,*) 'Enter EELS energy window above threshold in eV (between 1 and 100 ev):',char(10)
+            call get_input('Energy window', DE(kval))
+          enddo 
         end if
       end if
     enddo
     
-	num_ionizations = count(choices)
+	  num_ionizations = count(choices)
     
-	allocate(ionization_mu(nopiy,nopix,num_ionizations),atm_indices(num_ionizations),Ion_description(num_ionizations))
+	  allocate(ionization_mu(nopiy,nopix,num_ionizations),atm_indices(num_ionizations),Ion_description(num_ionizations))
     ionization_mu = 0
-	ii=1
+	  ii=1
     iii=1
-	!Now read in EELS or EDX parameters
+	  !Now read in EELS or EDX parameters
     do i = 1, nt;ZZ=nint(ATF(1,i))
-    do j=1,norbitals
+      do j=1,norbitals
         if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) then; if(choices(ii)) then
-            ionization_mu(:,:,iii) = make_fz_EELS_EDX(shell_name_EELS(j),zz,DE(ii),EDX)* atf(2,i)*fz_DWF(:,:,i)
-            atm_indices(iii) = i
-            Ion_description(iii) = shell_name_EELS(j)
-            iii=iii+1;endif; ii=ii+1; endif
-        enddo
-    enddo;
+          ionization_mu(:,:,iii) = make_fz_EELS_EDX(shell_name_EELS(j),zz,DE(ii),EDX)* atf(2,i)*fz_DWF(:,:,i)
+          atm_indices(iii) = i
+          Ion_description(iii) = shell_name_EELS(j)
+          iii=iii+1;endif; ii=ii+1; endif
+      enddo
+    enddo
  
-    end subroutine
+  end subroutine
       
-    !Subroutine to make the Fz_mu needs to have prefactors accounted for (volume fo the unit cell etc.)
-    !needs to be multiplied by the DWF for the pertinent atom type
-    function make_fz_EELS_EDX(orbital,zz,DE,EDX) result(fz_mu)
-	use m_precision
+  !Subroutine to make the Fz_mu needs to have prefactors accounted for (volume fo the unit cell etc.)
+  !needs to be multiplied by the DWF for the pertinent atom type
+  function make_fz_EELS_EDX(orbital,zz,DE,EDX) result(fz_mu)
+	  use m_precision
     use global_variables
-	use m_numerical_tools, only: cubspl,ppvalu
+	  use m_numerical_tools, only: cubspl,ppvalu
     use m_crystallography,only:trimr,make_g_vec_array
-	implicit none
+	  implicit none
     
     character(2),intent(in)::orbital
     integer*4,intent(in)::zz
@@ -640,96 +641,98 @@ module m_potential
     
     write(*,*) 'Making the ionization inelastic scattering factor grid, please wait...',char(10)
     	
-	!pppack interpolation
-	EELS_EDX_bscoef(1,:)= get_ionization_parameters(orbital,zz,DE,EDX)
-	call cubspl(svals,EELS_EDX_bscoef(:,:), 29, 0, 0 )
+	  !pppack interpolation
+	  EELS_EDX_bscoef(1,:) = get_ionization_parameters(orbital,zz,DE,EDX)
+	  call cubspl(svals,EELS_EDX_bscoef(:,:), 29, 0, 0 )
     
     fz_mu = 0.0_fp_kind
     call make_g_vec_array(g_vec_array,ifactory,ifactorx)
     !!$OMP PARALLEL PRIVATE(i, j, m2, m1, sky, skx, tempval, sval), SHARED(fz_mu) 
     !!$OMP DO
-	do i=1, nopiy;do j=1, nopix
-        sval = trimr(g_vec_array(:,i,j),ss) / 2.0_fp_kind
-        if (sval.le.20.0_fp_kind) fz_mu(i,j) = cmplx(ppvalu(svals,EELS_EDX_bscoef(:,:),28,4,sval,0),0.0_fp_kind ,fp_kind) / (tp * ak1)
+	  do i=1, nopiy;do j=1, nopix
+      sval = trimr(g_vec_array(:,i,j),ss) / 2.0_fp_kind
+      if (sval.le.20.0_fp_kind) fz_mu(i,j) = cmplx(ppvalu(svals,EELS_EDX_bscoef(:,:),28,4,sval,0),0.0_fp_kind ,fp_kind) / (tp*ak1)
     enddo;enddo
     !!$OMP END DO
-	!!$OMP END PARALLEL
+	  !!$OMP END PARALLEL
 
     return
-    end function
+  end function
 
-      !--------------------------------------------------------------------------------------
-      !   make_mu_matrix() makes the mu matrices for each HOLZ slice
-      !   subroutine to take the unit cell input, 
-      !   and slice based on holz
-      subroutine make_local_inelastic_potentials(ionization)
+  !--------------------------------------------------------------------------------------
+  !   make_mu_matrix() makes the mu matrices for each HOLZ slice
+  !   subroutine to take the unit cell input, 
+  !   and slice based on holz
+  subroutine make_local_inelastic_potentials(ionization)
       
-      use m_multislice
-      use global_variables!, only:adf,nopiy,nopix,high_accuracy,nt,ss,ndet,ig1,ig2,ifactory
-      use m_absorption
-      !use m_string
-      !use output
+    use m_multislice
+    use global_variables!, only:adf,nopiy,nopix,high_accuracy,nt,ss,ndet,ig1,ig2,ifactory
+    use m_absorption
+    !use m_string
+    !use output
       
-      implicit none
+    implicit none
       
-      logical,intent(in)::ionization
-      integer(4)   i,j,k,nat_
-      real(fp_kind) :: potential_matrix_complex(nopiy,nopix),vol
-      real(8)::thmin,thmax,phmin,phmax
-      complex(fp_kind)::fz_adf(nopiy,nopix,nt,ndet)
+    logical,intent(in)::ionization
+    integer(4)   i,j,k,nat_
+    real(fp_kind) :: potential_matrix_complex(nopiy,nopix),vol
+    real(8)::thmin,thmax,phmin,phmax
+    complex(fp_kind)::fz_adf(nopiy,nopix,nt,ndet)
 
-      write(6,134)
-134   format(/,' Calculating effective inelastic potentials.',/)
+    write(6,134)        
+134 format(/,' Calculating effective inelastic potentials.',/)
 
-      if(allocated(adf_potential)) deallocate(adf_potential)
-      if(allocated(ionization_potential)) deallocate(ionization_potential)
+    if(allocated(adf_potential)) deallocate(adf_potential)
+    if(allocated(ionization_potential)) deallocate(ionization_potential)
 
-      allocate(adf_potential(nopiy,nopix,n_slices,ndet))            !the adf potential
-      adf_potential=0
-      if(ionization) allocate(ionization_potential(nopiy,nopix,num_ionizations,n_slices))     !the ionization potential
+    allocate(adf_potential(nopiy,nopix,n_slices,ndet)) !the adf potential
+    adf_potential=0
+    if(ionization) allocate(ionization_potential(nopiy,nopix,num_ionizations,n_slices))  !the ionization potential
       
-      !if(adf) call make_fz_adf()
+    !if(adf) call make_fz_adf()
 	  if(adf.and.complex_absorption) then  
       do k=1,ndet/nseg
-          thmin =  atan(inner((k-1)/nseg+1)/ak)
-          thmax =  atan(outer((k-1)/nseg+1)/ak)
-          !Note that the absorptive calculations do not take into account the directionality of inelastic scattering, the absorptive scattering
-          !factors are assumed isotropic and this is only an approximation for inelastic scattering to segmented detectors
-          fz_adf(:,:,:,(k-1)*nseg+1:k*nseg) = spread(absorptive_scattering_factors(ig1,ig2,ifactory,ifactorx,nopiy,nopix,nt,a0,ss,atf,nat, ak, relm, orthog,thmin,thmax),dim=4,ncopies=nseg)/nseg
-          
+        thmin =  atan(inner((k-1)/nseg+1)/ak)
+        thmax =  atan(outer((k-1)/nseg+1)/ak)
+        !Note that the absorptive calculations do not take into account the directionality of inelastic scattering, the absorptive scattering
+        !factors are assumed isotropic and this is only an approximation for inelastic scattering to segmented detectors
+        fz_adf(:,:,:,(k-1)*nseg+1:k*nseg) = spread(absorptive_scattering_factors( &
+                            & ig1,ig2,ifactory,ifactorx,nopiy,nopix,nt,a0,ss,atf,nat,&
+                            & ak, relm, orthog,thmin,thmax),dim=4,ncopies=nseg)/nseg
       enddo
-      endif
+    endif
 
-      do j = 1, n_slices
-	      vol = ss_slice(7,j)
-	      !calculate the ionization potential
-	      if(ionization) then
-              
-				do i=1,num_ionizations
-                    nat_ = nat_slice(atm_indices(i),j)
-                    ionization_potential(:,:,i,j) = real(potential_from_scattering_factors(ionization_mu(:,:,i),tau_slice(:,atm_indices(i),:nat_,j),nat_,nopiy,nopix,high_accuracy)/vol)
-				enddo
-               
-          endif  
-	      !calculate the ADF potential
-            if(adf.and.complex_absorption) then  
-                
-                  do i=1,nt
-                      nat_ = nat_slice(i,j)
-                      do k=1,ndet
-                        adf_potential(:,:,j,k)= adf_potential(:,:,j,k) + real(potential_from_scattering_factors(fz_adf(:,:,i,k),tau_slice(:,i,:nat_,j),nat_,nopiy,nopix,high_accuracy)/vol*ss(7)*4*pi)
-                      enddo
-                  enddo
-            endif
-      enddo	!ends loop over the number of potential subslices
+    do j = 1, n_slices
+	    vol = ss_slice(7,j)
+	    !calculate the ionization potential
+	    if(ionization) then
+			  do i=1,num_ionizations
+          nat_ = nat_slice(atm_indices(i),j)
+          ionization_potential(:,:,i,j) = real(potential_from_scattering_factors( &
+                            & ionization_mu(:,:,i),tau_slice(:,atm_indices(i),:nat_,j), &
+                            & nat_,nopiy,nopix,high_accuracy)/vol)
+  			enddo
+      endif  
+	    !calculate the ADF potential
+      if(adf.and.complex_absorption) then  
+        do i=1,nt
+          nat_ = nat_slice(i,j)
+          do k=1,ndet
+            adf_potential(:,:,j,k) = adf_potential(:,:,j,k) + real( &
+                            & potential_from_scattering_factors(fz_adf(:,:,i,k), &
+                            & tau_slice(:,i,:nat_,j),nat_,nopiy,nopix,high_accuracy)/vol*ss(7)*4*pi)
+          enddo
+        enddo
+      endif
+    enddo	!ends loop over the number of potential subslices
       
-      end subroutine
+  end subroutine
       
-    !--------------------------------------------------------------------------------------
-    function potential_from_scattering_factors(scattering_factor,atom_posn,nat_layer,nopiy,nopix,high_accuracy) result(slice_potential)
+  !--------------------------------------------------------------------------------------
+  function potential_from_scattering_factors(scattering_factor,atom_posn,nat_layer,nopiy,nopix,high_accuracy) result(slice_potential)
     use m_precision
     use cufft_wrapper
-	use output
+    use output
     
     implicit none
     

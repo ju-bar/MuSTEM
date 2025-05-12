@@ -2,6 +2,6 @@
 <VisualStudioUserFile ProjectCreator="Intel Fortran" Keyword="Console Application" Version="11.0" ProjectIdGuid="{A1DA2EB1-6F04-4380-B1F4-67DCDAAF81BA}">
 	<Configurations>
 		<Configuration Name="Debug|Win32"/>
-		<Configuration Name="Debug|x64" CommandArguments="nopause ionic" WorkingDirectory="F:\Data\Simulation\_playpen\231117"/>
+		<Configuration Name="Debug|x64" WorkingDirectory=".\Test"/>
 		<Configuration Name="Release|Win32"/>
 		<Configuration Name="Release|x64" CommandArguments="nopause" WorkingDirectory=".\Test"/></Configurations></VisualStudioUserFile>
