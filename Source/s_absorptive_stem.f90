@@ -562,8 +562,8 @@ subroutine absorptive_stem(STEM,ionization,PACBED)
 #endif				
 				elseif(stem.and.adf) then
 					!write(6,*) '(dbg) > stem_inelastic_image (for all detectors)'
-                    do k=1,ndet; stem_inelastic_image(ny,nx,i_df,z_indx(1),k) = sum(adf_image(:,:,k)); enddo
-                endif
+          do k=1,ndet; stem_inelastic_image(ny,nx,i_df,z_indx(1),k) = sum(adf_image(:,:,k)); enddo
+        endif
 #ifdef GPU
 				if (istem.and.i_df==1) then;do l = 1, imaging_ndf
 					istem_image(:,:,l,z_indx(1)) = istem_image(:,:,l,z_indx(1)) + make_image(nopiy,nopix,psi_out,ctf(:,:,l),.false.) 
@@ -632,43 +632,43 @@ subroutine absorptive_stem(STEM,ionization,PACBED)
     fnam = trim(adjustl(output_prefix))
     if (n_tilts_total>1) fnam = trim(adjustl(output_prefix))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
     do idet = 1, ndet
-    if(output_thermal) then    
+      if(output_thermal) then    
         
         filename = trim(adjustl(fnam)) // '_DiffPlaneElastic_Detector'
         call add_zero_padded_int(filename, fnam_det, idet, 3)
-		if (n_tilts_total>1) fnam_det = trim(adjustl(fnam_det))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
+		    if (n_tilts_total>1) fnam_det = trim(adjustl(fnam_det))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
         if(stem) call output_stem_image(stem_elastic_image(:,:,:,:,idet),fnam_det,probe_df)
         
         if (stem.and.adf) then
-            stem_image(:,:,:,:,idet) = stem_elastic_image(:,:,:,:,idet) + stem_inelastic_image(:,:,:,:,idet)
+          stem_image(:,:,:,:,idet) = stem_elastic_image(:,:,:,:,idet) + stem_inelastic_image(:,:,:,:,idet)
     
-            filename = trim(adjustl(fnam)) // '_DiffPlaneTotal_Detector'
-            call add_zero_padded_int(filename, fnam_det, idet, 3)
-            if (n_tilts_total>1) fnam_det = trim(adjustl(fnam_det))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
-            call output_stem_image(stem_image(:,:,:,:,idet),fnam_det,probe_df)
+          filename = trim(adjustl(fnam)) // '_DiffPlaneTotal_Detector'
+          call add_zero_padded_int(filename, fnam_det, idet, 3)
+          if (n_tilts_total>1) fnam_det = trim(adjustl(fnam_det))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
+          call output_stem_image(stem_image(:,:,:,:,idet),fnam_det,probe_df)
     
-            filename = trim(adjustl(fnam)) // '_DiffPlaneTDS_Detector'
-            call add_zero_padded_int(filename, fnam_det, idet, 3)
-            if (n_tilts_total>1) fnam_det = trim(adjustl(fnam_det))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
-            call output_stem_image(stem_inelastic_image(:,:,:,:,idet),fnam_det,probe_df)
+          filename = trim(adjustl(fnam)) // '_DiffPlaneTDS_Detector'
+          call add_zero_padded_int(filename, fnam_det, idet, 3)
+          if (n_tilts_total>1) fnam_det = trim(adjustl(fnam_det))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
+          call output_stem_image(stem_inelastic_image(:,:,:,:,idet),fnam_det,probe_df)
         endif   
-    elseif(stem) then
+      elseif(stem) then
         if (adf) stem_image = stem_elastic_image + stem_inelastic_image
         if (.not.adf) stem_image = stem_elastic_image
         filename = trim(adjustl(fnam)) // '_DiffPlane'
         call add_zero_padded_int(filename, fnam_det, idet, 3)
         if (n_tilts_total>1) fnam_det = trim(adjustl(fnam_det))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
         call output_stem_image(stem_image(:,:,:,:,idet),fnam_det,probe_df)
-    endif
+      endif
     enddo
     if(ionization) then
         do ii=1,num_ionizations
 		
-        if(EDX) then
+          if(EDX) then
             filename = trim(adjustl(fnam)) // '_'//trim(adjustl(substance_atom_types(atm_indices(ii))))&
 						   &//'_'//trim(adjustl(Ion_description(ii)))//'_shell_EDX'
             call output_stem_image(stem_ion_image(:,:,:,:,ii), filename,probe_df)
-        else
+          else
             filename = trim(adjustl(fnam))// '_'//trim(adjustl(substance_atom_types(atm_indices(ii))))&
 						  &//'_'//trim(adjustl(Ion_description(ii)))//'_orbital_EELS'
             call output_stem_image(stem_ion_image(:,:,:,:,ii), filename,probe_df)
@@ -676,7 +676,7 @@ subroutine absorptive_stem(STEM,ionization,PACBED)
             filename =  trim(adjustl(fnam))//'_'//trim(adjustl(substance_atom_types(atm_indices(ii))))&
 						   &//'_'//trim(adjustl(Ion_description(ii)))//'_orbital_EELS_Corrected' 
             call output_stem_image(stem_ion_image(:,:,:,:,ii)*eels_correction_image, filename,probe_df)
-        endif
+          endif
         enddo
         if(.not.EDX) then
             filename = trim(adjustl(fnam)) // '_EELS_CorrectionMap' 

@@ -208,8 +208,8 @@
             write(*,*) '    (Accurately accounts for inelastic scattering'
             write(*,*) '     due to phonon excitation)'
             write(*,*) '<2> Absorptive model'
-            write(*,*) '     (Calculates faster than QEP but only approximates'
-            write(*,*) '      inelastic scattering due to phonon excitation)'
+            write(*,*) '    (Calculates faster than QEP but only approximates'
+            write(*,*) '     inelastic scattering due to phonon excitation)'
 
             call get_input('<1> QEP <2> ABS', i_tds_model)
             write(*,*)
@@ -226,6 +226,7 @@
         write(*,*) ' Options for output of inelastically and elastically scattered components'
         write(*,*) ' <1> Only output total signal (ie that measured in experiment)'
         write(*,*) ' <2> Separately output elastic, inelastic and total signal'
+        write(*,*) 'Note: option <2> does not apply to EELS or EDX output'
         if(complex_absorption.and.include_absorption) write(*,*) 'Note: option <2> only applies to STEM imaging'
         write(*,*)
         call get_input('Elastic and inelastic scattering output choice', i_tds_model)
