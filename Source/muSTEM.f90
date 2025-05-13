@@ -360,7 +360,7 @@
         integer*4 :: omp_get_max_threads, omp_get_num_procs
     
         num_cpu = omp_get_num_procs()
-        num_threads = max(1, int(num_cpu - 2))
+        num_threads = max(1, int(num_cpu/2))
         
         call omp_set_num_threads(num_threads)
 #ifdef GPU
