@@ -20,7 +20,7 @@
 !                       
 !--------------------------------------------------------------------------------
 
-    module global_variables
+module global_variables
     
     use m_precision, only: fp_kind
     
@@ -37,7 +37,7 @@
     real(fp_kind), allocatable :: bwl_mat(:,:)            !bandwidth limiting matrix
                                           
     integer(4), allocatable    :: nat(:)                     !number of each atom type in the unit celll
-	real(fp_kind), allocatable	:: dz(:)					  !ionicity of each atom type
+    real(fp_kind), allocatable	:: dz(:)					  !ionicity of each atom type
     real(fp_kind), allocatable :: tau(:,:,:)              !position of the atoms in the unit cell
     real(fp_kind), allocatable :: atf(:,:)                !atomic number, occupancy and DWF (urms)
     real(fp_kind), allocatable :: atomf(:,:),fx(:)        !electron scattering factor parameterisation from elsa
@@ -51,11 +51,11 @@
     
     !sample thickness and slicing variables
     real(fp_kind) :: thickness                        !sample thickness
-	real(fp_kind),allocatable:: zarray(:)
-	integer(4),allocatable::ncells(:)
-	integer(4)::nz
+    real(fp_kind),allocatable:: zarray(:)
+    integer(4),allocatable::ncells(:)
+    integer(4)::nz
     integer(4) :: n_cells  
-	logical::even_slicing
+    logical::even_slicing
 
     complex(fp_kind), allocatable :: fz(:,:,:)            !the scattering factors, in reciprocal space, calculated on the grid (supercell)
     complex(fp_kind), allocatable :: fz_DWF(:,:,:)        !the DWF smear_array, in reciprocal space, calculated on the grid (supercell)
@@ -71,7 +71,7 @@
     !output variables
     integer(4) :: ndet,nseg ,nopiyout,nopixout                           !number of integrating detectors and 4D STEM output
     real(fp_kind) :: seg_det_offset
-	logical::segments
+    logical::segments
     real(fp_kind), allocatable :: outer(:),inner(:)       !detector ranges (in inverse angstrom)
     
     !interpolation variables
@@ -95,19 +95,22 @@
     !logical types to pick inelastic calculations
     logical :: adf 
     logical :: EELS = .false.
+    
 
     
     logical :: qep,output_thermal,interpolation,fourdSTEM
     
     logical :: on_the_fly = .false.
     logical :: high_accuracy
-	logical :: ionic = .false.
+    logical :: ionic = .false.
     logical :: double_channeling,istem
-	logical :: plasmonmc = .false.
+    logical :: plasmonmc = .false.
+    logical :: linpoleels = .false.                       ! linear eels range interpolation (2025-May-14, JB)
+    
 	contains
      
     
-      function wavev(e)
+    function wavev(e)
       !  this function returns the wavevector in one over lambda, in a-1,
       !  for an input electron energy e in ev.
       

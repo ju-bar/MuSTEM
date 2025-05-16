@@ -123,7 +123,8 @@ subroutine qep_stem(STEM,ionization,PACBED)
 
 	!Double channeling variables
 	complex(fp_kind),device,allocatable,dimension(:,:) ::psi_inel_d,shiftarray,tmatrix_d,q_tmatrix_d
-	complex(fp_kind),device,allocatable,dimension(:,:,:)::tmatrix_states_d,Hn0_shifty_coord_d,Hn0_shiftx_coord_d,ctf_d
+	complex(fp_kind),device,allocatable,dimension(:,:,:)::tmatrix_states_d,ctf_d
+  complex(fp_kind),device,allocatable,dimension(:,:,:)::Hn0_shifty_coord_d,Hn0_shiftx_coord_d
 	real(fp_kind),device,allocatable,dimension(:,:)::cbed_inel_dc_d
 	real(fp_kind),device,allocatable,dimension(:,:,:)::Hn0_eels_detector_d
 	real(fp_kind),device,allocatable,dimension(:,:,:,:)::efistem_image_d,istem_image_d

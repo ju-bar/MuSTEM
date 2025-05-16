@@ -4,6 +4,7 @@
 !
 !  modified:
 !    2019-Dec-13, J. Barthel : code formatting, unirand, poirand1
+!    2025-May-14, J. Barthel : linpol
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -1219,5 +1220,56 @@ contains
   
   end function
   
+  
+  !
+  ! returns the linear interpolation for point x on a
+  ! given grid xa(n) with values ya(n)
+  ! assumes xa(n) is in ascending order
+  !   and xa(1) <= x <= xa(n)
+  !   2025-May-14, JB
+  function linpol(x, xa, ya, n)
+    
+    implicit none
+    
+    integer(4), intent(in) :: n ! number of data points provided
+    real(fp_kind), intent(in) :: x, xa(n), ya(n) ! x value and grid points
+
+    real(fp_kind) :: linpol ! the interpolation
+    real(fp_kind) :: dx, dy
+    integer(4) :: i, i1
+    
+    if (x <= xa(1)) then ! x at or below  lower grid range
+    
+      linpol = ya(1)
+      
+    elseif (x >= xa(n)) then ! x at or above  upper grid range
+      
+      linpol = ya(n)
+      
+    else ! x inside the grid
+      
+      if (n > 1 .and. x > xa(1)) then
+        ! find first xa(i) larger than x, cannot be xa(1)
+        i1 = n
+        do i=2, n
+          if (xa(i) > x) then
+            i1 = i
+            exit
+          end if
+        end do
+        
+        dx = xa(i1) - xa(i1-1)
+        dy = ya(i1) - ya(i1-1)
+        linpol = ya(i1-1) + (x - xa(i1-1)) * dy / dx
+        
+      else ! no grid
+        
+        linpol = ya(1)
+        
+      end if
+      
+    end if
+  
+  end function
 
 end module

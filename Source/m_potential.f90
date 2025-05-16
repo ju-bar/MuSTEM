@@ -385,9 +385,11 @@ module m_potential
   !atno is the atomic number
   !DE is the energy window for EELS and is ignored if the EDX parameterization is requested
   !EDX is a boolean variable, pass .TRUE. for EDX parameterization and .FALSE. for EELS
+  !
+  ! 2025-May-14, modified to run linear eels range interpolation on command line option linpoleels
     use m_numerical_tools
 		use m_string
-    use global_variables,only: ekv,ak1,nt,atf,substance_atom_types
+    use global_variables,only: ekv,ak1,nt,atf,substance_atom_types,linpoleels
         
     character(2),intent(in)::shell
 		integer*4,intent(in)::atno
@@ -433,6 +435,8 @@ module m_potential
     enddo
     !Can close parameters file now
     close(16)
+    
+    
 	  !Interpolate to accelerating voltage used
     !data in files is in steps of 50 keV with 8 points
     !this is stored in xdata
@@ -459,11 +463,15 @@ module m_potential
     !f(s)/DE is mostly flat and interpolates more simply
     EELS_EDX_params=0
     do i=1,mm
-		  do ii=1,5
-			  bscoef2_(1,ii) = EELS_param_set2(ii,i) / dedata(ii)
-		  enddo
-		  call cubspl(dedata, bscoef2_(:,:), 5, 0, 0)
-		  EELS_EDX_params(i) = DE*ppvalu(dedata,bscoef2_(:,:),4,4,DE,0)
+      if (linpoleels) then ! linear interpolation mode, 2025-May-14, JB
+        EELS_EDX_params(i) = linpol(DE, dedata, EELS_param_set2(:,i), 5)
+      else
+		    do ii=1,5
+			    bscoef2_(1,ii) = EELS_param_set2(ii,i) / dedata(ii)
+		    enddo
+		    call cubspl(dedata, bscoef2_(:,:), 5, 0, 0)
+		    EELS_EDX_params(i) = DE*ppvalu(dedata,bscoef2_(:,:),4,4,DE,0)
+      endif
     enddo
 		
 		return

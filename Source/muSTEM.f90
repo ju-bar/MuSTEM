@@ -20,9 +20,9 @@
 !
 !   version:        6.0  
 !  
-!  Copyright (C) 2022  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes, J. Barthel
+!  Copyright (C) 2025  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes, J. Barthel
 !
-!  v6.0 includes modifications by J. Barthel and L. J. Allen (2019 - 2022)
+!  v6.0 includes modifications by J. Barthel and L. J. Allen (2019 - 2025)
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -41,6 +41,7 @@
 
     program MU_STEM
     
+        use m_precision
         use m_user_input
         use global_variables!, only: high_accuracy, nt, atf, nat, atomf, volts, ss, qep, adf, constants, nopiy, nopix,output_thermal,ionic
         use m_lens
@@ -55,7 +56,7 @@
         use m_multislice
         use m_string
         use m_electron
-		use m_Hn0
+		    use m_Hn0
         
         implicit none
         
@@ -63,11 +64,12 @@
         
         logical :: nopause = .false.,there,ionization,stem,pacbed
         character(512)::command_argument
-        character(120)::fnam
+        character(120)::fnam, pnam
         character(2):: symb
         
-       
-108     write(6,109)
+        pnam                     = "single"
+        if(fp_kind==Double) pnam = "double"
+108     write(6,109) trim(pnam)
         109     format(&
        &1x,'|----------------------------------------------------------------------------|',/,&
        &1x,'|              Melbourne University (scanning) transmission electron         |',/,&
@@ -84,29 +86,30 @@
        &1x,'|                                                                            |',/,&
        &1x,"|       Copyright (C) 2025 L.J. Allen, H.G. Brown, A.J. D'Alfonso,           |",/,&
        &1x,'|              S.D. Findlay, B.D. Forbes, J. Barthel                         |',/,&
-	     &1x,'|       email: hgbrown@unimelb.edu.au                                        |',/,&
+	   &1x,'|       email: hgbrown@unimelb.edu.au                                        |',/,&
        &1x,'|              ju.barthel@fz-juelich.de (for this version)                   |',/,&
-       &1x,'|       This program comes with ABSOLUTELY NO WARRANTY;                      |',/,&
+       &1x,'|       This program comes with ABSOLUTELY NO WARRANTY.                      |',/,&
        &1x,'|                                                                            |',/,&
        &1x,'|       This program is licensed to you under the terms of the GNU           |',/,&
-	     &1x,'|       General Public License Version 3 as published by the Free            |',/,&
-	     &1x,'|       Software Foundation.                                                 |',/,&
+	   &1x,'|       General Public License Version 3 as published by the Free            |',/,&
+	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.0 (branch https://github.com/ju-bar 2025-05-12)        |',/,&
+       &1x,'|       GPU Version 6.0 (branch https://github.com/ju-bar 2025-05-16)        |',/,&
   	   &1x,'|           ! absorptive model calculations are known to crash occasionally  |',/,&
 #else
-       &1x,'|       CPU only Version 6.0 (branch https://github.com/ju-bar 2025-05-12)   |',/,&
+       &1x,'|       CPU only Version 6.0 (branch https://github.com/ju-bar 2025-05-16)   |',/,&
 #endif
+       &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&
-       &1x,'|       Note: pass the argument "nopause" (without quotation marks)          |',/,&
-       &1x,'|             e.g. muSTEM.exe nopause                                        |',/,&
-       &1x,'|             to avoid pauses.                                               |',/,&
+       &1x,'|       Optional arguments:  e.g. muSTEM.exe nopause                         |',/,&
+       &1x,'|         nopause      avoids program pauses                                 |',/,&
+       &1x,'|         linpoleels   applies linear interpolation on EELS energy windows   |',/,&
        &1x,'|                                                                            |',/,&
        &1x,'|----------------------------------------------------------------------------|',/)
        
-        ! Process command line arguments
-        ! Process command line arguments
+
+       ! Process command line arguments
         do i_arg = 1, command_argument_count()
             call get_command_argument(i_arg, command_argument)
             select case (trim(adjustl(command_argument)))
@@ -116,6 +119,8 @@
 				        timing = .true.
 			      case ('ionic')
 				        ionic = .true.
+            case ('linpoleels')
+                linpoleels = .true.
             end select
         enddo
         
