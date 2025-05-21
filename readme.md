@@ -45,6 +45,7 @@ Precompiled executables can be found in the [Executables](https://github.com/ju-
 * [**GPU** single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CUDA_muSTEM_x64_v6.0_single_precision.zip)
 
 **Remark:** The GPU version is distributed without the CUDA dynamic link libraries. The executable links to cudart64_101.dll and to cufft64_10.dll, which are distributed with the [NVIDIA CUDA Toolit Version 10.1](https://developer.nvidia.com/cuda-10.1-download-archive-base).
+The CPU version is linked against the Intel OpenMP libraries. It requires libiomp5md.dll, which is provided in the zip archive with the executable.
 
 ## Tutorial
 
