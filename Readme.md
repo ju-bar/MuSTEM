@@ -13,18 +13,16 @@ This is a fork of the [original µSTEM repository](https://github.com/HamishGBro
 
 ## Precompiled executables
 
-### GPU version
-* [**GPU** single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CUDA_muSTEM_x64_v6.1_single_precision.zip)
+### [GPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CUDA_muSTEM_x64_v6.1_single_precision.zip)
 
 #### Prerequisites
-* * 64-bit Windows OS
+* 64-bit Windows OS
 * A CUDA enabled GPU with compute class 3.0 up to 7.5, GPU compute classes >7.5 are only supported on Linux with the Nvidia HPC SDK.
 * Version 10.1 of the [Nvidia CUDA toolkit](https://developer.nvidia.com/cuda-toolkit-archive), this installs the .dll files necessary to run the GPU versions of μSTEM.
 
-### CPU version
-* [**CPU** single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CPU_muSTEM_x64_v6.1_single_precision.zip)
+### [CPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CPU_muSTEM_x64_v6.1_single_precision.zip)
 
-* #### Prerequisites
+#### Prerequisites
 * 64-bit Windows OS
 
 ### Executables archive
@@ -43,10 +41,10 @@ Executables of previous versions can be found in the [Executables](https://githu
 * Added option omp_num_threads={number} to allow OpenMP setup by users. By default the number of threads is set to half of the number of logical cores on the CPU. The maximum used threads is capped to number of cores - 1.
 * Added a linux makefile supporting GPU and CPU versions.
 
-**Remark:** The GPU version is distributed without the CUDA dynamic link libraries. The executable links to cudart64_101.dll and to cufft64_10.dll, which are distributed with the [NVIDIA CUDA Toolit Version 10.1](https://developer.nvidia.com/cuda-10.1-download-archive-base).
+**Remark:** The GPU version is distributed *without the CUDA dynamic link libraries*. The executable links to cudart64_101.dll and to cufft64_10.dll, which are distributed with the [NVIDIA CUDA Toolit Version 10.1](https://developer.nvidia.com/cuda-10.1-download-archive-base).
 The CPU version is linked against the Intel OpenMP libraries. It requires libiomp5md.dll, which is provided in the zip archive with the executable.
 
-### Version 6.0**
+### Version 6.0
 * Added Monte-Carlo code to simulate plasmon scattering, see [B. Mendis, Ultramic. 206 (2019) 112816, doi:10.1016/j.ultramic.2019.112816].
 * Updated the example run files distributed in the executable zip files. These also contain a STEM example now. Thanks to Duncan Alexander (EPFL, Lausanne, CH) for pointing out a problem with the distributed run files.
 
@@ -60,7 +58,7 @@ Click [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com
 ### Linux
 A makefile is provided in the repository that can be used to compile the source code on Linux systems. The makefile supports both the CPU and GPU versions of μSTEM. To compile the code, run `make` in the terminal from the root directory of the repository. Adopt to your system / compiler installations. The distributed version assumes (CPU) the Intel oneAPI (ifx) and (GPU) the Nvidia HPC SDK (nvfortran).
 
-### Window
+### Windows
 A compile_gpu.bat is provided with the repository to produce a GPU version of μSTEM. This script assumes that the PGI Fortran compiler is installed.
 The repository also contains solution and project files for Microsoft Visual Studio 2022 set up to work with the Intel oneAPI for producing a CPU version of µSTEM.
 
