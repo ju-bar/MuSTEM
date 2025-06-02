@@ -75,21 +75,22 @@
 			<File RelativePath=".\quadpack.f90"/>
 			<File RelativePath=".\s_absorptive_stem.f90"/>
 			<File RelativePath=".\s_absorptive_tem.f90"/>
-			<File RelativePath=".\s_qep_stem.f90"/>
+			<File RelativePath=".\s_qep_stem.f90">
+			</File>
 			<File RelativePath=".\s_qep_tem.f90"/>
 		</Filter>
 		<Filter Name="Test">
-			<File RelativePath=".\Test\user_input.txt"/>
+			<File RelativePath=".\Test\user_input.txt">
+			</File>
 		</Filter>
-		<File RelativePath="..\Makefile">
-		</File>
+		<File RelativePath="..\Makefile"/>
 		<File RelativePath=".\makefile">
 			<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
 			</FileConfiguration>
 			<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
 			</FileConfiguration>
 		</File>
-		<File RelativePath="..\readme.md">
+		<File RelativePath="..\Readme.md">
 		</File>
 	</Files>
 	<Globals/>
