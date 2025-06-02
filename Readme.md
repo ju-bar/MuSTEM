@@ -38,7 +38,7 @@ This is a fork of the [original µSTEM repository](https://github.com/HamishGBro
 
 Precompiled executables can be found in the [Executables](https://github.com/ju-bar/MuSTEM/tree/master/Executables) folder of the repository or by clicking the links below:
 
-### Current versions
+### Current version
 
 **Version 6.1**
 * [**CPU** single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CPU_muSTEM_x64_v6.1_single_precision.zip)
