@@ -13,14 +13,14 @@ This is a fork of the [original µSTEM repository](https://github.com/HamishGBro
 
 ## Precompiled executables
 
-### [GPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CUDA_muSTEM_x64_v6.1_single_precision.zip)
+### [µSTEM v6.1 GPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CUDA_muSTEM_x64_v6.1_single_precision.zip)
 
 #### Prerequisites
 * 64-bit Windows OS
 * A CUDA enabled GPU with compute class 3.0 up to 7.5, GPU compute classes >7.5 are only supported on Linux with the Nvidia HPC SDK.
 * Version 10.1 of the [Nvidia CUDA toolkit](https://developer.nvidia.com/cuda-toolkit-archive), this installs the .dll files necessary to run the GPU versions of μSTEM.
 
-### [CPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CPU_muSTEM_x64_v6.1_single_precision.zip)
+### [µSTEM v6.1 CPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CPU_muSTEM_x64_v6.1_single_precision.zip)
 
 #### Prerequisites
 * 64-bit Windows OS
