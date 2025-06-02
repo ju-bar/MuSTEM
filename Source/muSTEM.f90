@@ -18,11 +18,11 @@
 !   Date:           August 2017
 !   Requirements:   PGI Fortran
 !
-!   version:        6.0  
+!   version:        6.1  
 !  
 !  Copyright (C) 2025  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes, J. Barthel
 !
-!  v6.0 includes modifications by J. Barthel and L. J. Allen (2019 - 2025)
+!  v6.1 includes modifications by J. Barthel and L. J. Allen (2019 - 2025)
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@
     
         use m_precision
         use m_user_input
-        use global_variables!, only: high_accuracy, nt, atf, nat, atomf, volts, ss, qep, adf, constants, nopiy, nopix,output_thermal,ionic
+        use global_variables
         use m_lens
 #ifdef GPU        
         use cuda_setup, only: setup_GPU
@@ -56,17 +56,20 @@
         use m_multislice
         use m_string
         use m_electron
-		    use m_Hn0
+        use m_Hn0
         
         implicit none
         
         integer :: i_illum, i_tds_model, i_cb_menu, i_cb_calc_type,ifile,nfiles,i_arg,idum,i,ieftem
+        integer :: arg_num_threads, nerr
         
         logical :: nopause = .false.,there,ionization,stem,pacbed
         character(512)::command_argument
         character(120)::fnam, pnam
         character(2):: symb
         
+        nerr                     = 0
+        arg_num_threads          = 0
         pnam                     = "single"
         if(fp_kind==Double) pnam = "double"
 108     write(6,109) trim(pnam)
@@ -95,32 +98,50 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.0 (branch https://github.com/ju-bar 2025-05-16)        |',/,&
+       &1x,'|       GPU Version 6.1 (branch https://github.com/ju-bar 2025-06-02)        |',/,&
   	   &1x,'|           ! absorptive model calculations are known to crash occasionally  |',/,&
 #else
-       &1x,'|       CPU only Version 6.0 (branch https://github.com/ju-bar 2025-05-16)   |',/,&
+       &1x,'|       CPU only Version 6.1 (branch https://github.com/ju-bar 2025-06-02)   |',/,&
 #endif
        &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&
-       &1x,'|       Optional arguments:  e.g. muSTEM.exe nopause                         |',/,&
-       &1x,'|         nopause      avoids program pauses                                 |',/,&
-       &1x,'|         linpoleels   applies linear interpolation on EELS energy windows   |',/,&
+       &1x,'|       Optional arguments:  see muSTEM.exe options                          |',/,&
        &1x,'|                                                                            |',/,&
        &1x,'|----------------------------------------------------------------------------|',/)
        
 
-       ! Process command line arguments
+        ! Process command line arguments
         do i_arg = 1, command_argument_count()
             call get_command_argument(i_arg, command_argument)
+            idum = index(command_argument, 'omp_num_threads')
+            if (idum > 0) then
+                read(unit=command_argument(idum+16:),fmt='(i)',iostat=nerr) arg_num_threads
+                cycle
+            end if
             select case (trim(adjustl(command_argument)))
-            case ('nopause')
-                nopause = .true.
-			      case ('timing')
-				        timing = .true.
-			      case ('ionic')
-				        ionic = .true.
-            case ('linpoleels')
-                linpoleels = .true.
+            case ('options')
+                    write(*,*) 
+                    write(*,*) '  List of options for muSTEM:    e.g.  muSTEM nopause'
+                    write(*,*) '    nopause      - avoids program pauses'
+                    write(*,*) '    ionic        - applies ionic form factors (requires charge input via xtl)'
+                    write(*,*) '    linpoleels   - applies linear interpolation on EELS energy windows'
+                    write(*,*) '    omp_num_threads={n} sets number of OpenMP threads, e.g. omp_num_threads=3'
+                    write(*,*)
+                    stop
+                case ('nopause')
+                    nopause = .true.
+			    case ('timing')
+				    timing = .true.
+			    case ('ionic')
+                    ionic = .true.
+                case ('linpoleels')
+                    linpoleels = .true.
+                !case ('mmouse_wave')
+                !    arg_debug_wave = 1
+                !case ('mmouse_intens')
+                !    arg_debug_intens = 1
+                !case ('mmouse_stemdet')
+                !    arg_debug_stemdet = 1
             end select
         enddo
         
@@ -148,7 +169,7 @@
                 endif
             endif
         ! Set up CPU multithreading
-        call setup_threading
+        call setup_threading(arg_num_threads)
 #ifdef GPU
         ! Set up GPU
         call setup_GPU
@@ -328,7 +349,6 @@
             call qep_tem
 
         elseif (cb_illum .and. qep .and. i_cb_calc_type.eq.2) then
-            
             ! Convergent-beam QEP STEM
             call qep_stem(STEM,ionization,PACBED)
             
@@ -355,17 +375,23 @@
 
    
    
-    subroutine setup_threading()
+    subroutine setup_threading(nthreads)
     
         use m_string, only: to_string,command_line_title_box
     
         implicit none
       
-        integer*4 :: num_cpu, num_threads
+        integer, intent(in) :: nthreads
+        integer*4 :: num_cores, num_threads
         integer*4 :: omp_get_max_threads, omp_get_num_procs
     
-        num_cpu = omp_get_num_procs()
-        num_threads = max(1, int(num_cpu/2))
+        num_cores = omp_get_num_procs()
+        if (nthreads > 0) then
+            num_threads = min(nthreads, num_cores-1) ! Use the user-specified number of threads, capped to one less than the number of cores
+        else
+            num_threads = num_cores/2 ! Default to half the number of processors.
+        end if
+        num_threads = max(1, num_threads) ! Ensure at least one thread is used.
         
         call omp_set_num_threads(num_threads)
 #ifdef GPU
@@ -374,7 +400,7 @@
         call dfftw_plan_with_nthreads(num_threads)
 #endif
         call command_line_title_box('CPU multithreading')
-        write(*,*) 'The number of available logical CPUs is: ' // to_string(num_cpu)
+        write(*,*) 'The number of available logical cores is: ' // to_string(num_cores)
         write(*,*) 'The number of threads being used on the CPU is: ' // to_string(num_threads)
         write(*,*)
     

@@ -23,30 +23,55 @@
     subroutine correct_duplicate_atom_labels(substance_atom_types,nt)
     use m_string
     implicit none
-    character*10::substance_atom_types(nt)    
+    character*10::substance_atom_types(nt)
+    character*10::newname
     integer*4,intent(in)::nt
     
-    integer*4:: unique_list(nt),j,i,ii
-    logical::unique
+    integer*4:: unique_list(nt),j,i,ii,suffix
+    logical::unique!,duplicate
     
+    ! the list unique_list is used to count the number of duplicates for each atom type
     
     j=1
-    do i=1,nt
-        unique = .true.
+    do i=1,nt ! loop over all atom types
+        unique = .true. ! assume unique until proven otherwise
         
-        do ii=1,i-1
-            unique = .not.(trim(adjustl(substance_atom_types(ii)))==trim(adjustl(substance_atom_types(i))))
-            if(.not.unique) then
-                unique_list(i)=unique_list(ii)+1
-                exit
+        do ii=1,i-1 ! loop over all atom types previously inspected
+            unique = .not.(trim(adjustl(substance_atom_types(ii)))==trim(adjustl(substance_atom_types(i)))) ! update unique flag when type names are the same
+            if(.not.unique) then ! if not unique
+                unique_list(i)=unique_list(ii)+1 ! increment the number of duplicates for type i
+                exit ! stop searching, as type i is now handled as the (unique_list(ii)+1)-th duplicate of type ii
             endif
         enddo
         
-        if(unique) unique_list(i) = 1
+        if(unique) unique_list(i) = 1 ! no duplicates found so set to 1
     enddo
     
+    
     do i=1,nt
-        if(unique_list(i)>1) substance_atom_types(i)=trim(adjustl(substance_atom_types(i)))//to_string(unique_list(i))
+        ! update type name if there are duplicates
+        if(unique_list(i)>1) then
+            suffix = unique_list(i) ! initialize the suffix
+            newname = trim(adjustl(substance_atom_types(i)))//to_string(suffix)
+            
+            !
+            !! the code below checks for duplicates of the new name (2025-05-21 JB)
+            !duplicate = .True. ! assume duplicate until proven otherwise
+            !do while(duplicate)
+            !do ii=1, nt ! loop over all types again and check for duplicates with name+suffix
+            !    if (i==ii) cycle ! skip the current type
+            !    duplicate = (trim(adjustl(substance_atom_types(ii)))==trim(adjustl(newname))) ! check for duplicate
+            !    if (duplicate) then
+            !        suffix = suffix + 1 ! increment the suffix
+            !        newname = trim(adjustl(substance_atom_types(i)))//to_string(suffix) ! update the name with the new suffix
+            !        exit ! stop the loop (duplicate is .true.) to re-run the duplicate check with the updated newname
+            !    endif
+            !enddo ! this runs over all atom types other than the current one
+            !! if the preceeding loop has not found any duplicates, then the newname is unique and duplicate=.false. to end the while loop
+            !enddo ! this will exit when no duplicates are found
+            
+            substance_atom_types(i)=trim(adjustl(newname))
+        endif
     enddo
     end subroutine
 
@@ -122,7 +147,7 @@
 111   format(/,1x,a20)
 
       read(iunit,*) a0(1:3), deg(1:3)
-      write(6,121) a0(1:3), char(143), deg(1:3)
+      write(6,121) a0(1:3), 'A', deg(1:3)
 121   format(4x,' a = ',f9.4,7x,'b = ',f9.4,6x,'c = ',f9.4,1x,a1,/,&
      &' alpha = ',f9.4,2x,'  beta = ',f9.4,2x,'gamma = ',f9.4,&
      &' degrees',/)
@@ -361,7 +386,7 @@
         
         if (pw_illum) then
             if (a0(1)*ifactorx .ne. a0(2)*ifactory) then
-                write(*,10) a0(1)*ifactorx, char(143), a0(2)*ifactory, char(143)
+                write(*,10) a0(1)*ifactorx, 'A', a0(2)*ifactory, 'A'
 10              format(1x, 'Warning: the supercell has the non-square dimensions ', f8.2, 1x, a1, ' x ', f8.2, 1x, a1)
                 write(*,*) 'If a square grid of pixels is specified, the outputted'
                 write(*,*) 'images and diffraction patterns will have the wrong'
@@ -399,8 +424,8 @@
         
             write(6,161) nopix_ucell, nopiy_ucell
             if (.not.quick_shift) write(6,162)
-            write(6,163) ifactorx, ifactory, nopix, nopiy, max_qx, char(143),&
-                         &max_qy, char(143),max_mradx, max_mrady
+            write(6,163) ifactorx, ifactory, nopix, nopiy, max_qx, 'A',&
+                         &max_qy, 'A',max_mradx, max_mrady
             
 161  format(  '                                x               y', /, &
             & ' ---------------------------------------------------------', /, &
@@ -534,7 +559,7 @@
         n_cells = nint(thickness/a0(3))
         thickness = n_cells*a0(3)
 		do i=1,nz
-			write(6, 15) ncells(i), zarray(i), char(143)	
+			write(6, 15) ncells(i), zarray(i), 'A'	
 		enddo
 	15  format(' This corresponds to ', i5, ' unit cells with a total thickness of ', f6.1, ' ', a1, '.')
    

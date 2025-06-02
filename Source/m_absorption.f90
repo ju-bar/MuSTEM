@@ -268,7 +268,7 @@ module m_absorption
             write(*,*) 'Kinematic mean free path for TDS is effectively infinite.'
 
         else
-            if(thmin<1e-3.and.thmax>pi-1e-3) write(*,211) 1/mu_0, char(143)
+            if(thmin<1e-3.and.thmax>pi-1e-3) write(*,211) 1/mu_0, 'A'
     211     format(' Kinematic mean free path for TDS = ', f10.2, 1x, a1)
 
         endif

@@ -81,6 +81,16 @@
 		<Filter Name="Test">
 			<File RelativePath=".\Test\user_input.txt"/>
 		</Filter>
+		<File RelativePath="..\Makefile">
+		</File>
+		<File RelativePath=".\makefile">
+			<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+			</FileConfiguration>
+			<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
+			</FileConfiguration>
+		</File>
+		<File RelativePath="..\readme.md">
+		</File>
 	</Files>
 	<Globals/>
 </VisualStudioProject>

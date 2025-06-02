@@ -2,6 +2,9 @@
 !
 !  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
 !
+!  Additional modifications:
+!   2025-05-23 JB - custom ionization form-factor support
+!
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
 !  the Free Software Foundation, either version 3 of the License, or
@@ -22,22 +25,24 @@ module m_potential
     use m_precision, only: fp_kind
     implicit none
     
-      integer(4) :: num_ionizations
-      integer(4),allocatable::  atm_indices(:)
-      character(2),allocatable::ion_description(:)
-      logical:: EDX
+    integer(4) :: num_ionizations
+    integer(4),allocatable::  atm_indices(:)
+    character(20),allocatable::ion_description(:) ! increased to 20 chars for custom ionization lines (2025-05-21 JB)
+    logical:: EDX
       
-      complex(fp_kind), allocatable :: ionization_mu(:,:,:)        !the ionization scattering factor array, calculated on the grid (supercell)
-      complex(fp_kind), allocatable :: fz_adf(:,:,:,:)        !the adf scattering factor array, calculated on the grid (supercell)
-      real(fp_kind),    allocatable :: adf_potential(:,:,:,:)
-      real(fp_kind),    allocatable :: ionization_potential(:,:,:,:)
-      real(fp_kind),    allocatable :: eels_correction_detector(:,:)
-	 !complex(fp_kind), allocatable :: inverse_sinc_new(:,:)
+    complex(fp_kind), allocatable :: ionization_mu(:,:,:)        !the ionization scattering factor array, calculated on the grid (supercell)
+    complex(fp_kind), allocatable :: fz_adf(:,:,:,:)        !the adf scattering factor array, calculated on the grid (supercell)
+    real(fp_kind),    allocatable :: adf_potential(:,:,:,:)
+    real(fp_kind),    allocatable :: ionization_potential(:,:,:,:)
+    real(fp_kind),    allocatable :: eels_correction_detector(:,:)
+	!complex(fp_kind), allocatable :: inverse_sinc_new(:,:)
     
     integer(4) :: n_qep_grates,n_qep_passes,nran ! Start of random number sequence
     
     logical :: phase_ramp_shift
     logical(4) :: quick_shift
+    
+    real(fp_kind),parameter :: thr_cus_ekv = 1.0_fp_kind ! threshold for matching ekv (in keV) in custom ionization (2025-05-22 JB)
 
     interface
         subroutine make_site_factor_generic(site_factor, tau)
@@ -320,19 +325,212 @@ module m_potential
         use m_user_input
         use m_string
         implicit none
-		    integer*4::i_eels
+        integer*4::i_eels
       
         call command_line_title_box('Ionization')
-		    i_eels = 0
+		i_eels = 0
         do while(i_eels<1.or.i_eels>2)
-			    write(*,*) char(10),' <1> EELS',char(10),' <2> EDX',char(10)
-			    call get_input('Ionization choice', i_eels)
+		    write(*,*) char(10),' <1> EELS',char(10),' <2> EDX',char(10)
+            call get_input('Ionization choice', i_eels)
         enddo
         
-		    EDX = i_eels.eq.2
-		    call local_potential(EDX)
+        EDX = i_eels.eq.2
+		call local_potential(EDX)
 
-      end subroutine
+    end subroutine
+    
+    function get_custom_ionization_total() result(num_custom)
+    !Returns the total number of custom ionization data sets
+    ! in the custom ionization file
+    ! 2025-05-21 JB
+        implicit none
+        integer*4 :: num_custom, reason , lcnt
+        character*120 :: filename,line
+        num_custom=0
+        filename = 'custom_ionization.dat'
+		open(unit=35,file=filename,status='old',err=970)
+        lcnt = 0
+        do
+            read(35, '(a)', iostat=reason) line
+            if (0==reason) then ! successful read
+                lcnt = lcnt + 1
+            else ! stop reading
+                exit
+            end if
+        end do
+        close(35)
+        num_custom = RSHIFT(lcnt,1) ! divide by to (assuming two lines per data set)
+970     return ! could not open file, thus no custom ionization data
+    end function
+    
+    
+    function get_custom_ionization_num() result(n)
+    !Returns the number of matching custom ionization data sets and fills information
+    ! with the data from the custom ionization file (custom_ionization.dat)
+    ! This is not loading the data, only the number of matching data sets is determined
+    ! Use load_custom_ionization_data() to load the data
+    !
+    ! Warning: The loading in this function assumes that the compiler treats tabs as spaces
+    !           (which is not the case for gfortran, but is for ifort, ifx, pgifortran).
+    !           The solution is to replace the tabs with spaces in the file or in ldata.
+    !           Since the same problem exists with the default data files, we do not handle
+    !           this here. Note, char(9) is a tab character. ;)
+    !
+    ! 2025-05-23 JB
+        use global_variables, only: ekv, nt, atf
+        implicit none
+        integer*4, parameter :: funit = 35 ! unit number for file access
+        integer*4 :: n ! returned number of available (matching) custom ionization data sets
+        ! temps and parameters from file
+        character(10)::lsym,lshell
+        integer*4::reason,i,z,lz
+        character*120::filename,lhead
+        real(fp_kind)::lekv
+        ! init
+        n = 0
+        filename = 'custom_ionization.dat'
+        ! open the file
+        open(unit=funit,file=trim(filename),status='old',err=970)
+        ! start parsing the file
+        do ! reading lines loop
+            read(funit, '(a)', iostat=reason) lhead ! read next line (limited to 120 chars)
+            if (0==reason) then ! successful read
+                ! find matching header data (this must be equal to whats in load_custom_ionization(...))
+                if (INDEX(lhead, "EEL") > 0) then ! EELS header line
+                    ! check matches to atom types and ekv, using first four columns, which should always be there
+                    read(lhead, *) lsym, lz, lshell, lekv
+                    if (ABS(lekv-ekv)<thr_cus_ekv) then ! beam energy matches
+                        do i=1, nt ! loop over structure atom types
+                            if (lz==NINT(atf(1,i))) then ! atom type matches
+                                n = n + 1 ! we have to make a choice available for each atom type, so accumulate each match
+                            end if
+                        enddo 
+                    end if
+                else
+                    cycle ! next line
+                end if
+            else ! stop reading (probably end of file)
+                exit
+            endif
+        end do ! reading lines loop
+        ! close the file
+        close(unit=funit)
+970     return ! could not open file, thus no custom ionization data
+    end function
+    
+    
+    subroutine load_custom_ionization(num,aty,orb,de,linenum)
+    !Loads num data sets of matching custom ionization parameters into the interfaced arrays.
+    ! First, call num = get_custom_ionization_num() to get the number n of matching data sets.
+    !
+    ! This routine loads header data from file 'custom_ionization.dat'.
+    ! To load the actual ionization form factors, call the subroutine
+    ! load_custom_ionization_data(...) and provide the line number in the file,
+    ! which is returned by this routine in array linenum.
+    !
+    ! 2025-05-23 JB
+        use global_variables, only: ekv, nt, atf
+        implicit none
+        integer*4, parameter :: funit = 36 ! unit number for file access
+        integer*4, intent(in) :: num ! number of matching custom ionization data sets
+        integer*4, intent(inout) :: aty(num), linenum(num) ! atom type indices for each data set
+        character(2), intent(inout) :: orb(num) ! ionization shell symbol for each data set
+        real*4, intent(inout) :: de(2,num) ! energy-loss window and ff-parameters
+        ! temps and parameters from file
+        character(10)::lsym,lshell
+        integer*4::reason,i,ii,z,lz,iline
+        character*120::filename,lhead,ldum
+        character*1014::ldum2
+        real(fp_kind)::lekv,lde1,lde2
+        ! init
+        ii = 0
+        iline = 0
+        filename = 'custom_ionization.dat'
+        ! open the file
+        open(unit=funit,file=trim(filename),status='old',err=970)
+        ! start parsing the file
+        do ! reading lines loop
+            read(funit, '(a)', iostat=reason) lhead ! read next line assuming header
+            iline = iline + 1 ! increment line number
+            if (reason/=0) then ! eof or error, stop reading
+                close(unit=funit)
+                return
+            end if
+            read(funit, '(a)', iostat=reason) ldum ! read next line assuming data
+            iline = iline + 1 ! increment line number
+            if (0==reason) then ! successful data read
+                !
+                ! find matching header data (this must be equal to what's in get_custom_ionization_num())
+                if (INDEX(lhead, "EEL") > 0) then ! EELS header line
+                    ! check matches to atom types and ekv, using first four columns, which should always be there
+                    read(unit=lhead, fmt=*) lsym, lz, lshell, lekv, ldum, lde1, lde2
+                    if (ABS(lekv-ekv)<thr_cus_ekv) then ! beam energy matches
+                        do i=1, nt ! loop over structure atom types
+                            if (lz==NINT(atf(1,i))) then ! atom type also matches
+                                ii = ii + 1 ! increment store index
+                                ! store the header data
+                                aty(ii) = i ! atom type index
+                                orb(ii) = lshell ! ionization shell symbol
+                                de(1,ii) = lde1 ! energy-loss window start
+                                de(2,ii) = lde2 ! energy-loss window end
+                                linenum(ii) = iline ! read the parameters
+                                ! This way we only load the data once, but make it availabale to each
+                                ! matching atom type of the structure. This keeps the custom table
+                                ! consistent with how the default table is used.
+                            end if
+                        enddo 
+                    end if
+                else
+                    cycle ! next line
+                end if
+            else ! stop reading (probably end of file)
+                exit
+            endif
+        end do ! reading lines loop
+        ! close the file
+        close(unit=funit)
+970     return ! could not open file, thus no custom ionization data
+    end subroutine
+    
+    
+    subroutine load_custom_ionization_data(linenum, params)
+    !Loads the custom ionization form factor parameters from the file 'custom_ionization.dat'
+    ! This routine loads the parameters from the line number linenum in the file.
+    !
+    ! Call this subroutine after calling load_custom_ionization(...) to get the line number.
+    !
+    ! Warning: The loading in this function assumes that the compiler treats tabs as spaces
+    !           (which is not the case for gfortran, but is for ifort, ifx, pgifortran).
+    !           The solution is to replace the tabs with spaces in the file or in ldata.
+    !           Since the same problem exists with the default data files, we do not handle
+    !           this here. Note, char(9) is a tab character. ;)
+    !
+    ! 2025-05-23 JB
+        implicit none
+        integer*4, parameter :: funit = 37 ! unit number for file access
+        integer*4, intent(in) :: linenum ! line number in the file to read from
+        real(fp_kind), intent(inout) :: params(29) ! ionization form factor parameters taken from the file at linenum
+        integer*4::reason,i
+        character*120::filename ! file name buffer
+        character*1024::ldata ! data line (1024 chars, should be enough for 29 numbers and separators)
+        ! init
+        filename = 'custom_ionization.dat'
+        ! open the file
+        open(unit=funit,file=trim(filename),status='old',err=970)
+        ! start parsing the file
+        do i=1,linenum! reading lines loop
+            read(funit, '(a)', iostat=reason) ldata ! read linenum lines assuming data is in line linenum
+            if (reason/=0) then ! eof or error, stop reading
+                close(unit=funit)
+                return
+            end if
+        end do
+        ! close the file
+        close(unit=funit)
+        read(ldata,*) params ! read the parameters from the line
+970     return ! could not open file, thus no custom ionization data
+    end subroutine
+    
 	
     function get_ionization_shell_line(shell,atno) result(lineno)
         !Get the line for the given ionization shell and atom number,returns 
@@ -379,7 +577,7 @@ module m_potential
 970 write(*,*) 'Problem reading ',filename           
   end function
         
-	function get_ionization_parameters(shell,atno,DE,EDX) result (EELS_EDX_params)
+  function get_ionization_parameters(shell,atno,DE,EDX) result (EELS_EDX_params)
   !Read ionisation form factor parameters from ionization_data files
   !shell should be a string describing the orbital ie, '1s', '2s', '2p' etc
   !atno is the atomic number
@@ -388,73 +586,72 @@ module m_potential
   !
   ! 2025-May-14, modified to run linear eels range interpolation on command line option linpoleels
     use m_numerical_tools
-		use m_string
+    use m_string
     use global_variables,only: ekv,ak1,nt,atf,substance_atom_types,linpoleels
         
     character(2),intent(in)::shell
-		integer*4,intent(in)::atno
-		real(fp_kind),intent(in)::DE
-		logical,intent(in):: EDX
+    integer*4,intent(in)::atno
+	real(fp_kind),intent(in)::DE
+	logical,intent(in):: EDX
 		
-		real(fp_kind)::params(29,8,5),EELS_PARAM_SET2(5,29),xdata(8),bscoef_(4,8)
-		real(fp_kind) :: dedata(5),bscoef2_(4,5),p(29),EELS_EDX_params(29)
+	real(fp_kind)::params(29,8,5),EELS_PARAM_SET2(5,29),xdata(8),bscoef_(4,8)
+    real(fp_kind) :: dedata(5),bscoef2_(4,5),p(29),EELS_EDX_params(29)
         
     integer*4::iatom,atno_check,i,ii,m,ishell,iz,lineno,n,mm
-		character(10) junk
-		character(1) cjunk1,cjunk2,cjunk3
+	character(10) junk
+	character(1) cjunk1,cjunk2,cjunk3
 
-		m = 5
-		if(EDX) m=1
+	m = 5
+	if(EDX) m=1
 		
-		!write(*,*) 'reading inelastic scattering parameterization:'
-		!write(*,*) '- file: '//'ionization_data\EELS_EDX_'//shell//'.dat'
+	!write(*,*) 'reading inelastic scattering parameterization:'
+	!write(*,*) '- file: '//'ionization_data\EELS_EDX_'//shell//'.dat'
         
     n = str2int(shell(1:1))
     lineno = get_ionization_shell_line(shell,atno)
-		!write(*,*) '- shell: '//shell//' - id = '//to_string(n)
-		!write(*,*) '- from line: '//to_string(lineno)
+	!write(*,*) '- shell: '//shell//' - id = '//to_string(n)
+	!write(*,*) '- from line: '//to_string(lineno)
 		
-		!open the pertinent data files and read to relevant line        
-		open(unit=16,file='ionization_data\EELS_EDX_'//shell//'.dat',status='old',err=970)
-		do iz = 1,lineno
-		  read(16,*) junk
+    !open the pertinent data files and read to relevant line        
+	open(unit=16,file='ionization_data\EELS_EDX_'//shell//'.dat',status='old',err=970)
+	do iz = 1,lineno
+	  read(16,*) junk
     enddo
     p = 0
     !Later parametrizations only contain 28 datapoints
     mm=29;if (n>2) mm=28
-		!write(*,*) '- number of items per line: '//to_string(mm)
+    !write(*,*) '- number of items per line: '//to_string(mm)
     !Read parameters
-		do i=1,8 !Loop over accelerating voltages
-		  read(16,*) junk ! E=xx kev header
-		  do ii=1,6 !Loop over energy loss above threshhold (EELS) and EDX 
-			  read(16,*) p(1:mm)
-			  !write(*,*) '--- #'//to_string(ii)//': '//to_string(p(1))
-			  if((.not.EDX).and.(ii<6)) params(:,i,ii) = p(:) !EELS is the first 5 lines
-			  if(EDX.and.(ii==6)) params(:,i,1) = p(:) !EDX is the last line
-		  enddo
+    do i=1,8 !Loop over accelerating voltages
+	  read(16,*) junk ! E=xx kev header
+	  do ii=1,6 !Loop over energy loss above threshhold (EELS) and EDX 
+	    read(16,*) p(1:mm)
+		!write(*,*) '--- #'//to_string(ii)//': '//to_string(p(1))
+		if((.not.EDX).and.(ii<6)) params(:,i,ii) = p(:) !EELS is the first 5 lines
+		if(EDX.and.(ii==6)) params(:,i,1) = p(:) !EDX is the last line
+      enddo
     enddo
     !Can close parameters file now
     close(16)
     
     
-	  !Interpolate to accelerating voltage used
+    !Interpolate to accelerating voltage used
     !data in files is in steps of 50 keV with 8 points
     !this is stored in xdata
     xdata =(/(i*50, i=1,8,1)/)
-
     do ii=1,m
       do i=1,mm
-			  bscoef_(1,:) = params(i,1:8,ii)
-			  call cubspl(xdata, bscoef_(:,:), 8, 0, 0)
-			  EELS_param_set2(ii,i) = ppvalu(xdata,bscoef_(:,:),7,4,ekv,0)
+		bscoef_(1,:) = params(i,1:8,ii)
+		call cubspl(xdata, bscoef_(:,:), 8, 0, 0)
+		EELS_param_set2(ii,i) = ppvalu(xdata,bscoef_(:,:),7,4,ekv,0)
       enddo
     enddo
 	   
-	  !If EDX then no energy window interpolation is needed
-	  if (EDX) then
-		  EELS_EDX_params = EELS_param_set2(1,:)
-		  return
-	  endif
+	!If EDX then no energy window interpolation is needed
+	if (EDX) then
+	  EELS_EDX_params = EELS_param_set2(1,:)
+      return
+    endif
 	  
     ! contained within EELS_param_set2(i,ii) is the 29 data points (first index) interpolated
     ! to the correct incident energy there are 5 rows Interpolate to energy window desired
@@ -464,19 +661,20 @@ module m_potential
     EELS_EDX_params=0
     do i=1,mm
       if (linpoleels) then ! linear interpolation mode, 2025-May-14, JB
-        EELS_EDX_params(i) = linpol(DE, dedata, EELS_param_set2(:,i), 5)
+        bscoef2_(1,1:m) = EELS_param_set2(1:m,i) ! using m instead of fix number 5 (2025-05-21 JB)
+        EELS_EDX_params(i) = linpol(DE, dedata, bscoef2_(1,:), m)
       else
-		    do ii=1,5
-			    bscoef2_(1,ii) = EELS_param_set2(ii,i) / dedata(ii)
-		    enddo
-		    call cubspl(dedata, bscoef2_(:,:), 5, 0, 0)
-		    EELS_EDX_params(i) = DE*ppvalu(dedata,bscoef2_(:,:),4,4,DE,0)
+		do ii=1,m
+		  bscoef2_(1,ii) = EELS_param_set2(ii,i) / dedata(ii) ! setup for cupspl with coeffs/de
+		enddo
+		call cubspl(dedata, bscoef2_(:,:), m, 0, 0) ! cubic spline coefficients for m points
+        EELS_EDX_params(i) = DE*ppvalu(dedata,bscoef2_(:,:),m-1,4,DE,0)
       endif
     enddo
 		
-		return
+	return
 970 write(*,*) ' Cannot access data file EELS_EDX_'//shell//'.dat'
-		stop
+	stop
   end function
 
   
@@ -489,6 +687,10 @@ module m_potential
   !     2020-11-26 / JB / support for more orbitals added (4f, 5s, 5p)
   !                       now 12 files named 'EELS_EDX_{orb}.dat
   !                       are expected in the ionization_data folder
+  !     2025-05-14 / JB / added linear interpolation option for EELS range
+  !     2025-05-23 / JB / added custom ionization parameters to EELS
+  !                       this requires the file custom_ionization.dat to be
+  !                       present in the execution directory
   !     
   !********************************************************************************
   subroutine local_potential(EDX)
@@ -496,11 +698,11 @@ module m_potential
     use m_string
     use m_numerical_tools, only: cubspl,ppvalu
     use m_multislice
-	  use global_variables
+    use global_variables
     use m_user_input
 
     implicit none
-	  logical,intent(in)::EDX
+    logical,intent(in)::EDX
 
     integer(4) i,ii,iii,j,kval,m,nchoices,ZZ,nshells,norbitals,k
     integer(4),allocatable::available_shells(:),available_atoms(:)
@@ -508,53 +710,65 @@ module m_potential
     real(fp_kind),allocatable:: DE(:)
     real(fp_kind) eels_inner,eels_outer
     character(2) shell_name_EELS(12),orb
-    character(3) shells(12)!(9)
+    character(3) shells(12) !(9)
     !character(13):: contributions(4)
+    character(32)::tmpi
     logical,allocatable::choices(:)
     logical::k_shell,l_shell,EDXpresent(nt,4)
+    
+    ! addional variables for custom ionization parameters (2025-05-21 JB)
+    integer*4 :: ncustom ! number of available custom parameter sets
+    logical, allocatable :: choicus(:) ! menu selection for custom parameters
+    integer*4, allocatable :: cus_aty(:) ! structure atom type indices for custom parameters
+    character(2), allocatable :: cus_orb(:) ! orbital codes for custom parameters
+    real(fp_kind), allocatable :: cus_de(:,:) ! energy windows for custom parameters
+    integer*4, allocatable :: cus_line(:) ! custom ionization parameter line number in the parameterization file
 
     shell_name_EELS = [ '1s', '2s', '2p', '3s', '3p', '3d', '4s', '4p', '4d', '4f', '5s', '5p']
     shells =          [  'K', 'L1','L23', 'M1','M23','M45', 'N1','N23','N45','N67', 'O1','O23']
     !contributions = ['1s','2s and 2p','3s, 3p and 3d','4s, 4p and 4d']
     norbitals = size(shell_name_EELS)
     nshells = size(shells)
-	  !If EELS, setup detectors
-	  if(.not.EDX) then
-			write(6,91)
-91    format(1x,'The EELS calculations assume the local approximation, which', /, &
+    
+	!If EELS, setup detector
+	if(.not.EDX) then
+	    write(6,91)
+91      format(1x,'The EELS calculations assume the local approximation, which', /, &
 				&1x,'may be inappropriate when the EELS detector does not', /, &
 				&1x,'have a very large acceptance angle. To account for the', /, &
 				&1x,'finite detector size, a correction is applied.', /, &
 				&1x,'For more details see Y. Zhu et al. APL 103 (2013) 141908.', /)
 		
-		  eels_inner = 0.0_fp_kind
+        eels_inner = 0.0_fp_kind
 		  
-		  write(*,*) 'EELS detector outer angle (mrad):'
-		  call get_input('Outer EELS angle', eels_outer)
+        write(*,*) 'EELS detector outer angle (mrad):'
+        call get_input('Outer EELS angle', eels_outer)
 		  
-		  write(*,*)
+        write(*,*)
 
-		  eels_inner = ak1*tan(eels_inner/1000.0_fp_kind)
-		  eels_outer = ak1*tan(eels_outer/1000.0_fp_kind)
-		  if(allocated(eels_correction_detector)) deallocate(eels_correction_detector)
-		  allocate(eels_correction_detector(nopiy,nopix))
+        eels_inner = ak1*tan(eels_inner/1000.0_fp_kind)
+        eels_outer = ak1*tan(eels_outer/1000.0_fp_kind)
+        if(allocated(eels_correction_detector)) deallocate(eels_correction_detector)
+        allocate(eels_correction_detector(nopiy,nopix))
         eels_correction_detector = make_detector(nopiy,nopix,ifactory,ifactorx,ss,eels_inner,eels_outer)
-    endif  
-!Count available orbitals by checking what is available for the given atoms in
-!the parametrization files
-	  ii=0
-        
-    do i = 1, nt; ZZ=nint(ATF(1,i)); do j=1,norbitals
-        if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) ii=ii+1
-    enddo; enddo
-    !endif
+    endif
     
-	  nchoices = ii
-	  allocate(choices(ii),DE(ii))
-	  DE = 0
+    ! Setup for default ionization parameters
+    !
+    ! Count available orbitals by checking what is available for the given atoms in
+    ! the parametrization files
+    ii = 0
+    do i = 1, nt; ZZ=nint(ATF(1,i)); do j=1,norbitals
+        if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) ii=ii+1 ! count default ionization data sets
+    enddo; enddo
+          
+    ! allocations to hold user selections
+    nchoices = ii
+    allocate(choices(ii),DE(ii))
+    DE = 0
     choices = .false.
 	
-	  kval = -1
+    kval = -1
     write(*,*) char(10),' ',char(230),'STEM calculates EDX and EELS signals for ionization of electrons to the '
     write(*,*) 'continuum, at this point bound->bound (white line) transitions are not taken'
     write(*,*) 'into account.',char(10)
@@ -562,32 +776,34 @@ module m_potential
     write(*,*) 'that quantitative agreement between simulation and theory has only been '
     write(*,*) 'demonstrated for K and L shells (see Y. Zhu and C. Dwyer, Microsc. Microanal.'
     write(*,*) '20 (2014), 1070-1077)',char(10)
-	  do while ((kval.ne.0).or.all(.not.choices))
-100   format(/,' Ionization choices',/,/,'Index  Atom| Z  |',a,'| Included(y/n)'/&
-			        &,'-----------------------------------------------------------')
-	    if(EDX) write(*,100) ' Orbital | Shell '
-110   format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,a1,6x)
+    do while ((kval.ne.0).or.all(.not.choices)) !EELS selection menu loop
+100 format(/,' Ionization choices',/,/,'Index  Atom| Z  |',a,'| Included(y/n)'/&
+                &,'-----------------------------------------------------------')
+    if(EDX) write(*,100) ' Orbital | Shell '
+110 format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,a1,6x)
     
-      if(.not.EDX) write(*,100) ' Orbital | Shell | Window (eV)'
-111   format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,f5.1,6x,'|',1x,a1,6x)
-120   format(' < 0> continue')
+    if(.not.EDX) write(*,100) ' Orbital | Shell | Window (eV)'
+111 format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,f5.1,6x,'|',1x,a1,6x)
+120 format(' < 0> continue')
     
-    !Display choices for EDX and EELS ionizations
-	    ii=1
-      do i = 1, nt;ZZ=nint(ATF(1,i)); do j=1,norbitals
-        if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) then
-          if(EDX) write(*,110) ii,trim(adjustl(substance_atom_types(i))),int(ZZ),shell_name_EELS(j),shells(j),logical_to_yn(choices(ii))
-          if(.not.EDX) write(*,111) ii,trim(adjustl(substance_atom_types(i))),int(ZZ),shell_name_EELS(j),shells(j),DE(ii),logical_to_yn(choices(ii))
-          ii=ii+1
-        endif
-      enddo;enddo
-      
-      write(*,120)
+    !Display choices for default EDX and EELS ionizations
+    ii=1
+    do i = 1, nt;ZZ=nint(ATF(1,i)); do j=1,norbitals
+      if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) then
+        if(EDX) write(*,110) ii,trim(adjustl(substance_atom_types(i))), &
+                 & int(ZZ),shell_name_EELS(j),shells(j),logical_to_yn(choices(ii))
+        if(.not.EDX) write(*,111) ii,trim(adjustl(substance_atom_types(i))), &
+                 & int(ZZ),shell_name_EELS(j),shells(j),DE(ii),logical_to_yn(choices(ii))
+        ii=ii+1
+      endif
+    enddo;enddo
+    
+    write(*,120)
 	  
-      call get_input('Shell choice <0> continue', kval)
-	      !Update choice
-	      if ((kval.gt.0).and.(kval.le.nchoices)) then
-          choices(kval) = .not.choices(kval)
+    call get_input('Shell choice <0> continue', kval)
+	!Update choice
+	if ((kval.gt.0).and.(kval.le.nchoices)) then
+        choices(kval) = .not.choices(kval)
         
         !If EELS get energy window
         if (.not.EDX) then
@@ -597,39 +813,96 @@ module m_potential
             call get_input('Energy window', DE(kval))
           enddo 
         end if
-      end if
-    enddo
+    end if
+    enddo ! eels selection menu
     
-	  num_ionizations = count(choices)
     
-	  allocate(ionization_mu(nopiy,nopix,num_ionizations),atm_indices(num_ionizations),Ion_description(num_ionizations))
+    ! Custom EELS ionization data initializtation
+    ncustom = get_custom_ionization_num() ! get matching number of custom ionization data sets
+    if ((.not.EDX) .and. (ncustom>0)) then
+        allocate(cus_aty(ncustom), cus_orb(ncustom), cus_de(2,ncustom), &
+                & cus_line(ncustom), choicus(ncustom))
+        choicus = .false.
+        ! load custom ionization header data
+        call load_custom_ionization(ncustom, cus_aty, cus_orb, cus_de, cus_line)
+        write(unit=tmpi,fmt='(i)') ncustom
+        write(*,*) char(10),'Custom STEM EELS selection ('//TRIM(adjustl(tmpi))// &
+                & ' data sets available)'
+        
+        
+        ! allow the user to select custom ionization data sets
+        kval = -1        
+200 format('Index  Atom| Z  | Orbital | Shell | Window (eV)     | Incl.(y/n)'/&
+         &,'----------------------------------------------------------------')
+211 format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|', &
+                & 1x,f6.1,' - ',f6.1,1x,'|',1x,a1,6x)
+212 format(' <99> toggle all')
+                
+        do while ((kval.ne.0).or.all(.not.choicus)) !custom EELS selection menu loop
+            write(*,*) char(10),'Ionization choices',char(10)
+            write(*,200)
+            do i=1, ncustom
+                do j=1,norbitals
+                    if (0<INDEX(cus_orb(i),shell_name_EELS(j))) exit
+                end do
+                write(*,211) i,trim(adjustl(substance_atom_types(cus_aty(i)))), &
+                    & nint(atf(1,cus_aty(i))), cus_orb(i), shells(j), cus_de(1,i), &
+                    & cus_de(2,i), logical_to_yn(choicus(i))
+            end do
+            write(*,212)
+            write(*,120)
+            call get_input('Shell choice <0> continue', kval)
+            if((kval.gt.0).and.(kval.le.ncustom)) choicus(kval) = .not.choicus(kval)
+            if(kval.eq.99) choicus = .not.choicus ! toggle all choices
+        end do
+    end if
+    
+    num_ionizations = count(choices) + count(choicus) ! total number of ionizations (default + custom)
+    
+	allocate(ionization_mu(nopiy,nopix,num_ionizations),atm_indices(num_ionizations), &
+                & Ion_description(num_ionizations))
     ionization_mu = 0
-	  ii=1
+    ii=1
     iii=1
-	  !Now read in EELS or EDX parameters
-    do i = 1, nt;ZZ=nint(ATF(1,i))
+    !Now read in default EELS or EDX parameters
+    do i = 1, nt; ZZ=nint(ATF(1,i))
       do j=1,norbitals
         if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) then; if(choices(ii)) then
-          ionization_mu(:,:,iii) = make_fz_EELS_EDX(shell_name_EELS(j),zz,DE(ii),EDX)* atf(2,i)*fz_DWF(:,:,i)
-          atm_indices(iii) = i
-          Ion_description(iii) = shell_name_EELS(j)
+          ionization_mu(:,:,iii) = make_fz_EELS_EDX(shell_name_EELS(j),zz,DE(ii),EDX,0)* atf(2,i)*fz_DWF(:,:,i)
+          atm_indices(iii) = i ! store atom type index for this ionization, to be used for output
+          ion_description(iii) = shell_name_EELS(j) ! store shell name for this ionization, to be used for output
           iii=iii+1;endif; ii=ii+1; endif
       enddo
-    enddo
+      enddo
+    !... and now for the custom ionization data sets
+300 format(a2,'_',I0.4,'-',I0.4,'eV')
+    do i=1, ncustom
+      if (choicus(i)) then ! only if the user selected this data set
+        zz = nint(atf(1,cus_aty(i))) ! atom type index -> atomic number
+        ionization_mu(:,:,iii) = make_fz_EELS_EDX(cus_orb(i),zz,cus_de(2,i),.false.,cus_line(i))* &
+                & atf(2,cus_aty(i))*fz_DWF(:,:,cus_aty(i))
+        atm_indices(iii) = cus_aty(i) ! store atom type index for this ionization, to be used for output
+        ! store shell name and energy window for this ionization, to be used for output
+        write(unit=ion_description(iii),fmt=300) TRIM(adjustl(cus_orb(i))), nint(cus_de(1,i)), nint(cus_de(2,i))
+        iii=iii+1
+      end if
+    end do
  
-  end subroutine
+    end subroutine
       
   !Subroutine to make the Fz_mu needs to have prefactors accounted for (volume fo the unit cell etc.)
   !needs to be multiplied by the DWF for the pertinent atom type
-  function make_fz_EELS_EDX(orbital,zz,DE,EDX) result(fz_mu)
-	  use m_precision
+  !Modified interface by adding lc to allow for custom ionization data (2025-05-21 JB)
+  function make_fz_EELS_EDX(orbital,zz,DE,EDX,lc) result(fz_mu)
+	use m_precision
     use global_variables
-	  use m_numerical_tools, only: cubspl,ppvalu
+	use m_numerical_tools, only: cubspl,ppvalu
     use m_crystallography,only:trimr,make_g_vec_array
-	  implicit none
+    use m_electron, only:element
+	implicit none
     
     character(2),intent(in)::orbital
-    integer*4,intent(in)::zz
+    integer*4,intent(in)::zz,lc
     real(fp_kind),intent(in)::DE
     logical,intent(in)::EDX
     real(fp_kind):: g_vec_array(3,nopiy,nopix)
@@ -647,22 +920,36 @@ module m_potential
                & 5.0_fp_kind,6.0_fp_kind,7.0_fp_kind,8.0_fp_kind,9.0_fp_kind,10.0_fp_kind,12.0_fp_kind,14.0_fp_kind,16.0_fp_kind, &
                & 18.0_fp_kind,20.0_fp_kind /
     
-    write(*,*) 'Making the ionization inelastic scattering factor grid, please wait...',char(10)
+    if (lc > 0) then
+        write(*,*) 'Filling the custom ionization scattering factor grid for ' &
+                    & //element(zz)//' '//orbital//', please wait...',char(10)
+    else
+        write(*,*) 'Filling the ionization scattering factor grid for ' &
+                    & //element(zz)//' '//orbital//', please wait...',char(10)
+    end if
     	
-	  !pppack interpolation
-	  EELS_EDX_bscoef(1,:) = get_ionization_parameters(orbital,zz,DE,EDX)
-	  call cubspl(svals,EELS_EDX_bscoef(:,:), 29, 0, 0 )
+    ! 2025-05-22 JB: custom ionization data
+    if ((lc>0) .AND. (.NOT.EDX)) then
+        !read in the custom ionization form factors
+        call load_custom_ionization_data(lc, EELS_EDX_bscoef(1,:))
+    else
+        !read the default EELS or EDX parameterization data file
+        EELS_EDX_bscoef(1,:) = get_ionization_parameters(orbital,zz,DE,EDX)
+    end if
+    
+    !pppack interpolation over s=q/2 to q-grid cubspl -> ppvalu
+	call cubspl(svals,EELS_EDX_bscoef(:,:), 29, 0, 0 )
     
     fz_mu = 0.0_fp_kind
     call make_g_vec_array(g_vec_array,ifactory,ifactorx)
     !!$OMP PARALLEL PRIVATE(i, j, m2, m1, sky, skx, tempval, sval), SHARED(fz_mu) 
     !!$OMP DO
-	  do i=1, nopiy;do j=1, nopix
+	do i=1, nopiy;do j=1, nopix
       sval = trimr(g_vec_array(:,i,j),ss) / 2.0_fp_kind
       if (sval.le.20.0_fp_kind) fz_mu(i,j) = cmplx(ppvalu(svals,EELS_EDX_bscoef(:,:),28,4,sval,0),0.0_fp_kind ,fp_kind) / (tp*ak1)
     enddo;enddo
     !!$OMP END DO
-	  !!$OMP END PARALLEL
+	!!$OMP END PARALLEL
 
     return
   end function

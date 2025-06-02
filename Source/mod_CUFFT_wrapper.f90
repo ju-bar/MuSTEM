@@ -524,26 +524,27 @@ implicit none
     contains
           
  
- 
-    subroutine setup_threading()
-    implicit none
-      
-    integer*4   num_threads,junk
-    integer*4   OMP_GET_MAX_THREADS
-    external    OMP_GET_MAX_THREADS
-    
-    !Set the number of threads allowed
-    num_threads=OMP_GET_MAX_THREADS()
-    num_threads=num_threads/2
-    CALL OMP_SET_NUM_THREADS(num_threads)
-    call dfftw_init_threads(junk)
-    call dfftw_plan_with_nthreads(num_threads)
-    write(*,*) '|----------------------------------------------------------------------------|'
-    write(*,*) '        The number of threads available is: ',num_threads*2
-    write(*,*) '        The number of threads being used is: ',num_threads
-    write(*,*) '|----------------------------------------------------------------------------|'
-    return
-    end subroutine
+    !replaced by routine setup_threading in main program
+    !
+    !subroutine setup_threading()
+    !implicit none
+    !  
+    !integer*4   num_threads,junk
+    !integer*4   OMP_GET_MAX_THREADS
+    !external    OMP_GET_MAX_THREADS
+    !
+    !!Set the number of threads allowed
+    !num_threads=OMP_GET_MAX_THREADS()
+    !num_threads=num_threads/2
+    !CALL OMP_SET_NUM_THREADS(num_threads)
+    !call dfftw_init_threads(junk)
+    !call dfftw_plan_with_nthreads(num_threads)
+    !write(*,*) '|----------------------------------------------------------------------------|'
+    !write(*,*) '        The number of threads available is: ',num_threads*2
+    !write(*,*) '        The number of threads being used is: ',num_threads
+    !write(*,*) '|----------------------------------------------------------------------------|'
+    !return
+    !end subroutine
     
     
     subroutine dfft1b(nopixb,array_in,array_out)

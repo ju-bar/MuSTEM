@@ -705,7 +705,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
         integer :: i_slice
         call command_line_title_box('Unit cell slicing')
       
-    22  write(6,23) char(143)
+    22  write(6,23) 'A'
     23  format(' Do you wish to slice the unit cell in the beam direction?', /, &
               &' This may be a good idea if the unit cell is larger than 2 ', a1, /, &
               &' in the z-direction.', /, &
@@ -1045,13 +1045,13 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
         if(getinner) then
 		do i = 1, ndet
             write(*,50) i, inner_mrad(i), outer_mrad(i)
-            write(*,55) inner(i), outer(i), char(143)
+            write(*,55) inner(i), outer(i), 'A'
             write(*,60) 
         enddo
 		else
 		do i = 1, ndet
             write(*,65) i, outer_mrad(i)
-            write(*,70) outer(i), char(143)
+            write(*,70) outer(i), 'A'
             write(*,60) 
         enddo
 		endif

@@ -77,7 +77,7 @@ module m_lens
 		character(:),allocatable::tag
 		
 		tag = trim(adjustl(ab%description))
-        write(6,*)' Enter the amplitude of '//tag//' in '//char(143)//':' 
+        write(6,*)' Enter the amplitude of '//tag//' in '//'A'//':' 
         call get_input(tag//' coefficient', ab%amplitude)
         write(*,*)
 		if(ab%m>0) then
@@ -161,7 +161,7 @@ module m_lens
         nflag = -1
         apodisation = -1
         do while(nflag.ne.0)
-        write(6,11) atan(cutoff/ak1)*1000.0_fp_kind, char(143), cutoff, char(143),df(1)   
+        write(6,11) atan(cutoff/ak1)*1000.0_fp_kind, 'A', cutoff, 'A',df(1)   
 		do i=1,ndf-1
 			write(6,12) df(i+1)
 		enddo
@@ -248,7 +248,7 @@ module m_lens
                &' a probe with cutoff of ',g11.4,1x, a1, '-1, the first, second and third radial minima', /, &
                &' are located at ',g11.4,', ',g11.4,' and ',g11.4,1x, a1, '.',/,&
                &' To disable probe apodisation input a negative number.')
-        write(6,20) cutoff,char(143),3.8317/(cutoff*2*pi),7.0156/(cutoff*2*pi),10.1735/(cutoff*2*pi),char(143)
+        write(6,20) cutoff,'A',3.8317/(cutoff*2*pi),7.0156/(cutoff*2*pi),10.1735/(cutoff*2*pi),'A'
         call get_input('Probe real space cutoff',set_probe_apodisation)
     end function
     
@@ -424,7 +424,7 @@ module m_lens
      do while(ich.ne.1)
          if(interpolation) able_string = 'enabled'
          if(.not.interpolation) able_string = 'disabled'
-          write(6,103) r1, a1, char(143), r2, a2, char(143), thetad2, origin(1), origin(2), probe_cutoff
+          write(6,103) r1, a1, 'A', r2, a2, 'A', thetad2, origin(1), origin(2), probe_cutoff
           if(.not.PACBED_only) write(6,104)
           write(6,105) PACBED_or_STEM,min_step,nxsample_, nysample_, ceiling(nxsample/fract(1)),ceiling(nysample/fract(2)),nxsample, nysample
           if(.not.PACBED_only) write(6,106) able_string

@@ -1,9 +1,11 @@
 !--------------------------------------------------------------------------------
 !
-!  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
+!  Copyright (C) 2025  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes, J. Barthel
 !
 !  modified:
 !    2019-Dec-13, J. Barthel, added plasmon monte-carlo triggers and calls
+!    2025-Jun-02, J. Barthel, replaced get_sum using manual reduction kernels
+!    
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -28,6 +30,10 @@ module cuda_ms
     use cudafor
     
     implicit none
+    
+    integer, parameter :: max_blocks = 1048576
+    real(fp_kind), device :: block_sums_d(max_blocks)
+    real(fp_kind) :: block_sums(max_blocks)
 
     interface get_sum
         module procedure get_sum_complex
@@ -39,12 +45,13 @@ module cuda_ms
         module procedure cuda_stem_detector_cbed
     end interface
     
-	interface cuda_multislice_iteration
-		module procedure cuda_multislice_iteration_fractorized_prop
-		module procedure cuda_multislice_iteration_single_prop
-		module procedure cuda_multislice_iteration_new
-		module procedure cuda_multislice_iteration_cshifted_transf
-	end interface
+    interface cuda_multislice_iteration
+        module procedure cuda_multislice_iteration_fractorized_prop
+        module procedure cuda_multislice_iteration_single_prop
+        module procedure cuda_multislice_iteration_new
+        module procedure cuda_multislice_iteration_cshifted_transf
+        end interface
+    
     contains
 
 	attributes(host) subroutine cuda_phase_shift_from_1d_factor_arrays(arrayin,arrayout,shift_arrayy_d,shift_arrayx_d,nopiy,nopix,plan)
@@ -67,7 +74,7 @@ module cuda_ms
 
 	attributes(host) subroutine cuda_image(psi_d,ctf_d,image_d,normalisation, nopiy, nopix,plan,rspacein)
 		use CUFFT_wrapper
-       use cuda_array_library, only: blocks, threads
+        use cuda_array_library, only: blocks, threads
 		implicit none
 
 		complex(fp_kind),intent(in),dimension(nopiy,nopix),device::psi_d,ctf_d
@@ -383,51 +390,181 @@ module cuda_ms
     end function cuda_stem_detector_cbed
     
     
+    ! -------------------------------
+    ! Step 1: Per-block reduction
+    ! -------------------------------
+    attributes(global) subroutine reduce_real_kernel(A, n, block_sums)
+      implicit none
+      integer, value :: n
+      real(fp_kind), device :: A(n)
+      real(fp_kind), device :: block_sums(*)
+      real(fp_kind), shared :: cache(256)
+      integer :: tid, i, idx, gid
+      real(fp_kind) :: temp
 
+      tid = threadIdx%x
+      gid = blockIdx%x
+      idx = (gid - 1) * blockDim%x + tid ! 1-based indexing
+
+      if (idx <= n) then
+         temp = A(idx)
+      else
+         temp = 0.0_fp_kind
+      end if
+      cache(tid) = temp
+
+      call syncthreads()
+
+      i = blockDim%x / 2
+      do while (i > 0)
+         if (tid <= i) then
+            cache(tid) = cache(tid) + cache(tid + i)
+         end if
+         call syncthreads()
+         i = i / 2
+      end do
+
+      if (tid == 1) then
+         block_sums(gid) = cache(1)
+      end if
+    end subroutine reduce_real_kernel
+    
+    attributes(global) subroutine reduce_complex_kernel(A, n, block_sums)
+      implicit none
+      integer, value :: n
+      complex(fp_kind), device :: A(n)
+      real(fp_kind), device :: block_sums(*)
+      real(fp_kind), shared :: cache(256)
+      integer :: tid, i, idx, gid
+      complex(fp_kind) :: temp
+      real(fp_kind) :: mod_sqr
+
+      tid = threadIdx%x
+      gid = blockIdx%x
+      idx = (gid - 1) * blockDim%x + tid ! 1-based indexing
+
+      if (idx <= n) then
+         temp = A(idx)
+         mod_sqr = real(temp)**2 + aimag(temp)**2
+      else
+         mod_sqr = 0.0_fp_kind
+      end if
+      cache(tid) = mod_sqr
+
+      call syncthreads()
+
+      i = blockDim%x / 2
+      do while (i > 0)
+         if (tid <= i) then
+            cache(tid) = cache(tid) + cache(tid + i)
+         end if
+         call syncthreads()
+         i = i / 2
+      end do
+
+      if (tid == 1) then
+         block_sums(gid) = cache(1)
+      end if
+    end subroutine reduce_complex_kernel
+    
+
+    !rewritten to work with manual reduction kernel
+    ! attributes(host) function get_sum_complex(psi_d)
+    
+        ! implicit none
+    
+        ! integer(4) l,m
+        ! real(fp_kind) :: get_sum_complex
+        ! real(fp_kind),device :: get_sum_complex_d
+        ! complex(fp_kind), device, dimension(nopiy,nopix) :: psi_d
+    
+        ! get_sum_complex_d = 0.0_fp_kind
+    
+        ! !$cuf kernel do (2) <<<*,*>>>
+        ! do m = 1, nopix
+            ! do l = 1, nopiy
+                ! get_sum_complex_d = get_sum_complex_d + abs(psi_d(l,m))**2
+            ! enddo
+        ! enddo
+        
+        ! get_sum_complex = get_sum_complex_d
+    
+    ! end function get_sum_complex
+    
+    !new sum for complex taking mod square on the run, 2025-06-02 JB
     attributes(host) function get_sum_complex(psi_d)
     
         implicit none
-    
-        integer(4) l,m
-        real(fp_kind) :: get_sum_complex
-        real(fp_kind),device :: get_sum_complex_d
-        complex(fp_kind), device, dimension(nopiy,nopix) :: psi_d
-    
-        get_sum_complex_d = 0.0_fp_kind
-    
-        !$cuf kernel do (2) <<<*,*>>>
-        do m = 1, nopix
-            do l = 1, nopiy
-                get_sum_complex_d = get_sum_complex_d + abs(psi_d(l,m))**2
-            enddo
-        enddo
         
-        get_sum_complex = get_sum_complex_d
+        integer, parameter :: threads = 256
+        complex(fp_kind), device, dimension(nopiy,nopix) :: psi_d
+        real(fp_kind) :: get_sum_complex
+        integer :: n, blocks
+
+        !init numbers
+        n = nopiy * nopix
+        blocks = (n + threads - 1) / threads
+        if (blocks > max_blocks) stop 'Too many blocks'
+        
+        !Launch reduction kernel, this will init and synchronize itself
+        call reduce_complex_kernel<<<blocks, threads>>>(psi_d, n, block_sums_d)
     
+        !Copy result from device
+        block_sums(1:blocks) = block_sums_d(1:blocks)
+        
+        !Final sum on host
+        get_sum_complex = sum(block_sums(1:blocks))
+        
     end function get_sum_complex
     
     
+    ! rewritten to work with manual reduction kernel
+    ! attributes(host) function get_sum_real(psi_d)
     
+        ! implicit none
+        
+        ! integer(4) l, m
+        ! real(fp_kind) :: get_sum_real
+        ! real(fp_kind), device, dimension(nopiy,nopix) :: psi_d
+        ! real(fp_kind),device :: get_sum_real_d
+    
+        ! get_sum_real_d = 0.0_fp_kind
+    
+        ! !$cuf kernel do (2) <<<*,*>>>
+        ! do m = 1, nopix
+          ! do l = 1, nopiy
+              ! get_sum_real_d = get_sum_real_d + psi_d(l,m)
+          ! enddo
+        ! enddo
+        
+        ! get_sum_real = get_sum_real_d
+    
+    ! end function get_sum_real
+    
+    ! new sum for real, 2025-06-02 JB
     attributes(host) function get_sum_real(psi_d)
     
         implicit none
         
-        integer(4) l, m
-        real(fp_kind) :: get_sum_real
+        integer, parameter :: threads = 256
         real(fp_kind), device, dimension(nopiy,nopix) :: psi_d
-        real(fp_kind),device :: get_sum_real_d
-    
-        get_sum_real_d = 0.0_fp_kind
-    
-        !$cuf kernel do (2) <<<*,*>>>
-        do m = 1, nopix
-          do l = 1, nopiy
-              get_sum_real_d = get_sum_real_d + psi_d(l,m)
-          enddo
-        enddo
+        real(fp_kind) :: get_sum_real
+        integer :: n, blocks
+
+        ! init numbers
+        n = nopiy * nopix
+        blocks = (n + threads - 1) / threads
+        if (blocks > max_blocks) stop 'Too many blocks'
+
+        ! Launch reduction kernel, this will init and synchronize itself
+        call reduce_real_kernel<<<blocks, threads>>>(psi_d, n, block_sums_d)
+
+        ! Copy result from device
+        block_sums(1:blocks) = block_sums_d(1:blocks)
         
-        get_sum_real = get_sum_real_d
-    
+        ! Final sum on host
+        get_sum_real = sum(block_sums(1:blocks))
+
     end function get_sum_real
 
     

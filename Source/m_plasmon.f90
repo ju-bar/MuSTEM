@@ -139,10 +139,10 @@ module plasmon
 		doplasm = .false.
 		i = 0
 		write(*,*) 'Simulate bulk plasmon / low-loss inelastic scattering?'
-		write(*,*) '<1> Setup bulk plasmons.'
-		write(*,*) '<2> Setup generic low-loss.'
-		write(*,*) '<3> No.'
-		call get_input('Plasmon setup: <1> bulk plasmons <2> generic low-loss <3> none.', i)
+		write(*,*) '<1>  Setup bulk plasmons.'
+		write(*,*) '<2>  Setup generic low-loss.'
+		write(*,*) '<0>  No, continue.'
+		call get_input('Plasmon setup: <1> bulk plasmons <2> generic low-loss <0> none.', i)
 		write(*,*)
 		if (i<1 .or. i>2) then
 			doplasm = .false.
@@ -203,7 +203,7 @@ module plasmon
 		if (doplasm) then
 			write(*,*) 'Plasmon scattering setup'
 			write(*,*) '----------------------------------------------'
-			write(6,102) pl_lmfp, char(143)
+			write(6,102) pl_lmfp, 'A'
 			write(6,103) pl_theta_char * 1000.0_fp_kind
 			write(6,104) pl_theta_crit * 1000.0_fp_kind
 			write(6,105) pl_npemax

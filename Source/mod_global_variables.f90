@@ -36,8 +36,8 @@ module global_variables
     
     real(fp_kind), allocatable :: bwl_mat(:,:)            !bandwidth limiting matrix
                                           
-    integer(4), allocatable    :: nat(:)                     !number of each atom type in the unit celll
-    real(fp_kind), allocatable	:: dz(:)					  !ionicity of each atom type
+    integer(4), allocatable    :: nat(:)                  !number of each atom type in the unit celll
+    real(fp_kind), allocatable :: dz(:)					  !ionicity of each atom type
     real(fp_kind), allocatable :: tau(:,:,:)              !position of the atoms in the unit cell
     real(fp_kind), allocatable :: atf(:,:)                !atomic number, occupancy and DWF (urms)
     real(fp_kind), allocatable :: atomf(:,:),fx(:)        !electron scattering factor parameterisation from elsa
@@ -69,7 +69,7 @@ module global_variables
     character*10, allocatable :: substance_atom_types(:)
 
     !output variables
-    integer(4) :: ndet,nseg ,nopiyout,nopixout                           !number of integrating detectors and 4D STEM output
+    integer(4) :: ndet,nseg ,nopiyout,nopixout            !number of integrating detectors and 4D STEM output
     real(fp_kind) :: seg_det_offset
     logical::segments
     real(fp_kind), allocatable :: outer(:),inner(:)       !detector ranges (in inverse angstrom)
@@ -92,6 +92,7 @@ module global_variables
     real(fp_kind),parameter :: fsc = 7.29735e-3_fp_kind             ! fsc = fine structure constant (dimensionless)
     real(fp_kind),parameter :: hbarc = 1973.26_fp_kind              ! hbarc = hbar * c in eV A units
     
+    
     !logical types to pick inelastic calculations
     logical :: adf 
     logical :: EELS = .false.
@@ -106,6 +107,11 @@ module global_variables
     logical :: double_channeling,istem
     logical :: plasmonmc = .false.
     logical :: linpoleels = .false.                       ! linear eels range interpolation (2025-May-14, JB)
+    
+    ! arguments for debugging
+    integer(4) :: arg_debug_wave = 0    ! 0 = no debug, 1 = print debug values of wave function, triggered by secret option mmouse_wave
+    integer(4) :: arg_debug_intens = 0  ! 0 = no debug, 1 = print debug values of probe intensity, triggered by secret option mmouse_intens
+    integer(4) :: arg_debug_stemdet = 0 ! 0 = no debug, 1 = print debug values of stem detectors, triggered by secret option mmouse_stemdet
     
 	contains
      
@@ -152,7 +158,7 @@ module global_variables
           delk = ak - ak1
 
 	    write(6,*) 'Pertinent quantities for the crystal:'
-          write(6,111) ekv,ak,char(143),ak1,char(143),delk,char(143),relm
+          write(6,111) ekv,ak,'A',ak1,'A',delk,'A',relm
       111 format('          E = ',F12.3,' keV',/,&
          &' Crystal Ko = ',G20.10,1x,a1,'-1 (1/lambda)',/,&
          &'  Vacuum Ko = ',G20.10,1x,a1,'-1 (1/lambda)',/,&

@@ -1,0 +1,51 @@
+Quick Start Information for muSTEM
+----------------------------------
+
+The minimum needed to run muSTEM is
+
+1) a program control file "user_input.txt", and
+
+2) an XTL file with a structure model.
+
+A simulation text file is optional and can be recorded on the first run.
+
+
+GPU and CPU compile version differ in the format of control files.
+
+
+Program options
+----------------
+
+options
+	Lists available program options for the command-line.
+nopause
+	Skips all input pausing.
+ionic
+	Applies ionic potentials and expects charge data in the XTL file.
+linpoleels
+	Applies linear interpolation of energy-loss ranges instead of cubic splines.
+omp_num_threads={number}
+	Sets number of OpenMP threads.
+
+
+
+Program control file options
+----------------------------
+
+Line 1:
+interactive:
+	No recording or playing, all inputs taken from the console
+record:
+	As above, but does not overwrite the listed simulation file
+	if it exists.
+record overwrite:
+	Records the simulation file based on console inputs.
+	Overwrites the listed simulation file (if it exists).
+play:
+	Plays the listed simulation file with no input via console needed.
+play all:
+	Plays the listed simulation file(s) with no input via console needed.
+
+Line 2+:
+(file name) per line
+

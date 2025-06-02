@@ -64,16 +64,16 @@ subroutine qep_stem(STEM,ionization,PACBED)
   use m_user_input
   use m_precision
   use output
-	use plasmon ! plasmon scattering module, only for main qep wave, not for double channeling, inserted JB-191213
+  use plasmon ! plasmon scattering module, only for main qep wave, not for double channeling, inserted JB-191213
 #ifdef GPU	
   use cuda_array_library;use cudafor;use cuda_ms;use CUFFT;use cuda_potential;use cuda_setup
 #endif
-	use cufft_wrapper;use m_Hn0
-	use m_crystallography;use m_tilt;use m_string;use m_multislice;use m_potential;use m_numerical_tools
+  use cufft_wrapper;use m_Hn0
+  use m_crystallography;use m_tilt;use m_string;use m_multislice;use m_potential;use m_numerical_tools
     
   implicit none
     
-	logical,intent(in)::STEM,ionization,PACBED
+  logical,intent(in)::STEM,ionization,PACBED
   !dummy variables
   integer(4) ::  i,j,l,m,i_qep_pass,iz,k,ii,jj,ntilt,count,shifty,shiftx,ny,nx,i_df,idet,total_slices,lengthimdf,starting_slice
 
@@ -86,7 +86,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
   complex(fp_kind),dimension(nopiy,nopix) :: psi,trans,psi_initial,psi_out,temp_image
   complex(fp_kind),dimension(nopiy,nopix,nz)::psi_elastic
   complex(fp_kind),dimension(nopiy,nopix,n_qep_grates,n_slices)::projected_potential,qep_grates
-	complex(fp_kind),allocatable::ctf(:,:,:)
+  complex(fp_kind),allocatable::ctf(:,:,:)
   !output
   real(fp_kind),dimension(nopiy,nopix) :: image,temp
     
@@ -94,7 +94,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
   real(fp_kind) :: masks(nopiy,nopix,ndet),cbed(nopiy,nopix,nz)               !detector masks
   real(fp_kind),dimension(nysample,nxsample,probe_ndf,ndet,nz) :: stem_image,stem_elastic_image&
 											  &,stem_inelastic_image
-	real(fp_kind),dimension(nysample,nxsample,probe_ndf,nz) :: eels_correction_image
+  real(fp_kind),dimension(nysample,nxsample,probe_ndf,nz) :: eels_correction_image
   real(fp_kind),allocatable :: ion_image(:,:,:),stem_ion_image(:,:,:,:,:),pacbed_pattern(:,:,:),&
                         &pacbed_elastic(:,:,:),istem_image(:,:,:,:)
     
@@ -107,12 +107,12 @@ subroutine qep_stem(STEM,ionization,PACBED)
   character(120) :: fnam, fnam_temp, fnam_det
 #ifdef GPU
   !device variables
-	integer :: plan
+  integer :: plan
   complex(fp_kind),device,dimension(nopiy,nopix) :: psi_d,psi_out_d,psi_initial_d,trans_d
-	complex(fp_kind),device,dimension(nopiy,nopix,nz)::psi_elastic_d
+  complex(fp_kind),device,dimension(nopiy,nopix,nz)::psi_elastic_d
   real(fp_kind),device :: cbed_d(nopiy,nopix,nz),temp_d(nopiy,nopix)
-	complex(fp_kind),device,allocatable :: prop_d(:,:,:),transf_d(:,:,:,:)
-	complex(fp_kind),device,allocatable,dimension(:,:) ::shift_arrayx_d,shift_arrayy_d,shift_array_d
+  complex(fp_kind),device,allocatable :: prop_d(:,:,:),transf_d(:,:,:,:)
+  complex(fp_kind),device,allocatable,dimension(:,:) ::shift_arrayx_d,shift_arrayy_d,shift_array_d
   real(fp_kind),device,allocatable,dimension(:,:,:) :: masks_d,ion_image_d,pacbed_pattern_d
   real(fp_kind),device,allocatable :: eels_correction_detector_d(:,:),ion_potential_d(:,:,:,:)
     
@@ -121,16 +121,16 @@ subroutine qep_stem(STEM,ionization,PACBED)
   complex(fp_kind),device,allocatable,dimension(:,:,:) :: fz_d,fz_mu_d
   real(fp_kind),device,allocatable :: inelastic_potential_d(:,:)
 
-	!Double channeling variables
-	complex(fp_kind),device,allocatable,dimension(:,:) ::psi_inel_d,shiftarray,tmatrix_d,q_tmatrix_d
-	complex(fp_kind),device,allocatable,dimension(:,:,:)::tmatrix_states_d,ctf_d
+  !Double channeling variables
+  complex(fp_kind),device,allocatable,dimension(:,:) ::psi_inel_d,shiftarray,tmatrix_d,q_tmatrix_d
+  complex(fp_kind),device,allocatable,dimension(:,:,:)::tmatrix_states_d,ctf_d
   complex(fp_kind),device,allocatable,dimension(:,:,:)::Hn0_shifty_coord_d,Hn0_shiftx_coord_d
-	real(fp_kind),device,allocatable,dimension(:,:)::cbed_inel_dc_d
-	real(fp_kind),device,allocatable,dimension(:,:,:)::Hn0_eels_detector_d
-	real(fp_kind),device,allocatable,dimension(:,:,:,:)::efistem_image_d,istem_image_d
-	real(fp_kind),allocatable,dimension(:,:,:,:,:)::Hn0_eels_dc
-	real(fp_kind),allocatable,dimension(:,:,:)::tmatrix_states
-	integer::i_target
+  real(fp_kind),device,allocatable,dimension(:,:)::cbed_inel_dc_d
+  real(fp_kind),device,allocatable,dimension(:,:,:)::Hn0_eels_detector_d
+  real(fp_kind),device,allocatable,dimension(:,:,:,:)::efistem_image_d,istem_image_d
+  real(fp_kind),allocatable,dimension(:,:,:,:,:)::Hn0_eels_dc
+  real(fp_kind),allocatable,dimension(:,:,:)::tmatrix_states
+  integer::i_target
 #endif
 
   real(fp_kind),allocatable :: probe_intensity(:,:,:)
@@ -157,7 +157,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
   endif
 
 #ifdef GPU
-	if(double_channeling) then
+  if(double_channeling) then
     allocate(tmatrix_states_d(nopiy,nopix,nstates),psi_inel_d(nopiy,nopix),cbed_inel_dc_d(nopiy,nopix),tmatrix_states(nopiy,nopix,nstates))
     allocate(shiftarray(nopiy,nopix),tmatrix_d(nopiy,nopix),q_tmatrix_d(nopiy,nopix))
     tmatrix_states_d = setup_ms_hn0_tmatrices(nopiy,nopix,nstates)*alpha_n
@@ -342,7 +342,9 @@ subroutine qep_stem(STEM,ionization,PACBED)
     intens = sum(abs(psi_initial)**2)
     call ifft2(nopiy, nopix, psi_initial, nopiy, psi_initial, nopiy)
     psi_initial = psi_initial/sqrt(intens)
-
+    
+    if (arg_debug_wave>0) write(6,*) 'Initial psi(0,0) = ', psi_initial(1,1)
+    
     call tilt_wave_function(psi_initial)
     if (output_probe_intensity) probe_intensity = 0.0_fp_kind
     cbed=0_fp_kind
@@ -483,14 +485,25 @@ subroutine qep_stem(STEM,ionization,PACBED)
 
 		  !If this thickness corresponds to any of the output values then accumulate diffraction pattern
       if (any(i==ncells)) then
-			
-        call cufftExec(plan,psi_d,psi_out_d,CUFFT_FORWARD)
-        call cuda_mod<<<blocks,threads>>>(psi_out_d,temp_d,normalisation,nopiy,nopix)
         z_indx = minloc(abs(ncells-i))
-			
+        
+        if (arg_debug_wave>0) then
+            psi = psi_d ! download psi
+            write(6,*) 'psi(0,0) = ', psi(1,1), ' at z=',z_indx(1)
+        endif
+        
         ! Accumulate elastic wave function
         call cuda_addition<<<blocks,threads>>>(psi_elastic_d(:,:,z_indx(1)),psi_d,&
                             &psi_elastic_d(:,:,z_indx(1)),1.0_fp_kind,nopiy,nopix)
+        
+        ! Calculate the diffraction pattern
+        call cufftExec(plan,psi_d,psi_out_d,CUFFT_FORWARD)
+        call cuda_mod<<<blocks,threads>>>(psi_out_d,temp_d,normalisation,nopiy,nopix)
+        
+        if (arg_debug_intens>0) then
+            temp = temp_d ! download psi
+            write(6,*) 'cbed(0,0) = ', temp(1,1), ' at z=',z_indx(1)
+        endif
 
         ! Accumulate diffaction pattern
         !call cufftExec(plan,psi_d,psi_out_d,CUFFT_FORWARD)
@@ -529,6 +542,11 @@ subroutine qep_stem(STEM,ionization,PACBED)
       do idet = 1, ndet
         stem_image(ny,nx,i_df,idet,iz) = cuda_stem_detector(cbed_d(:,:,iz),masks_d(:,:,idet))
       enddo
+      if (arg_debug_stemdet>0) then
+          cbed(:,:,iz) = cbed_d(:,:,iz) ! download cbeds
+          write(6,*) 'cbed(0,0) = ', cbed(1,1,iz), ' at iz=',iz
+          write(6,*) 'stem_image_1 = ', stem_image(ny,nx,i_df,1,iz), ' at iz=',iz
+      end if
       if (ionization.and.(.not.EDX)) eels_correction_image(ny,nx,i_df,iz) = &
                             &cuda_stem_detector(cbed_d(:,:,iz),eels_correction_detector_d)
         
@@ -540,7 +558,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
       enddo
       psi_out = psi_out_d*sqrt(normalisation)
 			
-#else ! code indentation discontinued
+#else ! code indentation discontinued -> CPU code
     
     psi_elastic=0_fp_kind
     do i_qep_pass = 1, n_qep_passes 
@@ -578,11 +596,13 @@ subroutine qep_stem(STEM,ionization,PACBED)
               probe_intensity(:,:,cell_map(k)) = probe_intensity(:,:,cell_map(k)) + abs(psi)**2
             endif
           endif
-        enddo ! End loop over slices
+        enddo ! End loop j over slices
 				
         !If this thickness corresponds to any of the output values then accumulate diffraction pattern
         if (any(i==ncells)) then
           z_indx = minloc(abs(ncells-i))
+          
+          if (arg_debug_wave>0) write(6,*) 'psi(0,0) = ', psi(1,1), ' at z=',z_indx(1)
                     
           ! Accumulate elastic wave function - this will be Fourier transformed later
           psi_elastic(:,:,z_indx(1)) = psi_elastic(:,:,z_indx(1)) + psi
@@ -592,6 +612,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
                     
           ! Accumulate diffaction pattern
           temp = abs(psi_out)**2
+          if (arg_debug_intens>0) write(6,*) 'cbed(0,0) = ', temp(1,1), ' at z=',z_indx(1)
           cbed(:,:,z_indx(1)) = cbed(:,:,z_indx(1)) + temp
 
           if (ionization) then
@@ -601,7 +622,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
             
         endif
                 
-      enddo ! End loop over cells
+      enddo ! End loop i over cells
 			
       ! Plasmon scattering counting
       if (plasmonmc) call pl_populate(pl_exc_num)
@@ -617,6 +638,10 @@ subroutine qep_stem(STEM,ionization,PACBED)
       if (stem) then
         stem_image(ny,nx,i_df,1:ndet,iz) = sum(sum(spread(cbed(:,:,iz),dim=3,ncopies=ndet)*&
                           &masks(:,:,:),dim=1),dim=1)
+        if (arg_debug_stemdet>0) then
+            write(6,*) 'cbed(0,0) = ', cbed(1,1,iz), ' at iz=',iz
+            write(6,*) 'stem_image_1 = ', stem_image(ny,nx,i_df,1,iz), ' at iz=',iz
+        end if
         stem_elastic_image(ny,nx,i_df,1:ndet,iz)= sum(sum(spread(abs(psi_out)**2,dim=3,ncopies =ndet)*&
                           &masks(:,:,1:ndet),dim=1),dim=1)
       endif
