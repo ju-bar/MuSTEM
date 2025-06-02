@@ -39,7 +39,7 @@
 			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
 		</Configuration>
 		<Configuration Name="Release|x64" UseCompiler="ifxCompiler">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT25)\include\fftw" PreprocessorDefinitions="single_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" EnableOpenMPSupport="OpenMPParallelCodeIFX" ByteRECL="true" UseMkl="mklParallel"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT25)\include\fftw" PreprocessorDefinitions="single_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" EnableOpenMPSupport="OpenMPParallelCodeIFX" ByteRECL="true" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" SubSystem="subSystemConsole"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -62,7 +62,8 @@
 			<File RelativePath=".\m_numerical_tools.f90"/>
 			<File RelativePath=".\m_plasmon.f90"/>
 			<File RelativePath=".\m_potential.f90"/>
-			<File RelativePath=".\m_precision.f90"/>
+			<File RelativePath=".\m_precision.f90">
+			</File>
 			<File RelativePath=".\m_string.f90"/>
 			<File RelativePath=".\m_tilt.f90"/>
 			<File RelativePath=".\m_user_input.f90"/>
@@ -75,23 +76,21 @@
 			<File RelativePath=".\quadpack.f90"/>
 			<File RelativePath=".\s_absorptive_stem.f90"/>
 			<File RelativePath=".\s_absorptive_tem.f90"/>
-			<File RelativePath=".\s_qep_stem.f90">
-			</File>
+			<File RelativePath=".\s_qep_stem.f90"/>
 			<File RelativePath=".\s_qep_tem.f90"/>
 		</Filter>
 		<Filter Name="Test">
-			<File RelativePath=".\Test\user_input.txt">
-			</File>
+			<File RelativePath=".\Test\user_input.txt"/>
 		</Filter>
-		<File RelativePath="..\Makefile"/>
+		<File RelativePath="..\Makefile">
+		</File>
 		<File RelativePath=".\makefile">
 			<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
 			</FileConfiguration>
 			<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
 			</FileConfiguration>
 		</File>
-		<File RelativePath="..\Readme.md">
-		</File>
+		<File RelativePath="..\Readme.md"/>
 	</Files>
 	<Globals/>
 </VisualStudioProject>
