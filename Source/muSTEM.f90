@@ -98,10 +98,9 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.1 (branch https://github.com/ju-bar 2025-06-02)        |',/,&
-  	   &1x,'|           ! absorptive model calculations are known to crash occasionally  |',/,&
+       &1x,'|       GPU Version 6.1 (branch https://github.com/ju-bar 2025-06-04)        |',/,&
 #else
-       &1x,'|       CPU only Version 6.1 (branch https://github.com/ju-bar 2025-06-02)   |',/,&
+       &1x,'|       CPU only Version 6.1 (branch https://github.com/ju-bar 2025-06-04)   |',/,&
 #endif
        &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&

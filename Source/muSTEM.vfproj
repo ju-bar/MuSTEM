@@ -62,8 +62,7 @@
 			<File RelativePath=".\m_numerical_tools.f90"/>
 			<File RelativePath=".\m_plasmon.f90"/>
 			<File RelativePath=".\m_potential.f90"/>
-			<File RelativePath=".\m_precision.f90">
-			</File>
+			<File RelativePath=".\m_precision.f90"/>
 			<File RelativePath=".\m_string.f90"/>
 			<File RelativePath=".\m_tilt.f90"/>
 			<File RelativePath=".\m_user_input.f90"/>
@@ -72,9 +71,11 @@
 			<File RelativePath=".\mod_Hn0.f90"/>
 			<File RelativePath=".\mod_output.f90"/>
 			<File RelativePath=".\MS_utilities.f90"/>
-			<File RelativePath=".\muSTEM.f90"/>
+			<File RelativePath=".\muSTEM.f90">
+			</File>
 			<File RelativePath=".\quadpack.f90"/>
-			<File RelativePath=".\s_absorptive_stem.f90"/>
+			<File RelativePath=".\s_absorptive_stem.f90">
+			</File>
 			<File RelativePath=".\s_absorptive_tem.f90"/>
 			<File RelativePath=".\s_qep_stem.f90"/>
 			<File RelativePath=".\s_qep_tem.f90"/>
@@ -82,8 +83,6 @@
 		<Filter Name="Test">
 			<File RelativePath=".\Test\user_input.txt"/>
 		</Filter>
-		<File RelativePath="..\Makefile">
-		</File>
 		<File RelativePath=".\makefile">
 			<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
 			</FileConfiguration>

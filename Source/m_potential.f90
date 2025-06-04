@@ -808,8 +808,8 @@ module m_potential
         !If EELS get energy window
         if (.not.EDX) then
           DE(kval) =-1
-          do while ((DE(kval).lt.1).or.(DE(kval).gt.100)) ! 2025-05-05 lower limit corrected to 1 ev (JB/LJA)
-            write(*,*) 'Enter EELS energy window above threshold in eV (between 1 and 100 ev):',char(10)
+          do while ((DE(kval).lt.1).or.(DE(kval).gt.100)) ! 2025-05-05 lower limit corrected to 1 eV (JB/LJA)
+            write(*,*) 'Enter EELS energy window above threshold in eV (between 1 and 100):',char(10)
             call get_input('Energy window', DE(kval))
           enddo 
         end if

@@ -45,6 +45,9 @@ ifeq ($(MODE),GPU)
 
 else
 # === CPU Mode Configuration ===
+  ifndef MKLROOT
+    $(error Please run 'source /usr/local/intel/oneapi/setvars.sh' before calling make)
+  endif
   FC := ifx
   FCFLAGS := -fpp -qopenmp -O3 -heap-arrays -extend-source 132 -assume byterecl
   INCLUDES := -I$(MKLROOT)/include/fftw
