@@ -1,0 +1,92 @@
+Output filename
+    Results\Si110
+Input crystal file name
+    Si_110.xtl
+Probe accelerating voltage (kV)
+    200.0000
+Slice unit cell <1> yes <2> no
+    1
+Number of distinct potentials
+    2
+<1> manual or <2> auto slicing
+    2
+Thickness
+    50,100,200
+Scattering factor accuracy
+    1
+Tile supercell x
+    3
+Tile supercell y
+    4
+Number of pixels in x
+    384
+Number of pixels in y
+    384
+<1> Continue <2> Change
+    1
+Calculation type
+    2
+aperture cutoff
+    20.00000
+Defocus
+    0
+Change probe forming lens parameters
+    0
+<1> QEP <2> ABS
+    1
+Elastic and inelastic scattering output choice
+    1
+<0> Continue <1> Beam tilt <2> Specimen tilt
+    0
+Number of phase grates calculated
+    100
+Number of Monte Carlo calculated
+    10
+Number of ran1 discarded
+    123456
+Plasmon setup: <1> bulk plasmons <2> generic low-loss <0> none.
+    0
+<0> continue <1> save <2> load
+    0
+<1> CBED <2> STEM/PACBED
+    2
+STEM modes
+    1
+STEM modes
+    2
+STEM modes
+    0
+Probe scan menu choice
+    1
+output interpolation max pixels
+    48
+output interpolation tilex
+    2
+output interpolation tiley
+    3
+<0> Proceed <1> Output probe intensity
+    0
+Number of detectors
+    1
+manual detector <1> auto <2>
+    1
+<1> mrad <2> inv A
+    1
+inner
+    60.00000
+outer
+    150.0000
+Ionization choice
+    1
+Outer EELS angle
+    60.00000
+Shell choice <0> continue
+    2
+Energy window
+    100.0000
+Shell choice <0> continue
+    3
+Energy window
+    100.0000
+Shell choice <0> continue
+    0

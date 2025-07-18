@@ -1,6 +1,10 @@
 !--------------------------------------------------------------------------------
 !
-!  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
+!  Copyright (C) 2025  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, 
+!                      B. D. Forbes, J. Barthel
+!
+!  modified:
+!  - J. Barthel, 2025-06-26 - removed unused interface variables
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -28,7 +32,7 @@
 !			uses CUDA fortran
 !			requires the module files 
 !					1) precision.f90 
-!					2) cufft_mod.f90
+!					2) mod_cufft.f90
 !
 !			contains the subroutine channel_to_exit_abs which is a cuda implementation
 !			of the multislice algorithm.
@@ -39,62 +43,62 @@
 module CUFFT_wrapper
 
 #ifdef GPU
-use cufft
-implicit none
-  save
+	use cufft
+	implicit none
+	save
 
-      interface fft1
+    interface fft1
 	  module procedure dfft1d
 	  module procedure sfft1d
 	end interface fft1
 
-      interface ifft1
+    interface ifft1
 	  module procedure dfft1b
 	  module procedure sfft1b
 	end interface ifft1
 
-      interface fft2
+    interface fft2
 	  module procedure dfft2d
 	  module procedure sfft2d
 	end interface fft2
 
-      interface ifft2
+    interface ifft2
 	  module procedure dfft2b
 	  module procedure sfft2b
 	end interface ifft2
 
-      interface fft3
+    interface fft3
 	  module procedure dfft3d
 	  module procedure sfft3d
 	end interface fft3
 
-      interface ifft3
+    interface ifft3
 	  module procedure dfft3b
 	  module procedure sfft3b
 	end interface ifft3
 
 
 
-      contains
+    contains
 !	forward 1D transform
-	subroutine dfft1d(nopiyb,array_in,nopiy,array_out,nopix)
+	
+    subroutine dfft1d(n,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiyb
-	integer(4) :: nopiy,nopix 
-	complex(8),dimension(nopiyb) :: array_in
-	complex(8),dimension(nopiyb) :: array_out
+	integer(4) :: n
+	complex(8),dimension(n) :: array_in
+	complex(8),dimension(n) :: array_out
 
 	!device arrays
-	complex(8),device,dimension(nopiyb) :: array_in_d
-	complex(8),device,dimension(nopiyb) :: array_out_d
+	complex(8),device,dimension(n) :: array_in_d
+	complex(8),device,dimension(n) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
 	! Initialize the plan
-	call cufftPlan(plan,nopiyb,CUFFT_Z2Z)
+	call cufftPlan(plan,n,CUFFT_Z2Z)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_FORWARD)
@@ -105,30 +109,29 @@ implicit none
 	! Copy results back to host
 	array_out=array_out_d
 
-    array_out=array_out/(dsqrt(dfloat(nopiyb)))
+    array_out=array_out/(dsqrt(dfloat(n)))
 	return
 	end subroutine
 
 !----------------------------------------------------------------------------------------
 !	inverse 1D transform
-	subroutine dfft1b(nopiyb,array_in,nopiy,array_out,nopix)
+	subroutine dfft1b(n,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiyb
-	integer(4) :: nopiy,nopix 
-	complex(8),dimension(nopiyb) :: array_in
-	complex(8),dimension(nopiyb) :: array_out
+	integer(4) :: n
+	complex(8),dimension(n) :: array_in
+	complex(8),dimension(n) :: array_out
 
 	!device arrays
-	complex(8),device,dimension(nopiyb) :: array_in_d
-	complex(8),device,dimension(nopiyb) :: array_out_d
+	complex(8),device,dimension(n) :: array_in_d
+	complex(8),device,dimension(n) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
 	! Initialize the plan
-	call cufftPlan(plan,nopiyb,CUFFT_Z2Z)
+	call cufftPlan(plan,n,CUFFT_Z2Z)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_INVERSE)
@@ -139,7 +142,7 @@ implicit none
 	! Copy results back to host
 	array_out=array_out_d
 
-    array_out=array_out/(dsqrt(dfloat(nopiyb)))
+    array_out=array_out/(dsqrt(dfloat(n)))
 
 	return
 	end subroutine
@@ -151,25 +154,23 @@ implicit none
 
 !----------------------------------------------------------------------------------------
 !	forward 2D transform
-	subroutine dfft2d(nopiyb,nopixb,array_in,nopiy,array_out,nopix)
+	subroutine dfft2d(ny,nx,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiyb,nopixb
-	integer(4) :: nopiy,nopix 
-	complex(8),dimension(nopiyb,nopixb) :: array_in
-	complex(8),dimension(nopiyb,nopixb) :: array_out
+	integer(4) :: ny,nx
+	complex(8),dimension(ny,nx) :: array_in
+	complex(8),dimension(ny,nx) :: array_out
 
 	!device arrays
-	complex(8),device,dimension(nopiyb,nopixb) :: array_in_d
-	complex(8),device,dimension(nopiyb,nopixb) :: array_out_d
+	complex(8),device,dimension(ny,nx) :: array_in_d
+	complex(8),device,dimension(ny,nx) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
-	! Initialize the plan
-	call cufftPlan(plan,nopixb,nopiyb,CUFFT_Z2Z)
-    !call cufftPlan(plan,nopiyb,nopixb,CUFFT_Z2Z)
+	! Initialize the plan - reversed dimensions of the cufftPlan2d API
+	call cufftPlan(plan,nx,ny,CUFFT_Z2Z)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_FORWARD)
@@ -179,31 +180,29 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(dsqrt(dfloat(nopiyb*nopixb)))
+    array_out=array_out/(dsqrt(dfloat(ny*nx)))
 	return
 	end subroutine
 
 !----------------------------------------------------------------------------------------
 !	inverse 2D transform
-	subroutine dfft2b(nopiyb,nopixb,array_in,nopiy,array_out,nopix)
+	subroutine dfft2b(ny,nx,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiyb,nopixb
-	integer(4) :: nopiy,nopix !dummy
-	complex(8),dimension(nopiyb,nopixb) :: array_in
-	complex(8),dimension(nopiyb,nopixb) :: array_out
+	integer(4) :: ny,nx
+	complex(8),dimension(ny,nx) :: array_in
+	complex(8),dimension(ny,nx) :: array_out
 
 	!device arrays
-	complex(8),device,dimension(nopiyb,nopixb) :: array_in_d
-	complex(8),device,dimension(nopiyb,nopixb) :: array_out_d
+	complex(8),device,dimension(ny,nx) :: array_in_d
+	complex(8),device,dimension(ny,nx) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
-	! Initialize the plan
-	call cufftPlan(plan,nopixb,nopiyb,CUFFT_Z2Z)
-    !call cufftPlan(plan,nopiyb,nopixb,CUFFT_Z2Z)
+	! Initialize the plan - reversed dimensions of the cufftPlan2d API
+	call cufftPlan(plan,nx,ny,CUFFT_Z2Z)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_INVERSE)
@@ -213,31 +212,29 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(dsqrt(dfloat(nopiyb*nopixb)))
+    array_out=array_out/(dsqrt(dfloat(ny*nx)))
 	return
 	end subroutine
 	
 !----------------------------------------------------------------------------------------
 !	forward 3D transform
-	subroutine dfft3d(nopiyb,nopixb,nopizb,array_in,nopiy,nopix,array_out,nopiya,nopixa)
+	subroutine dfft3d(ny,nx,nz,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiya,nopixa,nopiza 
-	integer(4) :: nopiyb,nopixb,nopizb
-	integer(4) :: nopiy,nopix,nopiz 
-	complex(8),dimension(nopiyb,nopixb,nopizb) :: array_in
-	complex(8),dimension(nopiyb,nopixb,nopizb) :: array_out
+	integer(4) :: ny,nx,nz
+	complex(8),dimension(ny,nx,nz) :: array_in
+	complex(8),dimension(ny,nx,nz) :: array_out
 
 	!device arrays
-	complex(8),device,dimension(nopiyb,nopixb,nopizb) :: array_in_d
-	complex(8),device,dimension(nopiyb,nopixb,nopizb) :: array_out_d
+	complex(8),device,dimension(ny,nx,nz) :: array_in_d
+	complex(8),device,dimension(ny,nx,nz) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
-	! Initialize the plan
-	call cufftPlan(plan,nopiyb,nopixb,nopizb,CUFFT_Z2Z)
+	! Initialize the plan - reversed dimensions of the cufftPlan3d API
+	call cufftPlan(plan,nz,nx,ny,CUFFT_Z2Z)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_FORWARD)
@@ -247,31 +244,29 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(dsqrt(dfloat(nopiyb*nopixb*nopizb)))
+    array_out=array_out/(dsqrt(dfloat(ny*nx*nz)))
 	return
 	end subroutine
 
 !----------------------------------------------------------------------------------------
 !	inverse 3D transform
-	subroutine dfft3b(nopiyb,nopixb,nopizb,array_in,nopiy,nopix,array_out,nopiya,nopixa)
+	subroutine dfft3b(ny,nx,nz,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiya,nopixa,nopiza 
-	integer(4) :: nopiyb,nopixb,nopizb
-	integer(4) :: nopiy,nopix,nopiz 
-	complex(8),dimension(nopiyb,nopixb,nopizb) :: array_in
-	complex(8),dimension(nopiyb,nopixb,nopizb) :: array_out
+	integer(4) :: ny,nx,nz
+	complex(8),dimension(ny,nx,nz) :: array_in
+	complex(8),dimension(ny,nx,nz) :: array_out
 
 	!device arrays
-	complex(8),device,dimension(nopiyb,nopixb,nopizb) :: array_in_d
-	complex(8),device,dimension(nopiyb,nopixb,nopizb) :: array_out_d
+	complex(8),device,dimension(ny,nx,nz) :: array_in_d
+	complex(8),device,dimension(ny,nx,nz) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
-	! Initialize the plan
-	call cufftPlan(plan,nopiyb,nopixb,nopizb,CUFFT_Z2Z)
+	! Initialize the plan - reversed dimensions of the cufftPlan3d API
+	call cufftPlan(plan,nz,nx,ny,CUFFT_Z2Z)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_INVERSE)
@@ -281,34 +276,33 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(dsqrt(dfloat(nopiyb*nopixb*nopizb)))
+    array_out=array_out/(dsqrt(dfloat(ny*nx*nz)))
 	return
 	end subroutine
 
 
-      !----------------------------------------------------------------------------------------------------------------------------------
+    !----------------------------------------------------------------------------------------------------------------------------------
 
 
 
-      !	forward 1D transform
-	subroutine sfft1d(nopiyb,array_in,nopiy,array_out,nopix)
+    !	forward 1D transform
+	subroutine sfft1d(n,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiyb
-	integer(4) :: nopiy,nopix 
-	complex(4),dimension(nopiyb) :: array_in
-	complex(4),dimension(nopiyb) :: array_out
+	integer(4) :: n
+	complex(4),dimension(n) :: array_in
+	complex(4),dimension(n) :: array_out
 
 	!device arrays
-	complex(4),device,dimension(nopiyb) :: array_in_d
-	complex(4),device,dimension(nopiyb) :: array_out_d
+	complex(4),device,dimension(n) :: array_in_d
+	complex(4),device,dimension(n) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
 	! Initialize the plan
-	call cufftPlan(plan,nopiyb,CUFFT_C2C)
+	call cufftPlan(plan,n,CUFFT_C2C)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_FORWARD)
@@ -318,30 +312,29 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(sqrt(float(nopiyb)))
+    array_out=array_out/(sqrt(float(n)))
 	return
 	end subroutine
 
 !----------------------------------------------------------------------------------------
 !	inverse 1D transform
-	subroutine sfft1b(nopiyb,array_in,nopiy,array_out,nopix)
+	subroutine sfft1b(n,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiyb
-	integer(4) :: nopiy,nopix 
-	complex(4),dimension(nopiyb) :: array_in
-	complex(4),dimension(nopiyb) :: array_out
+	integer(4) :: n
+	complex(4),dimension(n) :: array_in
+	complex(4),dimension(n) :: array_out
 
 	!device arrays
-	complex(4),device,dimension(nopiyb) :: array_in_d
-	complex(4),device,dimension(nopiyb) :: array_out_d
+	complex(4),device,dimension(n) :: array_in_d
+	complex(4),device,dimension(n) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
 	! Initialize the plan
-	call cufftPlan(plan,nopiyb,CUFFT_C2C)
+	call cufftPlan(plan,n,CUFFT_C2C)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_INVERSE)
@@ -351,7 +344,7 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(sqrt(float(nopiyb)))
+    array_out=array_out/(sqrt(float(n)))
 	return
 	end subroutine
 	
@@ -362,24 +355,23 @@ implicit none
 
 !----------------------------------------------------------------------------------------
 !	forward 2D transform
-	subroutine sfft2d(nopiyb,nopixb,array_in,nopiy,array_out,nopix)
+	subroutine sfft2d(ny,nx,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiyb,nopixb
-	integer(4) :: nopiy,nopix 
-	complex(4),dimension(nopiyb,nopixb) :: array_in
-	complex(4),dimension(nopiyb,nopixb) :: array_out
+	integer(4) :: ny,nx
+	complex(4),dimension(ny,nx) :: array_in
+	complex(4),dimension(ny,nx) :: array_out
 
 	!device arrays
-	complex(4),device,dimension(nopiyb,nopixb) :: array_in_d
-	complex(4),device,dimension(nopiyb,nopixb) :: array_out_d
+	complex(4),device,dimension(ny,nx) :: array_in_d
+	complex(4),device,dimension(ny,nx) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
-	! Initialize the plan
-    call cufftPlan(plan,nopixb,nopiyb,CUFFT_C2C)
+	! Initialize the plan - reversed dimensions of the cufftPlan2d API
+    call cufftPlan(plan,nx,ny,CUFFT_C2C)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_FORWARD)
@@ -389,30 +381,29 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(sqrt(float(nopiyb*nopixb)))
+    array_out=array_out/(sqrt(float(ny*nx)))
 	return
 	end subroutine
 
 !----------------------------------------------------------------------------------------
 !	inverse 2D transform
-	subroutine sfft2b(nopiyb,nopixb,array_in,nopiy,array_out,nopix)
+	subroutine sfft2b(ny,nx,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiyb,nopixb
-	integer(4) :: nopiy,nopix 
-	complex(4),dimension(nopiyb,nopixb) :: array_in
-	complex(4),dimension(nopiyb,nopixb) :: array_out
+	integer(4) :: ny,nx
+	complex(4),dimension(ny,nx) :: array_in
+	complex(4),dimension(ny,nx) :: array_out
 
 	!device arrays
-	complex(4),device,dimension(nopiyb,nopixb) :: array_in_d
-	complex(4),device,dimension(nopiyb,nopixb) :: array_out_d
+	complex(4),device,dimension(ny,nx) :: array_in_d
+	complex(4),device,dimension(ny,nx) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
-	! Initialize the plan
-	call cufftPlan(plan,nopixb,nopiyb,CUFFT_C2C)
+	! Initialize the plan - reversed dimensions of the cufftPlan2d API
+	call cufftPlan(plan,nx,ny,CUFFT_C2C)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_INVERSE)
@@ -422,31 +413,29 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(sqrt(float(nopiyb*nopixb)))
+    array_out=array_out/(sqrt(float(ny*nx)))
 	return
 	end subroutine
 	
 !----------------------------------------------------------------------------------------
 !	forward 3D transform
-	subroutine sfft3d(nopiyb,nopixb,nopizb,array_in,nopiy,nopix,array_out,nopiya,nopixa)
+	subroutine sfft3d(ny,nx,nz,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiya,nopixa,nopiza 
-	integer(4) :: nopiyb,nopixb,nopizb
-	integer(4) :: nopiy,nopix,nopiz 
-	complex(4),dimension(nopiyb,nopixb,nopizb) :: array_in
-	complex(4),dimension(nopiyb,nopixb,nopizb) :: array_out
+	integer(4) :: ny,nx,nz
+	complex(4),dimension(ny,nx,nz) :: array_in
+	complex(4),dimension(ny,nx,nz) :: array_out
 
 	!device arrays
-	complex(4),device,dimension(nopiyb,nopixb,nopizb) :: array_in_d
-	complex(4),device,dimension(nopiyb,nopixb,nopizb) :: array_out_d
+	complex(4),device,dimension(ny,nx,nz) :: array_in_d
+	complex(4),device,dimension(ny,nx,nz) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
-	! Initialize the plan
-	call cufftPlan(plan,nopiyb,nopixb,nopizb,CUFFT_C2C)
+	! Initialize the plan - reversed dimensions of the cufftPlan3d API
+	call cufftPlan(plan,nz,nx,ny,CUFFT_C2C)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_FORWARD)
@@ -456,31 +445,29 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(sqrt(float(nopiyb*nopixb*nopizb)))
+    array_out=array_out/(sqrt(float(ny*nx*nz)))
 	return
 	end subroutine
 
 !----------------------------------------------------------------------------------------
 !	inverse 3D transform
-	subroutine sfft3b(nopiyb,nopixb,nopizb,array_in,nopiy,nopix,array_out,nopiya,nopixa)
+	subroutine sfft3b(ny,nx,nz,array_in,array_out)
 
 	implicit none
 	integer	plan
-	integer(4) :: nopiya,nopixa,nopiza 
-	integer(4) :: nopiyb,nopixb,nopizb
-	integer(4) :: nopiy,nopix,nopiz 
-	complex(4),dimension(nopiyb,nopixb,nopizb) :: array_in
-	complex(4),dimension(nopiyb,nopixb,nopizb) :: array_out
+	integer(4) :: ny,nx,nz
+	complex(4),dimension(ny,nx,nz) :: array_in
+	complex(4),dimension(ny,nx,nz) :: array_out
 
 	!device arrays
-	complex(4),device,dimension(nopiyb,nopixb,nopizb) :: array_in_d
-	complex(4),device,dimension(nopiyb,nopixb,nopizb) :: array_out_d
+	complex(4),device,dimension(ny,nx,nz) :: array_in_d
+	complex(4),device,dimension(ny,nx,nz) :: array_out_d
 	
 	!copy data to device
 	array_in_d=array_in
 
-	! Initialize the plan
-	call cufftPlan(plan,nopiyb,nopixb,nopizb,CUFFT_C2C)
+	! Initialize the plan - reversed dimensions of the cufftPlan2d API
+	call cufftPlan(plan,nz,nx,ny,CUFFT_C2C)
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_INVERSE)
@@ -490,12 +477,18 @@ implicit none
 
 	! Copy results back to host
 	array_out=array_out_d
-    array_out=array_out/(sqrt(float(nopiyb*nopixb*nopizb)))
+    array_out=array_out/(sqrt(float(ny*nx*nz)))
 	return
-	end subroutine
+    end subroutine
+    
 #else
-implicit none
 
+
+! -----------------------------------------------------------------------------
+!
+! CPU FFT wrapper (FFTW interface of the MKL)
+
+  implicit none
 
   save
 
@@ -547,148 +540,146 @@ implicit none
     !end subroutine
     
     
-    subroutine dfft1b(nopixb,array_in,array_out)
+    subroutine dfft1b(n,array_in,array_out)
 
 	implicit none
 	include 'fftw3.f'
 	integer*8	plan
-	integer*4	nopixb
-	complex*16  array_in(nopixb)
-	complex*16  array_out(nopixb)
+	integer*4	n
+	complex*16  array_in(n)
+	complex*16  array_out(n)
 
-    call dfftw_plan_dft (plan,nopixb,array_in,array_out,FFTW_BACKWARD,FFTW_ESTIMATE )
-	call dfftw_execute ( plan)
-	call dfftw_destroy_plan ( plan )
-	array_out=array_out/(dsqrt(dfloat(nopixb)))
+    call dfftw_plan_dft(plan,n,array_in,array_out,FFTW_BACKWARD,FFTW_ESTIMATE )
+	call dfftw_execute(plan)
+	call dfftw_destroy_plan(plan)
+	array_out=array_out/(dsqrt(dfloat(n)))
 
 	return
 	end subroutine
 	
-	subroutine dfft1d(nopixb,array_in,array_out)
+	subroutine dfft1d(n,array_in,array_out)
 	implicit none
 	include 'fftw3.f'
 	integer*8	plan
-	integer*4	nopixb
-	complex*16  array_in(nopixb)
-	complex*16  array_out(nopixb)
+	integer*4	n
+	complex*16  array_in(n)
+	complex*16  array_out(n)
 
-    call dfftw_plan_dft (plan,nopixb,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
-	call dfftw_execute ( plan)
-	call dfftw_destroy_plan ( plan )
-    array_out=array_out/(dsqrt(dfloat(nopixb)))
+    call dfftw_plan_dft(plan,n,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
+	call dfftw_execute(plan)
+	call dfftw_destroy_plan(plan)
+    array_out=array_out/(dsqrt(dfloat(n)))
     
 	return
 	end subroutine
 	
-	subroutine dfft2b(nopiyb,nopixb,array_in,nopiy,array_out,nopix)
+	subroutine dfft2b(ny,nx,array_in,array_out)
 
 	implicit none
 	include 'fftw3.f'
 	integer*8	plan
-	integer*4	nopiyb,nopixb
-	integer*4   nopiy,nopix !dummy variables
-	complex*16  array_in(nopiyb,nopixb)
-	complex*16  array_out(nopiyb,nopixb)
+	integer*4	ny,nx
+	complex*16  array_in(ny,nx)
+	complex*16  array_out(ny,nx)
 
-    call dfftw_plan_dft_2d (plan,nopiyb,nopixb,array_in,array_out,FFTW_BACKWARD,FFTW_ESTIMATE )
-	call dfftw_execute ( plan)
-	call dfftw_destroy_plan ( plan )
-	array_out=array_out/(dsqrt(dfloat(nopiyb*nopixb)))
+    call dfftw_plan_dft_2d(plan,ny,nx,array_in,array_out,FFTW_BACKWARD,FFTW_ESTIMATE )
+	call dfftw_execute(plan)
+	call dfftw_destroy_plan(plan)
+	array_out=array_out/(dsqrt(dfloat(ny*nx)))
 
 	return
 	end subroutine
 
-	subroutine dfft2d(nopiyb,nopixb,array_in,nopiy,array_out,nopix)
+	subroutine dfft2d(ny,nx,array_in,array_out)
 
 	implicit none
 	include 'fftw3.f'
 	integer*8	plan
-	integer*4	nopiyb,nopixb
-	integer*4   nopiy,nopix !dummy variables
-	complex*16  array_in(nopiyb,nopixb)
-	complex*16  array_out(nopiyb,nopixb)
+	integer*4	ny,nx
+	complex*16  array_in(ny,nx)
+	complex*16  array_out(ny,nx)
 
 
-    call dfftw_plan_dft_2d (plan,nopiyb,nopixb,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
-	call dfftw_execute ( plan)
-	call dfftw_destroy_plan ( plan )
-    array_out=array_out/(dsqrt(dfloat(nopiyb*nopixb)))
+    call dfftw_plan_dft_2d(plan,ny,nx,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
+	call dfftw_execute(plan)
+	call dfftw_destroy_plan(plan)
+    array_out=array_out/(dsqrt(dfloat(ny*nx)))
     	
 	return
 	end subroutine
 	
 	
 	
-	subroutine sfft1b(nopixb,array_in,array_out)
+	subroutine sfft1b(n,array_in,array_out)
 
 	implicit none
 	include 'fftw3.f'
 	integer*8  plan
-	integer*4  nopixb
-	complex*8  array_in(nopixb)
-	complex*8  array_out(nopixb)
+	integer*4  n
+	complex*8  array_in(n)
+	complex*8  array_out(n)
 
-    call sfftw_plan_dft (plan,nopixb,array_in,array_out,FFTW_BACKWARD,FFTW_ESTIMATE )
-	call sfftw_execute ( plan)
-	call sfftw_destroy_plan ( plan )
-	array_out=array_out/(sqrt(float(nopixb)))
+    call sfftw_plan_dft(plan,n,array_in,array_out,FFTW_BACKWARD,FFTW_ESTIMATE )
+	call sfftw_execute(plan)
+	call sfftw_destroy_plan(plan)
+	array_out=array_out/(sqrt(float(n)))
 
 	return
 	end subroutine
 	
-	subroutine sfft1d(nopixb,array_in,array_out)
+	subroutine sfft1d(n,array_in,array_out)
 	implicit none
 	include 'fftw3.f'
-	integer*8	plan
-	integer*4	nopixb
-	complex*8  array_in(nopixb)
-	complex*8  array_out(nopixb)
+	integer*8 plan
+	integer*4 n
+	complex*8 array_in(n)
+	complex*8 array_out(n)
 
-    call sfftw_plan_dft (plan,nopixb,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
-	call sfftw_execute ( plan)
-	call sfftw_destroy_plan ( plan )
-    array_out=array_out/(sqrt(float(nopixb)))
+    call sfftw_plan_dft(plan,n,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
+	call sfftw_execute(plan)
+	call sfftw_destroy_plan(plan)
+    array_out=array_out/(sqrt(float(n)))
     
 	return
 	end subroutine
 	
-	subroutine sfft2b(nopiyb,nopixb,array_in,nopiy,array_out,nopix)
+	subroutine sfft2b(ny,nx,array_in,array_out)
 
 	implicit none
 	include 'fftw3.f'
 	integer*8 plan
-	integer*4 nopiyb,nopixb
-	integer*4 nopiy,nopix !dummy variables
-	complex*8 array_in(nopiyb,nopixb)
-	complex*8 array_out(nopiyb,nopixb)
+	integer*4 ny,nx
+	complex*8 array_in(ny,nx)
+	complex*8 array_out(ny,nx)
 
-    call sfftw_plan_dft_2d (plan,nopiyb,nopixb,array_in,array_out,FFTW_BACKWARD,FFTW_ESTIMATE )
-	call sfftw_execute ( plan)
-	call sfftw_destroy_plan ( plan )
-	array_out=array_out/(sqrt(float(nopiyb*nopixb)))
+    call sfftw_plan_dft_2d(plan,ny,nx,array_in,array_out,FFTW_BACKWARD,FFTW_ESTIMATE )
+	call sfftw_execute(plan)
+	call sfftw_destroy_plan(plan)
+	array_out=array_out/(sqrt(float(ny*nx)))
 
 	return
 	end subroutine
 
-	subroutine sfft2d(nopiyb,nopixb,array_in,nopiy,array_out,nopix)
+	subroutine sfft2d(ny,nx,array_in,array_out)
 
 	implicit none
 	include 'fftw3.f'
 	integer*8 plan
-	integer*4 nopiyb,nopixb
-	integer*4 nopiy,nopix !dummy variables
-	complex*8 array_in(nopiyb,nopixb)
-	complex*8 array_out(nopiyb,nopixb)
+	integer*4 ny,nx
+	complex*8 array_in(ny,nx)
+	complex*8 array_out(ny,nx)
 
 
-    call sfftw_plan_dft_2d (plan,nopiyb,nopixb,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
-	call sfftw_execute ( plan)
-	call sfftw_destroy_plan ( plan )
-    array_out=array_out/(sqrt(float(nopiyb*nopixb)))
+    call sfftw_plan_dft_2d(plan,ny,nx,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
+	call sfftw_execute(plan)
+	call sfftw_destroy_plan(plan)
+    array_out=array_out/(sqrt(float(ny*nx)))
     	
 	return
-	end subroutine
+    end subroutine
+
 #endif
-      end module CUFFT_wrapper
+
+end module CUFFT_wrapper
 
 

@@ -54,7 +54,7 @@ interface cufftPlan
 	integer(c_int):: plan
 	integer(c_int),value:: nx, ny, type
 	end subroutine cufftPlan2d
-	! cufftPlan2d(cufftHandle *plan, int nx, int ny, cufftType type)
+	! cufftPlan3d(cufftHandle *plan, int nx, int ny, int nz, cufftType type)
 	subroutine cufftPlan3d(plan, nx, ny, nz, type) bind(C,name='cufftPlan3d') 
 	use iso_c_binding
 	integer(c_int):: plan

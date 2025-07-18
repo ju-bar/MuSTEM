@@ -592,11 +592,11 @@ module m_user_input
             !line_no = line_no + 1
 			!Tabs can cause all sorts of strife so must be removed
             if (to_upper(trim(adjustl(remove_tabs(temp_string)))) .ne. to_upper(trim(prompt))) then
-                write(6,*) 'Wrong input string:'
-                write(6,*) trim(adjustl(temp_string))
-                write(6,*) 'Expected:'
-                write(6,*) trim(prompt)
-                write(6,100) line_no
+                write(*,*) 'Wrong input string:'
+                write(*,*) trim(adjustl(temp_string))
+                write(*,*) 'Expected:'
+                write(*,*) trim(prompt)
+                write(*,100) line_no
 100             format(' On line number: ', i3)
                 call exit(0)
             endif

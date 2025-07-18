@@ -20,6 +20,19 @@
 !                       
 !--------------------------------------------------------------------------------
 
+    
+!--------------------------------------------------------------------------------
+!
+! Notes on saving and loading grates: (2025-06-26, JB)
+!    Grates stored by muSTEM are with dimensions (nopiy,nopix,...).
+!    Their loading also expects this order of dimensions.
+!    Grates added by the user (eg. from magnetic structure) are expected to be
+!    in transposed order (nopix,nopiy,...), and these will be transposed
+!    after loading to match the muSTEM grates order.
+!                       
+!--------------------------------------------------------------------------------
+    
+    
 module m_multislice
     
     use m_precision, only: fp_kind
@@ -106,11 +119,18 @@ module m_multislice
         integer*4,intent(in)::nopiy,nopix
 		integer(4):: iexc,isx,isy ! local plasmon scatter results added here, JB-191213
         complex(fp_kind)::psi_tmp(nopiy,nopix) ! temporary wave function for plasmon scattering, JB-191213
+        integer*4::i, j ! loop variables
         
         ! Transmit through slice potential
-		psi = psi*transmission
+		!psi = psi*transmission
+        do j = 1, nopix
+          !$omp simd
+          do i = 1, nopiy
+            psi(i,j) = psi(i,j) * transmission(i,j)
+          end do
+        end do
         ! Propagate to next slice
-		call fft2(nopiy,nopix,psi,nopiy,psi,nopiy)
+		call fft2(nopiy,nopix,psi,psi)
 		! plasmon trigger, JB-191213
 		if (plasmonmc) then
 			call pl_scatt_slc(pl_tslc,pl_grid_sqx,pl_grid_sqx,iexc,isx,isy,pl_idum)
@@ -119,8 +139,14 @@ module m_multislice
 				psi = cshift(cshift(psi_tmp(:,:),isy,dim=1),isy,dim=2)
 			endif
 		endif
-		psi = psi*propagator
-		call ifft2(nopiy,nopix,psi,nopiy,psi,nopiy)
+		!psi = psi*propagator    
+        do j = 1, nopix
+            !$omp simd
+            do i = 1, nopiy
+            psi(i,j) = psi(i,j) * propagator(i,j)
+            end do
+        end do
+		call ifft2(nopiy,nopix,psi,psi)
     
     end subroutine
     
@@ -135,25 +161,45 @@ module m_multislice
         logical,intent(in)::even_slicing
 		integer(4):: iexc,isx,isy ! local plasmon scatter results added here, JB-191213
         complex(fp_kind)::psi_tmp(nopiy,nopix) ! temporary wave function for plasmon scattering, JB-191213
+        integer*4::i, j ! loop variables
 		
         ! Transmit through slice potential
-		psi = psi*transmission
+		!psi = psi*transmission
+        do j = 1, nopix
+          !$omp simd
+          do i = 1, nopiy
+            psi(i,j) = psi(i,j) * transmission(i,j)
+          end do
+        end do
         ! Propagate to next slice
-		call fft2(nopiy,nopix,psi,nopiy,psi,nopiy)
+		call fft2(nopiy,nopix,psi,psi)
 		! plasmon trigger, JB-191213
 		if (plasmonmc) then
 			call pl_scatt_slc(pl_tslc,pl_grid_sqx,pl_grid_sqx,iexc,isx,isy,pl_idum)
 			if (iexc>0 .and. (isx/=0 .or. isy/=0)) then ! scattering happened and shift is needed
 				psi_tmp = psi
+                ! unaligned access pattern, difficult to paralllelize
 				psi = cshift(cshift(psi_tmp(:,:),isy,dim=1),isy,dim=2)
 			endif
 		endif
 		if(even_slicing) then
-            psi = psi*propagator
+            !psi = psi*propagator    
+            do j = 1, nopix
+              !$omp simd
+              do i = 1, nopiy
+                psi(i,j) = psi(i,j) * propagator(i,j)
+              end do
+            end do
         else
-            psi = psi*exp(prop_distance*propagator)
+            !psi = psi*exp(cmplx(0.0d0,1.0d0,fp_kind)*prop_distance*propagator)
+            do j = 1, nopix
+              !$omp simd
+              do i = 1, nopiy
+                psi(i,j) = psi(i,j) * exp(cmplx(0.0d0,1.0d0,fp_kind)*prop_distance*propagator(i,j))
+              end do
+            end do
         endif
-		call ifft2(nopiy,nopix,psi,nopiy,psi,nopiy)
+		call ifft2(nopiy,nopix,psi,psi)
 		return
     end subroutine
     
@@ -394,13 +440,13 @@ module m_multislice
                 write(*,*)
                 write(*,*) 'They can be loaded for later calculations provided'
                 write(*,*) 'the following parameters are identical:'
-                write(6,323)
+                write(*,323)
                 
             case (2)
                 write(*,*) 'It is up to the user to ensure that the parameters used'
                 write(*,*) 'to create the loaded transmission functions are consistent'
                 write(*,*) 'with those of the current calculation:'
-                write(6,323)
+                write(*,323)
                 retry=.true.
                 do while(retry)
                write(*,*) 'Enter filename of transmission functions:'
@@ -626,13 +672,13 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
 			write(*,*) 'functions to achieve convergence than would usually be the case.'
 			write(*,*)
         if (quick_shift) then
-            write(6,100) to_string(ifactorx*ifactory), to_string(n_qep_grates), to_string(ifactorx*ifactory*n_qep_grates)
+            write(*,100) to_string(ifactorx*ifactory), to_string(n_qep_grates), to_string(ifactorx*ifactory*n_qep_grates)
 100         format(' The choice of tiling and grid size permits quick shifting.',/,&
                   &' The effective number of transmission functions used in  ',/,&
                   &' calculations will be ', a, ' * ', a, ' = ', a, '.', /)
             qep_mode=2
         else
-            write(6,101)
+            write(*,101)
         101 format( ' Your choice of tiling and grid size does not permit quick shifting ', /, &
                     &' of the precalculated transmission functions. Shifting using the ', /, &
                     &' Fourier shift algorithm can be performed but is time consuming. ', /, &
@@ -641,7 +687,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
             
 			i=-1
 			do while(i<1.or.i>3)
-			110 write(6,111)
+			110 write(*,111)
 			111 format(  ' <1> Go back and choose a larger number', /, &
 						&' <2> Proceed with phase ramp shifting', /, &
 						&' <3> Proceed without phase ramp shifting', / &                
@@ -659,12 +705,12 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
             enddo
         endif
 		enddo
-        write(6,*) 'Enter the number of passes to perform for QEP calculation:'
+        write(*,*) 'Enter the number of passes to perform for QEP calculation:'
         write(*,*) 'Warning: using only a single pass is usually NOT sufficient.'
         call get_input("Number of Monte Carlo calculated", n_qep_passes )
         write(*,*)
     
-        write(6,*) 'Enter the starting position of the random number sequence:'
+        write(*,*) 'Enter the starting position of the random number sequence:'
         call get_input("Number of ran1 discarded", nran )
         write(*,*)       
 		!nran=1
@@ -705,7 +751,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
         integer :: i_slice
         call command_line_title_box('Unit cell slicing')
       
-    22  write(6,23) 'A'
+    22  write(*,23) 'A'
     23  format(' Do you wish to slice the unit cell in the beam direction?', /, &
               &' This may be a good idea if the unit cell is larger than 2 ', a1, /, &
               &' in the z-direction.', /, &
@@ -758,7 +804,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
 
             depths(n_slices+1) = 1.0_fp_kind
             
-            write(6,10)
+            write(*,10)
          10 format( ' You will now be asked to enter the depths at which slicing',/,&
                     &' will take place. These should be entered as fractions of',/,&
                     &' the unit cell. It is the front of the slice which should',/,&
@@ -767,7 +813,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
 	    
             ichoice = 0
             do while(ichoice<1.or.ichoice>2)
-            write(6,16) 
+            write(*,16) 
     16      format(' How would you like to specify the slice depths?', /, &
                   &' <1> Manually ', /, &
                   &' <2> Automatically (uniformly spaced)')
@@ -778,7 +824,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
                 ! Manual slicing
             
 	            do i = 1, n_slices
-	                write(6,20,ADVANCE='NO') achar(13), i
+	                write(*,20,ADVANCE='NO') achar(13), i
         20          format( a1,' Enter the fractional depth of slice number ', i4, ':  ')
 	                call get_input("depths", depths(i))
 	            enddo
@@ -789,7 +835,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
     21          format( ' Fractional depth of slice ', i4, ':  ', f7.4)
                 do i = 1, n_slices
                     depths(i) = float( (i-1)) / float(n_slices)
-                    write(6,21) i, depths(i)
+                    write(*,21) i, depths(i)
                 enddo
             endif
             enddo
@@ -865,7 +911,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
         enddo
 
         prop_distance = a0_slice(3,:)
-		 even_slicing = all(abs(prop_distance - sum(prop_distance)/n_slices)<1e-3)
+		even_slicing = all(abs(prop_distance - sum(prop_distance)/n_slices)<1e-3)
         
     end subroutine
     
@@ -956,9 +1002,10 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
 	    nat2(i)=jj-1
 	enddo
     
-	end subroutine        
-        
-    subroutine get_cbed_detector_info(ndet,k,outer,inner)
+    end subroutine        
+
+    
+    subroutine get_cbed_detector_info(ndet,k,outer,inner,eels)
     
         use m_precision, only: fp_kind
         use m_user_input, only: get_input
@@ -968,12 +1015,16 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
     
         integer(4)   ndet,ichoice,i,mrad
         real(fp_kind),dimension(ndet) :: outer,inner,inner_mrad,outer_mrad
-		optional::inner
+        logical::eels
+		optional::inner,eels
         real(fp_kind) :: k,dummy
-		logical::getinner
+		logical::getinner,opteels,is_eels
 
+        is_eels = .false.
 		getinner = present(inner)
-
+        opteels = present(eels)
+        if (opteels) is_eels = eels
+        
         write(*,*) 'Select a method for choosing detector angles:'
         write(*,*) '<1> Manual',char(10),' <2> Automatic'
     
@@ -1034,9 +1085,13 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
 		else
 			if(getinner) inner = k*tan(inner_mrad/1000.0_fp_kind)
 			outer = k*tan(outer_mrad/1000.0_fp_kind)
-		endif
+        endif
         
-        write(*,*) 'Summary of diffraction plane detectors:'
+        if (is_eels) then
+            write(*,*) 'Summary of EELS diffraction plane detectors:'
+        else    
+            write(*,*) 'Summary of diffraction plane detectors:'
+        endif
         write(*,*)
         
         if(getinner) write(*,*) '         inner    outer'
@@ -1063,8 +1118,6 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
 70          format(1x, 5x, ' | ', f6.2, '   (', a1, '^-1)')        
 
         write(*,*)
-		
-
         
     end subroutine
 	
@@ -1080,14 +1133,14 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
 		complex(fp_kind),dimension(nopiy,nopix)::psi_temp2,psi_temp
 
 		if(present(rspacein)) then
-			if(rspacein)call fft2(nopiy,nopix,psi,nopiy,psi_temp,nopiy)
+			if(rspacein)call fft2(nopiy,nopix,psi,psi_temp)
 			if(.not.rspacein) psi_temp = psi
 		else
-			call fft2(nopiy,nopix,psi,nopiy,psi_temp,nopiy)
+			call fft2(nopiy,nopix,psi,psi_temp)
 		endif
 
 		psi_temp = psi_temp*ctf
-		call ifft2(nopiy,nopix,psi_temp,nopiy,psi_temp2,nopiy)
+		call ifft2(nopiy,nopix,psi_temp,psi_temp2)
 		image = abs(psi_temp2)**2
 
 	end function

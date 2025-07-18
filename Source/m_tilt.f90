@@ -104,7 +104,7 @@ module m_tilt
 		tilt_theta_ = asin(sqrt(sum((bvec*[trimi(ig2,ss),trimi(ig1,ss),0._fp_kind])**2))/ak1)*1e3 ! JB 2022-08-03 error fixed on ifort compilation
 		! previous line has been corrected by exchanging ig1 and ig2 for correct display.
 
-        write(6,30) tilt_theta*1e3_fp_kind,tilt_theta_,tilt_phi*1e3_fp_kind,tilt_phi_
+        write(*,30) tilt_theta*1e3_fp_kind,tilt_theta_,tilt_phi*1e3_fp_kind,tilt_phi_
                 
 30     format(/,&
         &1x,'To ensure that the illumination wave function is continuous',/,&

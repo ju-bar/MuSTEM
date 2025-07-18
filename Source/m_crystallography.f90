@@ -30,31 +30,40 @@
 
         use m_precision, only: fp_kind
         use global_variables, only: nopiy, nopix, ig1, ig2
-        
-	    implicit none
     
-        real(fp_kind) :: g_vec_array(3,nopiy,nopix)
-        integer,intent(in),optional:: ifactory,ifactorx
-        
-        integer :: shiftx, shifty, m1, m2, i, j
-        real(fp_kind)::ifactory_,ifactorx_
-        
-        ifactory_= 1.0_fp_kind; if(present(ifactory)) ifactory_=ifactory
-        ifactorx_= 1.0_fp_kind; if(present(ifactorx)) ifactorx_=ifactorx
-        shifty = (nopiy-1)/2-1
-        shiftx = (nopix-1)/2-1
-        
-        !$OMP PARALLEL PRIVATE(i, m2, j, m1)
-        !$OMP DO
-	    do i = 1, nopiy
-	        m2 = mod( i+shifty, nopiy) - shifty -1
-	        do j = 1, nopix
-	            m1 = mod( j+shiftx, nopix) - shiftx -1
-	            g_vec_array(:,i,j) = m1 * ig1/ifactorx_ + m2 * ig2/ifactory_                
-	   	    enddo
-        enddo
-	    !$OMP END DO
-        !$OMP END PARALLEL
+        implicit none
+
+        real(fp_kind), intent(out) :: g_vec_array(3, nopiy, nopix)
+        integer, intent(in), optional :: ifactory, ifactorx
+    
+        integer :: shiftx, shifty
+        integer :: i, j, m1, m2
+        real(fp_kind) :: ifactory_, ifactorx_
+
+        ! Set scaling factors (cast to real)
+        ifactory_ = 1.0_fp_kind
+        if (present(ifactory)) ifactory_ = real(ifactory, fp_kind)
+        ifactorx_ = 1.0_fp_kind
+        if (present(ifactorx)) ifactorx_ = real(ifactorx, fp_kind)
+
+        ! Compute shifts (check your logic here)
+        !shifty = (nopiy - 1) / 2
+        !shiftx = (nopix - 1) / 2
+        shiftx = (nopix - mod(nopix, 2)) / 2
+        shifty = (nopiy - mod(nopiy, 2)) / 2
+
+        !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(i, j, m1, m2)
+        do j = 1, nopix
+            do i = 1, nopiy
+                !m1 = mod(j + shiftx, nopix) - shiftx
+                !m2 = mod(i + shifty, nopiy) - shifty
+                m1 = mod(j - 1 + shiftx, nopix) - shiftx
+                m2 = mod(i - 1 + shifty, nopiy) - shifty
+                g_vec_array(:, i, j) = (real(m1, fp_kind) / ifactorx_) * ig1 + &
+                                       (real(m2, fp_kind) / ifactory_) * ig2
+            end do
+        end do
+        !$OMP END PARALLEL DO
 
     end subroutine make_g_vec_array_real
     
@@ -69,20 +78,22 @@
         
         integer :: shiftx, shifty, m1, m2, i, j
         
-        shifty = (nopiy-1)/2-1
-        shiftx = (nopix-1)/2-1
+        !shifty = (nopiy-1)/2-1
+        !shiftx = (nopix-1)/2-1
+        shiftx = (nopix - mod(nopix, 2)) / 2
+        shifty = (nopiy - mod(nopiy, 2)) / 2
         
-        !$OMP PARALLEL PRIVATE(i, m2, j, m1)
-        !$OMP DO
-	    do i = 1, nopiy
-	        m2 = mod( i+shifty, nopiy) - shifty -1
-	        do j = 1, nopix
-	            m1 = mod( j+shiftx, nopix) - shiftx -1
+        !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(i, j, m1, m2)
+        do j = 1, nopix
+	        do i = 1, nopiy
+                !m1 = mod( j+shiftx, nopix) - shiftx -1
+                !m2 = mod( i+shifty, nopiy) - shifty -1
+                m1 = mod(j - 1 + shiftx, nopix) - shiftx
+                m2 = mod(i - 1 + shifty, nopiy) - shifty
 	            g_vec_array(:,i,j) = m1 * ig1 + m2 * ig2
 	   	    enddo
         enddo
-	    !$OMP END DO
-        !$OMP END PARALLEL
+	    !$OMP END PARALLEL DO
 
     end subroutine make_g_vec_array_int
 
@@ -129,6 +140,57 @@
 99    continue
       return
       end SUBROUTINE
+    
+    ! 2025-06-12 JB, added for SE transmission calculations
+    ! This subroutine calculates the transformation matrix H from the unit cell parameters A0 and angles DEG.
+    ! It can be used to calculate cartesian coordinates from fractional coordinates in the unit cell.
+    SUBROUTINE cellmatrix(A0, DEG, H)
+        use m_precision
+        IMPLICIT NONE
+
+        ! Inputs
+        REAL(fp_kind), INTENT(IN) :: A0(3) ! Cell lengths (Å)
+        REAL(fp_kind), INTENT(IN) :: DEG(3) ! Cell angles (degrees)
+
+        ! Output
+        REAL(fp_kind), INTENT(OUT) :: H(3,3) ! Transformation matrix
+
+        ! Local variables
+        REAL(fp_kind) :: alpha, beta, gamma                    ! Angles in radians
+        REAL(fp_kind) :: cos_alpha, cos_beta, cos_gamma
+        REAL(fp_kind) :: sin_gamma
+        REAL(fp_kind) :: volume_factor
+
+        ! Convert degrees to radians
+        alpha = DEG(1) * acos(-1.0_fp_kind) / 180.0_fp_kind
+        beta  = DEG(2)  * acos(-1.0_fp_kind) / 180.0_fp_kind
+        gamma = DEG(3) * acos(-1.0_fp_kind) / 180.0_fp_kind
+
+        cos_alpha = cos(alpha)
+        cos_beta  = cos(beta)
+        cos_gamma = cos(gamma)
+        sin_gamma = sin(gamma)
+
+        ! First row (a vector)
+        H(1,1) = A0(1)
+        H(1,2) = A0(2) * cos_gamma
+        H(1,3) = A0(3) * cos_beta
+
+        ! Second row
+        H(2,1) = 0.0_fp_kind
+        H(2,2) = A0(2) * sin_gamma
+        H(2,3) = A0(3) * (cos_alpha - cos_beta * cos_gamma) / sin_gamma
+
+        ! Third row
+        H(3,1) = 0.0_fp_kind
+        H(3,2) = 0.0_fp_kind
+        volume_factor = sqrt(1.0_fp_kind - cos_alpha**2 - cos_beta**2 - cos_gamma**2 + &
+                            & 2.0_fp_kind * cos_alpha * cos_beta * cos_gamma)
+        H(3,3) = A0(3) * volume_factor / sin_gamma
+        
+        return
+
+    END SUBROUTINE cellmatrix
 !--------------------------------------------------------------------------------------
 	subroutine zone(ig1,ig2,izone)
       !
@@ -381,7 +443,7 @@
       ag1 = trimi(ig1,ss)
       ag2 = trimi(ig2,ss)
       if(ag1.eq.0.0_fp_kind.or.ag2.eq.0.0_fp_kind) then
-            write(6,101)
+            write(*,101)
   101       format(' Error in Angle - one vector has zero magnitude')
             go to 99
       endif
@@ -524,7 +586,7 @@
 	ag1 = trimr(g1,ss)
 	ag2 = trimr(g2,ss)
 	if(ag1.eq.0.0.or.ag2.eq.0.0) then
-	write(6,101)
+	write(*,101)
 101   format(' Error in Angle - one vector has zero magnitude')
 	go to 99
 	endif

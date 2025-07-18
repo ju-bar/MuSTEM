@@ -77,11 +77,11 @@ module m_lens
 		character(:),allocatable::tag
 		
 		tag = trim(adjustl(ab%description))
-        write(6,*)' Enter the amplitude of '//tag//' in '//'A'//':' 
+        write(*,*)' Enter the amplitude of '//tag//' in '//'A'//':' 
         call get_input(tag//' coefficient', ab%amplitude)
         write(*,*)
 		if(ab%m>0) then
-			write(6,*)' Enter the azimuthal orientation of '//tag//' ('//char(237)//') in radians:' 
+			write(*,*)' Enter the azimuthal orientation of '//tag//' ('//char(237)//') in radians:' 
 			call get_input(tag//' azimuth', ab%angle)
 		endif
         write(*,*)
@@ -161,18 +161,18 @@ module m_lens
         nflag = -1
         apodisation = -1
         do while(nflag.ne.0)
-        write(6,11) atan(cutoff/ak1)*1000.0_fp_kind, 'A', cutoff, 'A',df(1)   
+        write(*,11) atan(cutoff/ak1)*1000.0_fp_kind, 'A', cutoff, 'A',df(1)   
 		do i=1,ndf-1
-			write(6,12) df(i+1)
+			write(*,12) df(i+1)
 		enddo
 		do i=1,13
 			if(aberrations(i)%n==0) then 
-				write(6,13) i+2,aberrations(i)%Krivanek,aberrations(i)%Haider,aberrations(i)%Description,aberrations(i)%amplitude
+				write(*,13) i+2,aberrations(i)%Krivanek,aberrations(i)%Haider,aberrations(i)%Description,aberrations(i)%amplitude
 			else
-				write(6,13) i+2,aberrations(i)%Krivanek,aberrations(i)%Haider,aberrations(i)%Description,aberrations(i)%amplitude,aberrations(i)%angle
+				write(*,13) i+2,aberrations(i)%Krivanek,aberrations(i)%Haider,aberrations(i)%Description,aberrations(i)%amplitude,aberrations(i)%angle
 			endif
 		enddo
-		write(6,14)
+		write(*,14)
 		
      11 format(   ' Current simulation parameters:',/,             &
                  &' -----------------------------------------------', /, &
@@ -214,7 +214,7 @@ module m_lens
             probe = make_ctf(xyposn,df(1),cutoff,aberrations,apodisation)
 			call binary_out_unwrap(nopiy,nopix,atan2(imag(probe),real(probe))*abs(probe)**2,&
 			                      &trim(adjustl(output_prefix)) //'_'//trim(adjustl(string))//'_forming_lens_ctf_phase')
-			call ifft2(nopiy,nopix,probe,nopiy,probe,nopiy)
+			call ifft2(nopiy,nopix,probe,probe)
 			call binary_out_unwrap(nopiy,nopix,abs(probe)**2,trim(adjustl(output_prefix))//'_'//trim(adjustl(string))&
 			                                                      &//'_forming_lens_ctf_real_space_intensity')
             
@@ -248,7 +248,7 @@ module m_lens
                &' a probe with cutoff of ',g11.4,1x, a1, '-1, the first, second and third radial minima', /, &
                &' are located at ',g11.4,', ',g11.4,' and ',g11.4,1x, a1, '.',/,&
                &' To disable probe apodisation input a negative number.')
-        write(6,20) cutoff,'A',3.8317/(cutoff*2*pi),7.0156/(cutoff*2*pi),10.1735/(cutoff*2*pi),'A'
+        write(*,20) cutoff,'A',3.8317/(cutoff*2*pi),7.0156/(cutoff*2*pi),10.1735/(cutoff*2*pi),'A'
         call get_input('Probe real space cutoff',set_probe_apodisation)
     end function
     
@@ -323,9 +323,9 @@ module m_lens
                 if (r.le.apodisation) real_space_aperture(ny,nx) =1
             enddo;enddo
             real_space_aperture = quad_shift(real_space_aperture,nopiy,nopix)
-            call ifft2(nopiy,nopix,ctf,nopiy,ctf,nopiy)
+            call ifft2(nopiy,nopix,ctf,ctf)
             ctf = ctf*real_space_aperture
-            call fft2(nopiy,nopix,ctf,nopiy,ctf,nopiy)
+            call fft2(nopiy,nopix,ctf,ctf)
         endif
         endif
         !$OMP PARALLEL DO PRIVATE(nx, m1, ny, m2, kr, akr,phi)
@@ -424,11 +424,11 @@ module m_lens
      do while(ich.ne.1)
          if(interpolation) able_string = 'enabled'
          if(.not.interpolation) able_string = 'disabled'
-          write(6,103) r1, a1, 'A', r2, a2, 'A', thetad2, origin(1), origin(2), probe_cutoff
-          if(.not.PACBED_only) write(6,104)
-          write(6,105) PACBED_or_STEM,min_step,nxsample_, nysample_, ceiling(nxsample/fract(1)),ceiling(nysample/fract(2)),nxsample, nysample
-          if(.not.PACBED_only) write(6,106) able_string
-          write(6,107)
+          write(*,103) r1, a1, 'A', r2, a2, 'A', thetad2, origin(1), origin(2), probe_cutoff
+          if(.not.PACBED_only) write(*,104)
+          write(*,105) PACBED_or_STEM,min_step,nxsample_, nysample_, ceiling(nxsample/fract(1)),ceiling(nysample/fract(2)),nxsample, nysample
+          if(.not.PACBED_only) write(*,106) able_string
+          write(*,107)
 103         format(/,' The probe scan vectors are: ', /,                  & 
             &       ' x = ', 3g12.5, ' mag = ', g12.5, 1x, a1, /,         &
             &       ' y = ', 3g12.5, ' mag = ', g12.5, 1x, a1, /,         &
@@ -454,7 +454,7 @@ module m_lens
             write(*,*)
         
             if(ich.eq.2) then             !changing size of x and y vectors
-                  write(6,111)
+                  write(*,111)
         111       format(' Enter fractional increase in both x and y.',/, 'For example, to double the size of the scan enter 2 2')
                   call get_input("Enter fractional increase in x and y", fract(1),fract(2))
 
@@ -468,7 +468,7 @@ module m_lens
                   interpolation=.false.
             elseif(ich.eq.3) then
         121       format( /, ' Please enter a new x-scan vector.' )
-                  write(6,121)
+                  write(*,121)
                   call get_input("x-scan vector", ig1a, 3)
                   call zone(izone, ig1a, ig2a)          !get an orthogonal vector to the zone axis and ig1
                   call angle(ig1a, ig2a, ss, thetad2)    !calculate angle between scan vectors
@@ -571,7 +571,7 @@ module m_lens
         integer(4) :: out_max
         
         if((nysample.gt.1).and.(nxsample.gt.1)) then
-            write(6,99) 
+            write(*,99) 
             99 format(' Enter the maximum number of pixels to interpolate the output image to.',/,&
                       &' Enter a negative number to disable interpolation.')
             call get_input('output interpolation max pixels', out_max)
@@ -587,8 +587,9 @@ module m_lens
             endif
             
             
-            write(*,*) 'Enter the tiling in x and y for interpolation output'
+            write(*,*) 'Enter the tiling in x for interpolation output'
             call get_input('output interpolation tilex', tilex)
+            write(*,*) 'Enter the tiling in y for interpolation output'
             call get_input('output interpolation tiley', tiley)
             write(*,*)
             
@@ -598,7 +599,7 @@ module m_lens
             if(mod(out_max, 2).ne.0) out_max = out_max + 1
             
             if(out_max.lt.max(nxsample*tilex, nysample*tiley)) then
-				write(6,105) out_max,max(nxsample*tilex, nysample*tiley)
+				write(*,105) out_max,max(nxsample*tilex, nysample*tiley)
 105			format(' The choice of ',i4,' output pixels means that sampling of the output STEM image',/,&
 				& ' would fall below the Nyquist  criterion for your choice of probe parameters.',/,&
 				&' The maximum number of output pixels has been increased to ',i4,' to avoid ',/,&

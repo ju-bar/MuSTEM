@@ -309,10 +309,10 @@ implicit none
         
         numdash = len(trim(adjustl(title)))+10
 
-		write(6,*)
-        write(6,*) '|',('-',i=1,numdash),'|'
-        write(6,*) '|     ',trim(adjustl(title)),'     |'
-        write(6,*) '|',('-',i=1,numdash),'|',char(10),char(10)
+		write(*,*)
+        write(*,*) '|',('-',i=1,numdash),'|'
+        write(*,*) '|     ',trim(adjustl(title)),'     |'
+        write(*,*) '|',('-',i=1,numdash),'|',char(10),char(10)
 
     end subroutine
 end module

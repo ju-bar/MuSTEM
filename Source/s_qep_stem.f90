@@ -75,12 +75,14 @@ subroutine qep_stem(STEM,ionization,PACBED)
     
   logical,intent(in)::STEM,ionization,PACBED
   !dummy variables
-  integer(4) ::  i,j,l,m,i_qep_pass,iz,k,ii,jj,ntilt,count,shifty,shiftx,ny,nx,i_df,idet,total_slices,lengthimdf,starting_slice
+  integer(4) :: i,j,l,m,i_qep_pass,iz,k,ii,jj,ntilt,cntscan,numscan
+  integer(4) :: shifty,shiftx,ny,nx,i_df,idet,total_slices
+  integer(4) :: lengthimdf,starting_slice
 
   !random variables
   integer(4) :: idum,nsliceoutput,z_indx(1)
   !real(fp_kind) :: ran1
-  complex(fp_kind) :: temp_transf(nopiy,nopix),prop(nopiy,nopix,n_slices)
+  complex(fp_kind) :: prop(nopiy,nopix,n_slices)!,temp_transf(nopiy,nopix)
        
   !probe variables
   complex(fp_kind),dimension(nopiy,nopix) :: psi,trans,psi_initial,psi_out,temp_image
@@ -99,9 +101,9 @@ subroutine qep_stem(STEM,ionization,PACBED)
                         &pacbed_elastic(:,:,:),istem_image(:,:,:,:)
     
   !diagnostic variables
-  real(fp_kind) :: intensity,intens
-! intens added May 2019 to accommodate changes awhere it occurs below 
-  real(fp_kind) :: t1, delta
+  real(fp_kind) :: intensity, intens
+  ! intens added May 2019 to accommodate changes awhere it occurs below 
+  real(fp_kind) :: t1, dnow, dnext, delta, dest, dest_last
     
   !output variables
   character(120) :: fnam, fnam_temp, fnam_det
@@ -115,6 +117,8 @@ subroutine qep_stem(STEM,ionization,PACBED)
   complex(fp_kind),device,allocatable,dimension(:,:) ::shift_arrayx_d,shift_arrayy_d,shift_array_d
   real(fp_kind),device,allocatable,dimension(:,:,:) :: masks_d,ion_image_d,pacbed_pattern_d
   real(fp_kind),device,allocatable :: eels_correction_detector_d(:,:),ion_potential_d(:,:,:,:)
+  real(fp_kind),device,allocatable :: se_transmission_d(:,:,:) ! per slice secondary electron transmission function, JB-2025-06-26
+  real(fp_kind),device,allocatable :: se_acctransm_d(:,:) ! accumulated SE transmission function, JB-2025-06-26
     
   !device variables for on the fly potentials
   complex(fp_kind),device,allocatable,dimension(:,:) :: bwl_mat_d,inverse_sinc_d,fz_dwf_d
@@ -136,9 +140,10 @@ subroutine qep_stem(STEM,ionization,PACBED)
   real(fp_kind),allocatable :: probe_intensity(:,:,:)
   character(1024) :: filename
   real(fp_kind)::qep_stem_GPU_memory,const,rnorm
-  logical::elfourd,manytilt,manyz,many_df
+  logical::elfourd,manytilt,manyz,many_df,has_eta
   integer*4::length,lengthdf
-	
+  real(fp_kind),allocatable :: se_acctransm(:,:) ! accumulated SE transmission function, JB-2025-06-26
+  
 #ifdef GPU    
   call GPU_memory_message(qep_stem_GPU_memory(n_qep_grates, quick_shift, phase_ramp_shift), on_the_fly)
 #endif
@@ -165,11 +170,18 @@ subroutine qep_stem(STEM,ionization,PACBED)
     allocate(Hn0_shiftx_coord_d(nopix,maxval(natoms_slice_total),n_slices))
     Hn0_shiftx_coord_d = Hn0_shiftx_coord
     Hn0_shifty_coord_d = Hn0_shifty_coord
-    allocate(Hn0_eels_dc(nysample,nxsample,probe_ndf,nz,numeels))
-    allocate(Hn0_eels_detector_d(nopiy,nopix,numeels),Hn0_eels_detector(nopiy,nopix,numeels))
-    do l=1,numeels
-      Hn0_eels_detector(:,:,l) = make_detector(nopiy,nopix,ifactory,ifactorx,ss,0.0_fp_kind,outerrad(l))
-    enddo
+    allocate(Hn0_eels_dc(nysample,nxsample,probe_ndf,nz,dc_numeels))
+    allocate(Hn0_eels_detector_d(nopiy,nopix,dc_numeels),Hn0_eels_detector(nopiy,nopix,dc_numeels))
+    !do l=1,numeels ! 2025-07-14, JB: replaced by annular and segmented EELS options in DC, see below
+    !  Hn0_eels_detector(:,:,l) = make_detector(nopiy,nopix,ifactory,ifactorx,ss,0.0_fp_kind,outerrad(l))
+    !enddo
+    do i=1,dc_numeels/dc_eels_nseg; do j=1,dc_eels_nseg
+        l=(i-1)*dc_eels_nseg+j
+		if(dc_eels_nseg>1) Hn0_eels_detector(:,:,l) = make_detector(nopiy,nopix,ifactory,ifactorx, &
+                &   ss,dc_eels_inner(i),dc_eels_outer(i),2*pi*j/dc_eels_nseg-dc_eels_seg_offset,2*pi/dc_eels_nseg)
+		if(dc_eels_nseg==1) Hn0_eels_detector(:,:,l) = make_detector(nopiy,nopix,ifactory,ifactorx, &
+                &   ss,dc_eels_inner(i),dc_eels_outer(i))
+	enddo; enddo
     Hn0_eels_detector_d = Hn0_eels_detector
     Hn0_eels_dc = 0.0_fp_kind
     if(istem) then
@@ -218,6 +230,11 @@ subroutine qep_stem(STEM,ionization,PACBED)
     endif
     call make_local_inelastic_potentials(ionization)  !setup the REAL space inelastic potential (ionization and adf) for QUEP ADF is disabled
   endif
+  if (SEI) then ! 2025-06-26, JB: Secondary electron transmission function (always not on-the-fly)
+    call make_se_transmission_grates() ! calculate the transmission function for SE per slice
+    allocate(se_acctransm(nopiy,nopix)) ! allocate the accumulated SE transmission function
+    se_acctransm = 1.0_fp_kind ! initialize to 1 (full transmission)
+  endif
 
   if(stem) then
     do i=1,ndet/nseg
@@ -232,9 +249,19 @@ subroutine qep_stem(STEM,ionization,PACBED)
       enddo
     enddo
   endif
+  
 
   t1 = secnds(0.0)
-  rnorm = 1.0
+  rnorm = 1.0_fp_kind
+  intensity = 1.0d0
+  numscan = nysample * nxsample * probe_ndf * n_tilts_total
+  cntscan = 0
+  dnow = 0.0_fp_kind
+  dnext = 15.0_fp_kind
+  has_eta = .false.
+  dest = 0.0_fp_kind
+  dest_last = 0.0_fp_kind
+  
   call command_line_title_box('Calculation running')
   if(stem) stem_image = 0.0_fp_kind
   if(stem) stem_elastic_image = 0.0_fp_kind
@@ -253,9 +280,14 @@ subroutine qep_stem(STEM,ionization,PACBED)
 
   if (ionization) then
     allocate(ion_image_d(nopiy,nopix,num_ionizations))
-    if(.not.EDX) then
+    if(EELS) then ! 2025-06-07, JB: EELS flag replaces previous .not.EDX conditions
       allocate(eels_correction_detector_d(nopiy,nopix))
       eels_correction_detector_d=eels_correction_detector
+    endif
+    if(SEI) then ! 2025-06-26, JB: SE transmission functions on device
+      allocate(se_transmission_d(nopiy,nopix,n_slices),se_acctransm_d(nopiy,nopix))
+      se_transmission_d = se_transmission ! copy from host to device
+      se_acctransm_d = se_acctransm ! initialize the accumulated SE transmission function
     endif
   endif
   if(pacbed) then
@@ -295,21 +327,22 @@ subroutine qep_stem(STEM,ionization,PACBED)
   if (ionization) then
     allocate(stem_ion_image(nysample,nxsample,probe_ndf,nz,num_ionizations))
     stem_ion_image = 0.0_fp_kind
-    if (.not.EDX) eels_correction_image = 0.0_fp_kind
+    if (EELS) eels_correction_image = 0.0_fp_kind ! 2025-06-07, JB: EELS flag replaces previous .not.EDX conditions
     !call binary_out_unwrap(nopiy,nopix,eels_correction_detector,'eels_correction_detector')
   endif
   if (output_probe_intensity) allocate(probe_intensity(nopiy,nopix,size(output_thickness_list)))
-  intensity = 1.0d0
-
+  
+  
+  ! loop over the specimen tilts
   do ntilt=1,n_tilts_total
     do i = 1, n_slices
       call make_propagator(nopiy,nopix,prop(:,:,i),prop_distance(i),Kz(1),ss,ig1,ig2,claue(:,1),ifactorx,ifactory)
       prop(:,:,i) = prop(:,:,i) * bwl_mat
       qep_grates(:,:,:,i) = exp(ci*pi*a0_slice(3,i)/Kz(ntilt)*projected_potential(:,:,:,i))
       do j=1,n_qep_grates
-        call fft2(nopiy,nopix,qep_grates(:,:,j,i),nopiy,psi,nopiy)
+        call fft2(nopiy,nopix,qep_grates(:,:,j,i),psi)
         if(qep_mode.eq.3) qep_grates(:,:,j,i)= psi*bwl_mat
-        if(qep_mode.ne.3) call ifft2(nopiy,nopix,psi*bwl_mat,nopiy,qep_grates(:,:,j,i),nopiy)
+        if(qep_mode.ne.3) call ifft2(nopiy,nopix,psi*bwl_mat,qep_grates(:,:,j,i))
       enddo ! n_qep_grates
     enddo ! n_slices
 #ifdef GPU
@@ -319,18 +352,49 @@ subroutine qep_stem(STEM,ionization,PACBED)
     lengthdf = ceiling(log10(maxval(abs(probe_df))))
     if(any(probe_df<0)) lengthdf = lengthdf+1
 
+    
+! --------------------------------------------------------------------
 ! >> SCANNING LOOPS (code formatting relaxed due to too many loops) <<
+    
     do i_df = 1, probe_ndf
     do ny = 1, nysample
     do nx = 1, nxsample
-
+        
+    if (cntscan > 0 .and. cntscan < numscan-1) then ! valid progress for eta
+        if (dnow > dnext) then
+            dest = dnow / cntscan * (real(numscan-cntscan,fp_kind))
+            dnext = dnext + 3.0_fp_kind
+            dest_last = dest
+            has_eta = .true.
+        else
+            dest = dest_last
+        end if
+    end if
+        
 #ifdef GPU
-    write(6,903,ADVANCE='NO') achar(13), i_df, probe_ndf, ny, nysample, nx, nxsample, intensity
-903	format(a1,' df:',i3,'/',i3,' y:',i3,'/',i3,' x:',i3,'/',i3,'  Intensity:', f6.3, ' (to monitor BWL)')	
+    if (has_eta .AND. cntscan < numscan-1) then
+        write(6,902,advance='no') achar(13), i_df, probe_ndf, ny, nysample, &
+                    & nx, nxsample, intensity, int(dest)
+    else
+        write(6,901,advance='no') achar(13), i_df, probe_ndf, ny, nysample, &
+                    & nx, nxsample, intensity
+    end if
+901 format(a1,' df:',i3,'/',i3,' y:',i3,'/',i3,' x:',i3,'/',i3, &
+                    & '  Intensity:',f6.3,' (to monitor BWL)      ')
+902 format(a1,' df:',i3,'/',i3,' y:',i3,'/',i3,' x:',i3,'/',i3, &
+                    & '  Intensity:',f6.3,' (ETA: ',i0,' s)       ')
 #else
-    write(6,900) i_df, probe_ndf, ny, nysample, nx, nxsample, intensity
-900	format(1h+,1x,' df:',i3,'/',i3,' y:',i3,'/',i3,' x:',i3,'/',i3,'  Intensity:', f6.3, ' (to monitor BWL)')	
-#endif        
+    if (has_eta .AND. cntscan < numscan-1) then
+        write(6,902) i_df, probe_ndf, ny, nysample, nx, nxsample, intensity, int(dest)
+    else
+        write(6,901) i_df, probe_ndf, ny, nysample, nx, nxsample, intensity
+    end if
+901 format(1h+,1x,' df:',i3,'/',i3,' y:',i3,'/',i3,' x:',i3,'/',i3, &
+                    &'  Intensity:',f6.3,' (to monitor BWL)      ')
+902 format(1h+,1x,' df:',i3,'/',i3,' y:',i3,'/',i3,' x:',i3,'/',i3, &
+                    &'  Intensity:',f6.3,' (ETA: ',i0,' s)       ')
+#endif      
+    flush(6)
 !
 !       Make STEM probe
 !
@@ -340,10 +404,10 @@ subroutine qep_stem(STEM,ionization,PACBED)
 ! The above three lines replaced by the following four to improve accuracy (May 2019) - Findlay suggestion
     psi_initial = make_ctf(probe_positions(:,ny,nx),probe_df(i_df),probe_cutoff,probe_aberrations,probe_apodisation)
     intens = sum(abs(psi_initial)**2)
-    call ifft2(nopiy, nopix, psi_initial, nopiy, psi_initial, nopiy)
+    call ifft2(nopiy, nopix, psi_initial, psi_initial)
     psi_initial = psi_initial/sqrt(intens)
     
-    if (arg_debug_wave>0) write(6,*) 'Initial psi(0,0) = ', psi_initial(1,1)
+    if (arg_debug_wave>0) write(*,*) 'Initial psi(0,0) = ', psi_initial(1,1)
     
     call tilt_wave_function(psi_initial)
     if (output_probe_intensity) probe_intensity = 0.0_fp_kind
@@ -361,30 +425,39 @@ subroutine qep_stem(STEM,ionization,PACBED)
 
       ! plasmon scattering reset, JB-191213
       if (plasmonmc) call pl_reset()
-
+      if (SEI) se_acctransm_d = se_acctransm ! reset attenuation for secondary electrons, 2025-06-26, JB
+                                    ! note: se_acctransm remains as initialized, i.e. 1.0_fp_kind for GPU code
       do i = 1,maxval(ncells) ! main multislice loop of cells ! code formatting relaxed due to too many loops
       do j = 1, n_slices ! sub loop over slices per cell
-			! Accumulate ionization cross section
+        ! Accumulate ionization cross section
         if(ionization) then
           do ii=1,num_ionizations
-            call cuda_mod<<<blocks,threads>>>(psi_d,temp_d,1.0_fp_kind,nopiy,nopix) 
+            call cuda_mod<<<blocks,threads>>>(psi_d,temp_d,1.0_fp_kind,nopiy,nopix)
+            ! overlap
             if(on_the_fly) then
               call cuda_make_ion_potential(inelastic_potential_d,tau_slice(:,atm_indices(ii),:,j),&
                             &nat_slice(atm_indices(ii),j),plan,&
-														&fz_mu_d(:,:,ii),inverse_sinc_d,Volume_array(j))
+                            &fz_mu_d(:,:,ii),inverse_sinc_d,Volume_array(j))
               call cuda_multiplication<<<blocks,threads>>>(temp_d,inelastic_potential_d,&
                             &temp_d,prop_distance(j),nopiy,nopix)
             else
               call cuda_multiplication<<<blocks,threads>>>(temp_d,ion_potential_d(:,:,ii,j),&
-                            &temp_d,prop_distance(j),nopiy,nopix)     !overlap
+                            &temp_d,prop_distance(j),nopiy,nopix)
             endif
-            call cuda_addition<<<blocks,threads>>>(temp_d,ion_image_d(:,:,ii),ion_image_d(:,:,ii),&
-                            &1.0_fp_kind,nopiy,nopix)                          !depth sum
+            if (SEI) then ! 2025-06-26, JB: Apply SE transmission function
+              ! Multiply the current accumulated SE transmission function to
+              ! the ionization cross section overlap of the current layer.
+              call cuda_multiplication<<<blocks,threads>>>(temp_d,se_acctransm_d,&
+                            &temp_d,1.0_fp_kind,nopiy,nopix)
+            endif
+            
+            ! depth sum, 2025-06-26, JB
+            call cuda_addition<<<blocks,threads>>>(ion_image_d(:,:,ii),temp_d,ion_image_d(:,:,ii),&
+                            &1.0_fp_kind,nopiy,nopix)  
           enddo ! ii
         endif
 
-!Double channeling
-
+        !Double channeling, i.e., propagation of inelastic wave functions through the specimen
         if(double_channeling) then
           do i_target = 1, natoms_slice_total(j) ! Loop over targets
             ! Calculate inelastic transmission matrix
@@ -430,7 +503,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
                   call cufftExec(plan, psi_inel_d, psi_out_d, CUFFT_FORWARD)
 							
                   ! Accumulate the EELS images
-                  do l=1,numeels
+                  do l=1,dc_numeels
                     Hn0_eels_dc(ny,nx,i_df,z_indx(1),l) = Hn0_eels_dc(ny,nx,i_df,z_indx(1),l)+&
                             &cuda_stem_detector(psi_out_d, Hn0_eels_detector_d(:,:,l))
                   enddo ! l
@@ -473,7 +546,6 @@ subroutine qep_stem(STEM,ionization,PACBED)
         else
           call cuda_multislice_iteration(psi_d, transf_d(:,:,nran,j), prop_d(:,:,j), normalisation, nopiy, nopix,plan)
         endif
-
         if (output_probe_intensity) then
           k = (i-1)*n_slices+j
           if (output_cell_list(k)) then
@@ -481,15 +553,21 @@ subroutine qep_stem(STEM,ionization,PACBED)
             probe_intensity(:,:,cell_map(k)) = probe_intensity(:,:,cell_map(k)) + abs(psi)**2
           endif
         endif
+        
+        if (SEI) then ! 2025-06-26, JB: Update accumulated SE transmission function
+          call cuda_multiplication<<<blocks,threads>>>(se_acctransm_d,se_transmission_d(:,:,j),&
+                            &se_acctransm_d,1.0_fp_kind,nopiy,nopix)
+        endif
+        
       enddo ! End loop j over slices
 
-		  !If this thickness corresponds to any of the output values then accumulate diffraction pattern
+      !If this thickness corresponds to any of the output values then accumulate diffraction pattern
       if (any(i==ncells)) then
         z_indx = minloc(abs(ncells-i))
         
         if (arg_debug_wave>0) then
             psi = psi_d ! download psi
-            write(6,*) 'psi(0,0) = ', psi(1,1), ' at z=',z_indx(1)
+            write(*,*) 'psi(0,0) = ', psi(1,1), ' at z=',z_indx(1)
         endif
         
         ! Accumulate elastic wave function
@@ -502,7 +580,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
         
         if (arg_debug_intens>0) then
             temp = temp_d ! download psi
-            write(6,*) 'cbed(0,0) = ', temp(1,1), ' at z=',z_indx(1)
+            write(*,*) 'cbed(0,0) = ', temp(1,1), ' at z=',z_indx(1)
         endif
 
         ! Accumulate diffaction pattern
@@ -544,11 +622,11 @@ subroutine qep_stem(STEM,ionization,PACBED)
       enddo
       if (arg_debug_stemdet>0) then
           cbed(:,:,iz) = cbed_d(:,:,iz) ! download cbeds
-          write(6,*) 'cbed(0,0) = ', cbed(1,1,iz), ' at iz=',iz
-          write(6,*) 'stem_image_1 = ', stem_image(ny,nx,i_df,1,iz), ' at iz=',iz
+          write(*,*) 'cbed(0,0) = ', cbed(1,1,iz), ' at iz=',iz
+          write(*,*) 'stem_image_1 = ', stem_image(ny,nx,i_df,1,iz), ' at iz=',iz
       end if
-      if (ionization.and.(.not.EDX)) eels_correction_image(ny,nx,i_df,iz) = &
-                            &cuda_stem_detector(cbed_d(:,:,iz),eels_correction_detector_d)
+      if (EELS) eels_correction_image(ny,nx,i_df,iz) = & ! 2025-06-07, JB: EELS flag replaces previous .not.EDX conditions
+                   & cuda_stem_detector(cbed_d(:,:,iz),eels_correction_detector_d)
         
       ! Integrate the elastic diffraction pattern
       call cufftExec(plan,psi_elastic_d(:,:,iz),psi_out_d,CUFFT_FORWARD)
@@ -568,14 +646,16 @@ subroutine qep_stem(STEM,ionization,PACBED)
             
       ! Plasmon scattering reset, JB-191213
       if (plasmonmc) call pl_reset()
-
+    
+      if (SEI) se_acctransm = 1.0_fp_kind ! reset accumulated SE transmission function, 2025-06-26, JB
       do i = 1,maxval(ncells)
         do j = 1, n_slices
           ! Accumulate ionization cross section
           if(ionization) then
             do ii=1,num_ionizations
               temp = abs(psi)**2 * ionization_potential(:,:,ii,j) * prop_distance(j)
-              ion_image(:,:,ii) = temp+ion_image(:,:,ii)
+              if (SEI) temp = temp * se_acctransm ! 2025-06-26, JB: Apply SE transmission function
+              ion_image(:,:,ii) = temp + ion_image(:,:,ii) ! depth sum
             enddo
           endif
 					
@@ -596,23 +676,27 @@ subroutine qep_stem(STEM,ionization,PACBED)
               probe_intensity(:,:,cell_map(k)) = probe_intensity(:,:,cell_map(k)) + abs(psi)**2
             endif
           endif
+          
+          ! 2025-06-26, JB: Update accumulated SE transmission function
+          if (SEI) se_acctransm = se_acctransm * se_transmission(:,:,j)
+            
         enddo ! End loop j over slices
 				
         !If this thickness corresponds to any of the output values then accumulate diffraction pattern
         if (any(i==ncells)) then
           z_indx = minloc(abs(ncells-i))
           
-          if (arg_debug_wave>0) write(6,*) 'psi(0,0) = ', psi(1,1), ' at z=',z_indx(1)
+          if (arg_debug_wave>0) write(*,*) 'psi(0,0) = ', psi(1,1), ' at z=',z_indx(1)
                     
           ! Accumulate elastic wave function - this will be Fourier transformed later
           psi_elastic(:,:,z_indx(1)) = psi_elastic(:,:,z_indx(1)) + psi
                     
           !Transform into diffraction space
-          call fft2(nopiy,nopix,psi,nopiy,psi_out,nopiy)
+          call fft2(nopiy,nopix,psi,psi_out)
                     
           ! Accumulate diffaction pattern
           temp = abs(psi_out)**2
-          if (arg_debug_intens>0) write(6,*) 'cbed(0,0) = ', temp(1,1), ' at z=',z_indx(1)
+          if (arg_debug_intens>0) write(*,*) 'cbed(0,0) = ', temp(1,1), ' at z=',z_indx(1)
           cbed(:,:,z_indx(1)) = cbed(:,:,z_indx(1)) + temp
 
           if (ionization) then
@@ -634,18 +718,18 @@ subroutine qep_stem(STEM,ionization,PACBED)
     do iz=1,nz
         
       ! Integrate the elastic diffraction pattern
-      call fft2(nopiy,nopix,psi_elastic(:,:,iz),nopiy,psi_out,nopiy)
+      call fft2(nopiy,nopix,psi_elastic(:,:,iz),psi_out)
       if (stem) then
         stem_image(ny,nx,i_df,1:ndet,iz) = sum(sum(spread(cbed(:,:,iz),dim=3,ncopies=ndet)*&
                           &masks(:,:,:),dim=1),dim=1)
         if (arg_debug_stemdet>0) then
-            write(6,*) 'cbed(0,0) = ', cbed(1,1,iz), ' at iz=',iz
-            write(6,*) 'stem_image_1 = ', stem_image(ny,nx,i_df,1,iz), ' at iz=',iz
+            write(*,*) 'cbed(0,0) = ', cbed(1,1,iz), ' at iz=',iz
+            write(*,*) 'stem_image_1 = ', stem_image(ny,nx,i_df,1,iz), ' at iz=',iz
         end if
         stem_elastic_image(ny,nx,i_df,1:ndet,iz)= sum(sum(spread(abs(psi_out)**2,dim=3,ncopies =ndet)*&
                           &masks(:,:,1:ndet),dim=1),dim=1)
       endif
-      if(ionization.and.(.not.EDX)) then
+      if (EELS) then ! 2025-06-07, JB: EELS flag replaces previous .not.EDX conditions
         eels_correction_image(ny,nx,i_df,z_indx(1)) = sum(cbed(:,:,iz)*eels_correction_detector)
       endif
 
@@ -681,17 +765,23 @@ subroutine qep_stem(STEM,ionization,PACBED)
     if (output_probe_intensity) then
       call probe_intensity_to_file(probe_intensity,i_df,ny,nx,n_qep_passes,probe_ndf,nysample,nxsample)
     endif
+    
+    cntscan = cntscan + 1
+    dnow = secnds(t1)
       
     enddo ! End loop over x probe positions
     enddo ! End loop over y probe positions
     enddo ! End loop over defocus series
     
 ! >> SCANNING LOOPS (code formatting relaxed due to too many loops) <<
+! --------------------------------------------------------------------
+    
+    
 	
     ! QEP normalisation
     if(ionization) then
       stem_ion_image = stem_ion_image/float(n_qep_passes)
-      if(.not.EDX) eels_correction_image = eels_correction_image/float(n_qep_passes)
+      if(EELS) eels_correction_image = eels_correction_image/float(n_qep_passes) ! 2025-06-07, JB: EELS flag replaces previous .not.EDX conditions
     endif
 
     if (ndet.gt.0) then
@@ -750,7 +840,11 @@ subroutine qep_stem(STEM,ionization,PACBED)
           filename = trim(adjustl(fnam)) // '_'//trim(adjustl(substance_atom_types(atm_indices(ii))))//&
                             &'_'//trim(adjustl(Ion_description(ii)))//'_shell_EDX'
           call output_stem_image(stem_ion_image(:,:,:,:,ii), filename,probe_df)
-        else
+        elseif(SEI) then
+          filename = trim(adjustl(fnam)) // '_'//trim(adjustl(substance_atom_types(atm_indices(ii))))//&
+                            &'_'//trim(adjustl(Ion_description(ii)))//'_shell_SE'
+          call output_stem_image(stem_ion_image(:,:,:,:,ii)*se_det_scale, filename,probe_df)
+        else ! EELS
           filename = trim(adjustl(fnam))// '_'//trim(adjustl(substance_atom_types(atm_indices(ii))))//&
                             &'_'//trim(adjustl(Ion_description(ii)))//'_orbital_EELS'
           call output_stem_image(stem_ion_image(:,:,:,:,ii), filename,probe_df)
@@ -760,7 +854,11 @@ subroutine qep_stem(STEM,ionization,PACBED)
           call output_stem_image(stem_ion_image(:,:,:,:,ii), filename,probe_df)
         endif
       enddo
-      if(.not.EDX) then
+      if (SEI) then ! 2025-06-07, combined SE image output
+          filename = trim(adjustl(fnam)) // '_SE'
+          call output_stem_image(sum(stem_ion_image(:,:,:,:,:),dim=5)*se_det_scale, filename, probe_df)
+      endif
+      if(EELS) then ! 2025-06-07, JB: EELS flag replaces previous .not.EDX conditions
         filename = trim(adjustl(fnam)) // '_EELS_CorrectionMap' 
         call output_stem_image(eels_correction_image, filename,probe_df)
       endif
@@ -785,8 +883,9 @@ subroutine qep_stem(STEM,ionization,PACBED)
 
 #ifdef GPU
 
-    rnorm = 1.0 / float(n_qep_passes*nysample*nxsample)
-    if(double_channeling.and.istem) then
+        
+    if(double_channeling.and.istem) then ! EFISTEM
+      rnorm = 1.0 / float(n_qep_passes*nysample*nxsample)
       do i=1,nz
         do l=1,imaging_ndf
           temp = efistem_image_d(:,:,l,i)
@@ -798,14 +897,16 @@ subroutine qep_stem(STEM,ionization,PACBED)
       enddo
     endif	
 		
-    if(double_channeling) then
-      do l=1,numeels
+    if(double_channeling) then ! DC-EELS
+      rnorm = 1.0 / float(n_qep_passes)
+      do l=1,dc_numeels
         filename =  trim(adjustl(fnam))//'_double_channeling_EELS_'//zero_padded_int(l,2)
-        call output_stem_image(Hn0_eels_dc(:,:,:,:,l), filename,probe_df)
+        call output_stem_image(Hn0_eels_dc(:,:,:,:,l)*rnorm, filename,probe_df) ! 2025-07-14, JB: QEP normalization added
       enddo
     endif
 
-    if(istem) then
+    if(istem) then ! ISTEM
+      rnorm = 1.0 / float(n_qep_passes*nysample*nxsample)
       do i=1,nz
         do l=1,imaging_ndf
           temp = istem_image_d(:,:,l,i)

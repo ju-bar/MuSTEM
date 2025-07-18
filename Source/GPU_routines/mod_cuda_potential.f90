@@ -60,7 +60,7 @@ module cuda_potential
             Volume_array(j) = ss_slice(7,j)
 	        no_atoms = sum(nat_slice(:,j))
 	     
-    198	    write(6,199) no_atoms
+    198	    write(*,199) no_atoms
     199     format(/,' Number of atoms in slice:',i5,/) 
 		    ccd_slice_array(j) = relm / (tp * ak * ss_slice(7,j))
 	    enddo

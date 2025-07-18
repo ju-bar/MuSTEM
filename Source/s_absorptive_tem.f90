@@ -141,7 +141,7 @@ subroutine absorptive_tem
         psi_initial = 1.0_fp_kind/sqrt(float(nopiy*nopix))
 	else
         psi_initial = make_ctf(probe_initial_position,probe_df(1),probe_cutoff,probe_aberrations,probe_apodisation)
-        call ifft2(nopiy, nopix, psi_initial, nopiy, psi_initial, nopiy)
+        call ifft2(nopiy, nopix, psi_initial, psi_initial)
         psi_initial = psi_initial/sqrt(sum(abs(psi_initial)**2))
     endif
     call tilt_wave_function(psi_initial)
@@ -207,9 +207,9 @@ subroutine absorptive_tem
     do i = 1, n_slices 
         transf_absorptive(:,:,i) = exp(ci*pi*a0_slice(3,i)/Kz(ntilt)*projected_potential(:,:,i))
         ! Bandwith limit the phase grate, psi is used for temporary storage
-        call fft2(nopiy, nopix, transf_absorptive(:,:,i), nopiy, psi, nopiy)
+        call fft2(nopiy, nopix, transf_absorptive(:,:,i), psi)
         psi = psi * bwl_mat
-        call ifft2(nopiy, nopix, psi, nopiy, transf_absorptive(:,:,i), nopiy)
+        call ifft2(nopiy, nopix, psi, transf_absorptive(:,:,i))
     enddo
 	endif
 #ifdef GPU
@@ -222,7 +222,7 @@ subroutine absorptive_tem
 900     format(a1, 1x, 'Cell: ', i5, ' Intensity: ', f12.6)
         do i_slice = 1, n_slices
 			k =  i_slice+(i_cell-1)*n_slices
-			if( modulo(k,10)==0) write(6,900,advance='no') achar(13), k, intensity
+			if( modulo(k,10)==0) write(*,900,advance='no') achar(13), k, intensity
 			if(double_channeling) then
                 do i_target = 1, natoms_slice_total(i_slice) ! Loop over targets
                 ! Calculate inelastic transmission matrix
@@ -294,8 +294,8 @@ subroutine absorptive_tem
 	psi = psi_initial
     do i_cell = 1, maxval(ncells)
 		intensity = sum(abs(psi)**2)
-        if(n_tilts_total<2) write(6,900) i_cell, intensity
-        if(n_tilts_total>1) write(6,901) i_cell, ntilt,n_tilts_total, intensity
+        if(n_tilts_total<2) write(*,900) i_cell, intensity
+        if(n_tilts_total>1) write(*,901) i_cell, ntilt,n_tilts_total, intensity
 900     format(1h+,1x, 'Cell: ', i5, ' Intensity: ', f12.6)	        
 901     format(1h+,1x, 'Cell: ', i5, ' tilt:',i5,'/',i5,' Intensity: ', f12.6)	
     
@@ -307,7 +307,7 @@ subroutine absorptive_tem
 		!If this thickness corresponds to any of the output values then output images
 		if (any(i_cell==ncells)) then
 			  
-			call fft2(nopiy, nopix, psi, nopiy, psi_out, nopiy)
+			call fft2(nopiy, nopix, psi, psi_out)
 			cbed = abs(psi_out)**2
 			z_indx = minloc(abs(ncells-i_cell))
 			filename = trim(adjustl(output_prefix))
@@ -321,10 +321,10 @@ subroutine absorptive_tem
             call binary_out(nopiy, nopix, atan2(imag(psi),real(psi)), trim(adjustl(filename))//'_Exit_surface_phase')
 			do i=1,imaging_ndf
 			   
-				call fft2(nopiy, nopix, psi, nopiy, psi_out, nopiy)
+				call fft2(nopiy, nopix, psi, psi_out)
 																		  
 				psi_out = psi_out*lens_ctf(:,:,i)
-				call ifft2(nopiy, nopix, psi_out, nopiy, psi_out, nopiy)
+				call ifft2(nopiy, nopix, psi_out, psi_out)
 				tem_image = abs(psi_out)**2
 				fnam_df = trim(adjustl(filename))// '_Image'
 				if(imaging_ndf>1) fnam_df = trim(adjustl(fnam_df))//'_Defocus_'//zero_padded_int(int(imaging_df(i)),lengthdf)//'_Ang'

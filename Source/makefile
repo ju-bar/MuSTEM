@@ -36,7 +36,8 @@ CUDA_ROOT  := /opt/nvidia/hpc_sdk/Linux_x86_64/25.5/cuda
 # === GPU Mode Configuration ===
 ifeq ($(MODE),GPU)
   FC := $(NVCOMP_BIN)/nvfortran
-  FCFLAGS := -Mpreprocess -DGPU -Mbackslash -Mfree -mp -cuda -fast -O3
+  #FCFLAGS := -Mpreprocess -DGPU -Mbackslash -Mfree -mp -cuda -fast -O3
+  FCFLAGS := -Mpreprocess -DGPU -Mbackslash -Mfree -mp -cuda -O2 -Kieee
   INCLUDES := -I$(CUDA_ROOT)/include
   LIBDIRS := -L$(CUDA_ROOT)/lib64
   LIBS := -lcufft -lrt -lpthread -ldl
@@ -49,7 +50,7 @@ else
     $(error Please run 'source /usr/local/intel/oneapi/setvars.sh' before calling make)
   endif
   FC := ifx
-  FCFLAGS := -fpp -qopenmp -O3 -heap-arrays -extend-source 132 -assume byterecl
+  FCFLAGS := -fpp -qopenmp -O2 -heap-arrays -extend-source 132 -assume byterecl
   INCLUDES := -I$(MKLROOT)/include/fftw
   LIBDIRS := -L$(MKLROOT)/lib/intel64
   LIBS := -qmkl -liomp5

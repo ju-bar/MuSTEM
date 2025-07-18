@@ -1,9 +1,11 @@
 !--------------------------------------------------------------------------------
 !
-!  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
+!  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, 
+!                      B. D. Forbes, J. Barthel
 !
 !  modified:
 !  - J. Barthel, 2019-12-12 - added plasmonmc switch
+!  - J. Barthel, 2025-06-26 - note on grid allocations
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -18,6 +20,26 @@
 !  You should have received a copy of the GNU General Public License
 !  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !                       
+!--------------------------------------------------------------------------------
+    
+!--------------------------------------------------------------------------------
+!
+! Module for global variables
+!
+! Note on grid allocations (2025-06-26, JB):
+!     Any array holding grid data is allocated with dimensions (nopiy,nopix)
+!     where nopiy and nopix are the number of pixels in the y and x directions.
+!     This deviates from the Fortran standard, which requires that the first
+!     dimension is the fastest varying one thus storing such an array on disk
+!     would have y changing along each row of data. This is however changed
+!     upon output to disk by the subroutine binary_out in mod_output.f90, which
+!     applies a transpose before writing to file.
+!     In principle there is no good reason to have y as the fastest varying
+!     dimension, but this is how the code was originally written. There is no
+!     issue with this, as long as all array operations take that into account.
+!     Also the CUDA code works optimally. There is just the small inconvenience
+!     that the arrays are internally accessed as (y,x).
+!
 !--------------------------------------------------------------------------------
 
 module global_variables
@@ -45,7 +67,7 @@ module global_variables
     real(fp_kind)  :: thetad,surfn(3),orthog(3,3)
     real(fp_kind)  :: volts,ak                            !mean inner potential, wavevector (corrected for refraction)
     real(fp_kind)  :: ak1,relm                            !wavevector in freespace, relativistically corrected mass
-    real(fp_kind),allocatable  :: claue(:,:),Kz(:)        !Specimen tilt vector and z component of incident wave vector
+    real(fp_kind),allocatable :: claue(:,:), Kz(:)        !Specimen tilt vector and z component of incident wave vector
     integer*4::n_tilts_total                              !Total number of specimen tilts
     real(fp_kind)  :: bvec(3)                             !Beam tilt vector
     
@@ -96,8 +118,12 @@ module global_variables
     !logical types to pick inelastic calculations
     logical :: adf 
     logical :: EELS = .false.
+    logical :: EDX = .false.
+    logical :: SEI = .false.
     
-
+    ! SE variables, 2025-06-26, JB
+    real(fp_kind) :: se_det_scale = 1.0_fp_kind ! scale factor for the SE detector, initialised to accept full angular range
+    real(fp_kind) :: se_imfp = 0.001_fp_kind ! inelastic mean free path (1/e decay) for secondary electrons, initialised to 0.001 A
     
     logical :: qep,output_thermal,interpolation,fourdSTEM
     
@@ -112,6 +138,7 @@ module global_variables
     integer(4) :: arg_debug_wave = 0    ! 0 = no debug, 1 = print debug values of wave function, triggered by secret option mmouse_wave
     integer(4) :: arg_debug_intens = 0  ! 0 = no debug, 1 = print debug values of probe intensity, triggered by secret option mmouse_intens
     integer(4) :: arg_debug_stemdet = 0 ! 0 = no debug, 1 = print debug values of stem detectors, triggered by secret option mmouse_stemdet
+    integer(4) :: arg_debug_dump = 0    ! 0 = no debug dumps, bits of this can trigger particular memory dumps
     
 	contains
      
@@ -157,8 +184,8 @@ module global_variables
           
           delk = ak - ak1
 
-	    write(6,*) 'Pertinent quantities for the crystal:'
-          write(6,111) ekv,ak,'A',ak1,'A',delk,'A',relm
+	    write(*,*) 'Pertinent quantities for the crystal:'
+          write(*,111) ekv,ak,'A',ak1,'A',delk,'A',relm
       111 format('          E = ',F12.3,' keV',/,&
          &' Crystal Ko = ',G20.10,1x,a1,'-1 (1/lambda)',/,&
          &'  Vacuum Ko = ',G20.10,1x,a1,'-1 (1/lambda)',/,&

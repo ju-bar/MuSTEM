@@ -1,9 +1,12 @@
 !--------------------------------------------------------------------------------
 !
-!  Copyright (C) 2017  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes
+!  Copyright (C) 2017-2025  L. J. Allen, H. G. Brown, A. J. D’Alfonso, &
+!                           S.D. Findlay, B. D. Forbes, J. Barthel
 !
 !  Additional modifications:
 !   2025-05-23 JB - custom ionization form-factor support
+!   2025-06-07 JB - SE-imaging option
+!   2025-06-12 JB - table of atomic and ionic radii added
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -28,13 +31,14 @@ module m_potential
     integer(4) :: num_ionizations
     integer(4),allocatable::  atm_indices(:)
     character(20),allocatable::ion_description(:) ! increased to 20 chars for custom ionization lines (2025-05-21 JB)
-    logical:: EDX
       
     complex(fp_kind), allocatable :: ionization_mu(:,:,:)        !the ionization scattering factor array, calculated on the grid (supercell)
     complex(fp_kind), allocatable :: fz_adf(:,:,:,:)        !the adf scattering factor array, calculated on the grid (supercell)
     real(fp_kind),    allocatable :: adf_potential(:,:,:,:)
     real(fp_kind),    allocatable :: ionization_potential(:,:,:,:)
     real(fp_kind),    allocatable :: eels_correction_detector(:,:)
+    real(fp_kind),    allocatable :: se_transf_aty_radius(:) ! list of effective radii for each atom type in the structure for SE transmission functions
+    real(fp_kind),    allocatable :: se_transmission(:,:,:) ! SE transmission coefficients for each slice of the supercell
 	!complex(fp_kind), allocatable :: inverse_sinc_new(:,:)
     
     integer(4) :: n_qep_grates,n_qep_passes,nran ! Start of random number sequence
@@ -43,7 +47,33 @@ module m_potential
     logical(4) :: quick_shift
     
     real(fp_kind),parameter :: thr_cus_ekv = 1.0_fp_kind ! threshold for matching ekv (in keV) in custom ionization (2025-05-22 JB)
-
+    real(fp_kind),parameter :: thr_se_transm = 0.01_fp_kind ! transmission threshold for stopping the SE calculation (2025-06-26 JB)
+    real(fp_kind), parameter :: atomicRadius(99) = (/ &
+        &  25.0, 120.0, 145.0, 105.0,  85.0,  70.0,  65.0,  60.0,  50.0, 160.0, & ! 1–10
+        & 180.0, 150.0, 125.0, 110.0, 100.0, 100.0, 100.0,  71.0, 220.0, 180.0, & ! 11–20
+        & 160.0, 140.0, 135.0, 140.0, 140.0, 140.0, 135.0, 135.0, 135.0, 135.0, & ! 21–30
+        & 130.0, 125.0, 115.0, 115.0, 115.0,  88.0, 235.0, 200.0, 180.0, 155.0, & ! 31–40
+        & 145.0, 145.0, 135.0, 130.0, 135.0, 140.0, 160.0, 155.0, 155.0, 145.0, & ! 41–50
+        & 145.0, 140.0, 140.0, 108.0, 260.0, 215.0, 195.0, 185.0, 185.0, 185.0, & ! 51–60
+        & 185.0, 185.0, 185.0, 180.0, 175.0, 175.0, 175.0, 175.0, 175.0, 175.0, & ! 61–70
+        & 175.0, 155.0, 145.0, 135.0, 135.0, 130.0, 135.0, 135.0, 135.0, 150.0, & ! 71–80
+        & 190.0, 180.0, 160.0, 190.0, 127.0, 120.0, 348.0, 215.0, 195.0, 180.0, & ! 81–90
+        & 180.0, 175.0, 175.0, 175.0, 175.0, 176.0, 170.0, 186.0, 186.0         & ! 91–99
+        /) ! Atomic radii in pm, 1-99 from https://en.wikipedia.org/wiki/Atomic_radii_of_the_elements_(data_page)#Atomic_radius
+    real(fp_kind), parameter :: bondRadius(99) = (/ &
+        &  32.0,  64.0, 133.0, 102.0,  85.0,  75.0,  71.0,  63.0,  64.0,  67.0, & ! 1–10
+        & 155.0, 139.0, 126.0, 116.0, 111.0, 103.0,  99.0,  96.0, 196.0, 171.0, & ! 11–20
+        & 148.0, 136.0, 134.0, 122.0, 119.0, 116.0, 111.0, 110.0, 112.0, 118.0, & ! 21–30
+        & 124.0, 121.0, 121.0, 116.0, 114.0, 117.0, 210.0, 185.0, 163.0, 154.0, & ! 31–40
+        & 147.0, 138.0, 128.0, 125.0, 125.0, 120.0, 128.0, 136.0, 142.0, 140.0, & ! 41–50
+        & 140.0, 136.0, 133.0, 131.0, 232.0, 196.0, 180.0, 163.0, 176.0, 174.0, & ! 51–60
+        & 173.0, 172.0, 168.0, 169.0, 168.0, 167.0, 166.0, 165.0, 164.0, 170.0, & ! 61–70
+        & 162.0, 152.0, 146.0, 137.0, 131.0, 129.0, 122.0, 123.0, 124.0, 133.0, & ! 71–80
+        & 144.0, 144.0, 151.0, 145.0, 147.0, 142.0, 223.0, 201.0, 186.0, 175.0, & ! 81–90
+        & 169.0, 170.0, 171.0, 172.0, 166.0, 166.0, 168.0, 168.0, 165.0         & ! 91–99
+        /) ! Atomic radii in pm, 1-99 from "Molecular Single-Bond Covalent Radii for Elements 1–118"
+        ! Pyykkö and Atsumi, Chem. Eur. J. 2009, 15, 186-192, https://doi.org/10.1002/chem.200800987
+    
     interface
         subroutine make_site_factor_generic(site_factor, tau)
             use m_precision, only: fp_kind
@@ -106,14 +136,16 @@ module m_potential
 		use m_numerical_tools, only: cubspl,ppvalu
         use output
         use m_string
-
+  
 	    implicit none
     
         integer(4) :: i, j, k,Z
         real(fp_kind) :: xkstep, temp,el_scat,ax,ay,g2,s2,sky,skx
         real(fp_kind),allocatable :: xdata(:),tdsbrc(:,:,:) 
         real(fp_kind) :: factor, eps, g_vec_array(3,nopiy,nopix)
-
+        
+        write(*,*) 'Precalculating scattering factors ...'
+  
         if(allocated(inverse_sinc)) deallocate(inverse_sinc)
         if(allocated(fz)) deallocate(fz)
         if(allocated(fz_DWF)) deallocate(fz_DWF)
@@ -128,9 +160,9 @@ module m_potential
         eps = tiny(0.0_fp_kind)
         call make_g_vec_array(g_vec_array,ifactory,ifactorx)
         
-	    do i = 1, nopiy;do j = 1, nopix
-            sky = trimr([0.0_fp_kind,g_vec_array(2,i,j),0.0_fp_kind],ss)
+	    do j = 1, nopix;do i = 1, nopiy;
             skx = trimr([g_vec_array(1,i,j),0.0_fp_kind,0.0_fp_kind],ss)
+            sky = trimr([0.0_fp_kind,g_vec_array(2,i,j),0.0_fp_kind],ss)
             g2 =  trimr(g_vec_array(:,i,j),ss)**2
             s2 = g2 / 4.0_fp_kind
                 
@@ -153,7 +185,12 @@ module m_potential
         
         ! Normalise the sinc function
         inverse_sinc = inverse_sinc*float(nopiy)*float(nopix)
+        
+        write(*,*)
+    
     end subroutine precalculate_scattering_factors
+    
+
     
     subroutine make_site_factor_matmul(site_factor, tau)
 
@@ -177,9 +214,11 @@ module m_potential
         
         !$OMP PARALLEL PRIVATE(i, j)
         !$OMP DO
-	    do i = 1, nopiy;do j = 1, nopix
+	    do i = 1, nopiy
+            do j = 1, nopix
                 site_factor(i,j) = sum(exp(cmplx(0.0_fp_kind, -tp*matmul(g_vec_array(:,i,j), tau), fp_kind)))
-	   	 enddo;enddo
+            enddo
+        enddo
 	    !$OMP END DO
         !$OMP END PARALLEL
         
@@ -299,7 +338,7 @@ module m_potential
         site_factor = cshift(site_factor,SHIFT = -1,DIM=1)
         site_factor = cshift(site_factor,SHIFT = -1,DIM=2)
 
-        call fft2(nopiy, nopix, site_factor, nopiy, site_factor, nopiy)
+        call fft2(nopiy, nopix, site_factor, site_factor)
         site_factor = site_factor * inverse_sinc/sqrt(float(nopiy)*float(nopix))!_new * sqrt(float(nopiy)*float(nopix))
         
         contains
@@ -321,7 +360,7 @@ module m_potential
     end subroutine make_site_factor_hybrid
 
     subroutine setup_inelastic_ionization_types()
-        use global_variables    
+        use global_variables, only: EELS, EDX, SEI
         use m_user_input
         use m_string
         implicit none
@@ -329,13 +368,14 @@ module m_potential
       
         call command_line_title_box('Ionization')
 		i_eels = 0
-        do while(i_eels<1.or.i_eels>2)
-		    write(*,*) char(10),' <1> EELS',char(10),' <2> EDX',char(10)
+        do while(i_eels<1.or.i_eels>3) ! 2025-06-07 JB: added SE-Imaging option
+		    write(*,*) char(10),' <1> EELS',char(10),' <2> EDX',char(10),' <3> SE-imaging',char(10)
             call get_input('Ionization choice', i_eels)
         enddo
-        
+        EELS = i_eels.eq.1
         EDX = i_eels.eq.2
-		call local_potential(EDX)
+        SEI = i_eels.eq.3
+		call local_potential()
 
     end subroutine
     
@@ -545,8 +585,8 @@ module m_potential
         integer*4::reason,lineno,l
     
         !open the pertinent data files
-        
-        filename = 'ionization_data\EELS_EDX_'//shell//'.dat'
+        ! 2025-06-12 JB: modified path seprator to '/', should work with Windows and Linux
+        filename = 'ionization_data/EELS_EDX_'//shell//'.dat'
 		open(unit=35,file=filename,status='old',err=970)
         
         l = len('Z = '//to_string(int(atno))//' ')
@@ -605,15 +645,16 @@ module m_potential
 	if(EDX) m=1
 		
 	!write(*,*) 'reading inelastic scattering parameterization:'
-	!write(*,*) '- file: '//'ionization_data\EELS_EDX_'//shell//'.dat'
+	!write(*,*) '- file: '//'ionization_data/EELS_EDX_'//shell//'.dat'
         
     n = str2int(shell(1:1))
     lineno = get_ionization_shell_line(shell,atno)
 	!write(*,*) '- shell: '//shell//' - id = '//to_string(n)
 	!write(*,*) '- from line: '//to_string(lineno)
 		
-    !open the pertinent data files and read to relevant line        
-	open(unit=16,file='ionization_data\EELS_EDX_'//shell//'.dat',status='old',err=970)
+    !open the pertinent data files and read to relevant line 
+    ! 2025-06-12 JB: modified path seprator to '/', should work with Windows and Linux
+	open(unit=16,file='ionization_data/EELS_EDX_'//shell//'.dat',status='old',err=970)
 	do iz = 1,lineno
 	  read(16,*) junk
     enddo
@@ -678,7 +719,6 @@ module m_potential
   end function
 
   
-  
   !********************************************************************************
   !     subroutine EELS_local_potential()
   !     reads in the scattering factors and performs the interpolation
@@ -691,9 +731,11 @@ module m_potential
   !     2025-05-23 / JB / added custom ionization parameters to EELS
   !                       this requires the file custom_ionization.dat to be
   !                       present in the execution directory
+  !     2025-06-07 / JB / added SE imaging, flags EDX and SEI are now in
+  !                       global_variables module, and set before this subroutine
   !     
   !********************************************************************************
-  subroutine local_potential(EDX)
+  subroutine local_potential()
 
     use m_string
     use m_numerical_tools, only: cubspl,ppvalu
@@ -702,7 +744,6 @@ module m_potential
     use m_user_input
 
     implicit none
-    logical,intent(in)::EDX
 
     integer(4) i,ii,iii,j,kval,m,nchoices,ZZ,nshells,norbitals,k
     integer(4),allocatable::available_shells(:),available_atoms(:)
@@ -731,13 +772,12 @@ module m_potential
     nshells = size(shells)
     
 	!If EELS, setup detector
-	if(.not.EDX) then
-	    write(6,91)
-91      format(1x,'The EELS calculations assume the local approximation, which', /, &
-				&1x,'may be inappropriate when the EELS detector does not', /, &
-				&1x,'have a very large acceptance angle. To account for the', /, &
-				&1x,'finite detector size, a correction is applied.', /, &
-				&1x,'For more details see Y. Zhu et al. APL 103 (2013) 141908.', /)
+	if(EELS) then
+	    write(*,91)
+91      format(1x,'The EELS calculations assume the local approximation, which may be', /, &
+			  &1x,'inappropriate when the EELS detector does not have a very large', /, &
+              &1x,'acceptance angle. To account for the finite detector size, a correction', /, &
+              &1x,'is applied. For more details see Y. Zhu et al. APL 103 (2013) 141908.', /)
 		
         eels_inner = 0.0_fp_kind
 		  
@@ -747,10 +787,80 @@ module m_potential
         write(*,*)
 
         eels_inner = ak1*tan(eels_inner/1000.0_fp_kind)
-        eels_outer = ak1*tan(eels_outer/1000.0_fp_kind)
+        eels_outer = ak1*tan(abs(eels_outer)/1000.0_fp_kind)
         if(allocated(eels_correction_detector)) deallocate(eels_correction_detector)
         allocate(eels_correction_detector(nopiy,nopix))
         eels_correction_detector = make_detector(nopiy,nopix,ifactory,ifactorx,ss,eels_inner,eels_outer)
+    endif
+    
+    !If SEI, setup detector, 2025-06-07 JB
+	if(SEI) then
+	    write(*,92)
+92      format(/,1x,'The SE image simulation assumes an isotropic SE emission. A limited', /, &
+                &1x,'acceptance angle for the SE detector is taken into account as scaling factor.',/)
+		
+        eels_inner = 0.0_fp_kind
+		  
+        write(*,*) 'Enter SE detector acceptance semi angle (mrad):'
+        call get_input('SE acceptance angle', eels_outer)
+		  
+        write(*,*)
+
+        se_det_scale = abs(eels_outer) / 1.256637E+04_fp_kind ! convert to radians and devide by 4pi
+        eels_outer = ak1*tan(abs(eels_outer)/1000.0_fp_kind) ! convert to 1/A (only for consistency with EELS)
+        
+        write(*,93)
+93      format(  1x,'The SE detector usually accepts only slow electrons. Their signal', /, &
+		        &1x,'quickly attenuates depending on the depth of the ionization event', /, &
+		        &1x,'in the material. Effective transmission functions are calculated', /, &
+				&1x,'based on atomic radii and the inelastic mean free path for slow', /, &
+                &1x,'secondary electrons. Figures 1(a) and (d) in  Seah & Dench,', /, &
+                &1x,'Surf. and Interf. Anal. 1 (1979) 2-11 could help to estimate a value.',/)
+        
+        se_imfp = 0.001_fp_kind
+        do while(se_imfp < 0.1_fp_kind) ! 2025-06-07 lower limit 0.1 A
+            write(*,*) 'Enter the effective inelastic mean free path (>0.1) in A for SE:'
+            call get_input('SE inelastic mean free path', se_imfp)
+            se_imfp = ABS(se_imfp) ! ensure positive value
+        enddo
+        
+        write(*,*)
+        
+        ! setup table of effective atomic radii used for SE transmission
+        allocate(se_transf_aty_radius(nt))
+        do i = 1, nt
+            ZZ=nint(ATF(1,i)); se_transf_aty_radius(i) = bondRadius(ZZ) ! use bond radius as default
+        enddo
+        ! implement a menu that allows the user to change the effective atomic radius
+        write(*,94)
+94      format(  1x,'The SE absorption in the structure is modelled by effective radii', /, &
+		        &1x,'defining a Gaussian like peak at the equilibrium position for all', /, &
+		        &1x,'atoms in the input structure. The radii are preset from a table of', /, &
+				&1x,'bond radii, see Pyykkoe and Atsumi, Chem. Eur. J. 2009, 15, 186-192.', /, &
+                &1x,'These radii can be modified now:')
+95      format('Index  Atom| Z  | Radius (pm)')
+96      format('------------------------------')
+97      format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',1x,f6.1)
+        kval = -1
+        do while (kval.ne.0)
+            write(*,*) char(10),'Radii used for SE transmission functions:',char(10)
+            write(*,95)
+            write(*,96)
+            do i=1, nt
+                write(*,97) i,trim(adjustl(substance_atom_types(i))), &
+                    & nint(atf(1,i)), se_transf_aty_radius(i)
+            enddo
+            write(*,120)
+            write(*,96)
+            call get_input('Select to change radius <0> continue', kval)
+            if ((kval>0).AND.(kval<=nt)) then
+                ! get new radius for the selected atom type
+                write(*,*) 'Enter new effective atomic radius in pm:'
+                call get_input('Set atom radius', se_transf_aty_radius(kval))
+            endif
+        enddo
+        write(*,*)
+        
     endif
     
     ! Setup for default ionization parameters
@@ -767,26 +877,32 @@ module m_potential
     allocate(choices(ii),DE(ii))
     DE = 0
     choices = .false.
+    num_ionizations = 0
+    
+    do while (num_ionizations.eq.0) ! loop until user selects ionization shells
 	
     kval = -1
-    write(*,*) char(10),' ',char(230),'STEM calculates EDX and EELS signals for ionization of electrons to the '
-    write(*,*) 'continuum, at this point bound->bound (white line) transitions are not taken'
+    write(*,*) char(10),' muSTEM calculates signals for ionization of electrons to the continuum.'
+    write(*,*) 'At this point bound->bound (white line) transitions are not taken'
     write(*,*) 'into account.',char(10)
     write(*,*) 'K, L, M and N shell ionizations are available though users should be aware '
     write(*,*) 'that quantitative agreement between simulation and theory has only been '
     write(*,*) 'demonstrated for K and L shells (see Y. Zhu and C. Dwyer, Microsc. Microanal.'
     write(*,*) '20 (2014), 1070-1077)',char(10)
-    do while ((kval.ne.0).or.all(.not.choices)) !EELS selection menu loop
-100 format(/,' Ionization choices',/,/,'Index  Atom| Z  |',a,'| Included(y/n)'/&
-                &,'-----------------------------------------------------------')
+    
+    do while (kval.ne.0) ! Default table EELS selection menu loop
+        
+100 format(/,' Ionization choices',/,/,'Index  Atom| Z  |',a,'| Included(y/n)')
+101 format(  '---------------------------------------------------------------')
     if(EDX) write(*,100) ' Orbital | Shell '
 110 format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,a1,6x)
     
     if(.not.EDX) write(*,100) ' Orbital | Shell | Window (eV)'
+    write(*,101)
 111 format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|',1x,f5.1,6x,'|',1x,a1,6x)
 120 format(' < 0> continue')
     
-    !Display choices for default EDX and EELS ionizations
+    !Display choices for default ionization tables
     ii=1
     do i = 1, nt;ZZ=nint(ATF(1,i)); do j=1,norbitals
       if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) then
@@ -799,48 +915,53 @@ module m_potential
     enddo;enddo
     
     write(*,120)
-	  
+    write(*,101)
     call get_input('Shell choice <0> continue', kval)
 	!Update choice
 	if ((kval.gt.0).and.(kval.le.nchoices)) then
         choices(kval) = .not.choices(kval)
         
-        !If EELS get energy window
+        !If EELS or SEI get energy window
         if (.not.EDX) then
+          if (EELS) write(*,*) 'Define the electron energy-loss window for the selected shell.'
+          if (SEI) write(*,*) 'Define the energy range accepted by the SE detector.'
           DE(kval) =-1
           do while ((DE(kval).lt.1).or.(DE(kval).gt.100)) ! 2025-05-05 lower limit corrected to 1 eV (JB/LJA)
-            write(*,*) 'Enter EELS energy window above threshold in eV (between 1 and 100):',char(10)
+            write(*,*) 'Enter energy range above ionization threshold in eV (between 1 and 100):',char(10)
             call get_input('Energy window', DE(kval))
           enddo 
         end if
     end if
+    num_ionizations = count(choices)
     enddo ! eels selection menu
     
     
-    ! Custom EELS ionization data initializtation
+    ! Custom EELS ionization data initializtation (currently not allowed for EDX)
     ncustom = get_custom_ionization_num() ! get matching number of custom ionization data sets
     if ((.not.EDX) .and. (ncustom>0)) then
+        if (ALLOCATED(cus_aty)) deallocate(cus_aty, cus_orb, cus_de, cus_line, choicus)
         allocate(cus_aty(ncustom), cus_orb(ncustom), cus_de(2,ncustom), &
                 & cus_line(ncustom), choicus(ncustom))
         choicus = .false.
         ! load custom ionization header data
         call load_custom_ionization(ncustom, cus_aty, cus_orb, cus_de, cus_line)
         write(unit=tmpi,fmt='(i)') ncustom
-        write(*,*) char(10),'Custom STEM EELS selection ('//TRIM(adjustl(tmpi))// &
+        write(*,*) char(10),'Custom ionization selection ('//TRIM(adjustl(tmpi))// &
                 & ' data sets available)'
         
         
         ! allow the user to select custom ionization data sets
         kval = -1        
-200 format('Index  Atom| Z  | Orbital | Shell | Window (eV)     | Incl.(y/n)'/&
-         &,'----------------------------------------------------------------')
+200 format('Index  Atom| Z  | Orbital | Shell | Window (eV)     | Incl.(y/n)')
+201 format('----------------------------------------------------------------')
 211 format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',2x,a2,5x,'|',1x,a3,3x,'|', &
                 & 1x,f6.1,' - ',f6.1,1x,'|',1x,a1,6x)
 212 format(' <99> toggle all')
                 
-        do while ((kval.ne.0).or.all(.not.choicus)) !custom EELS selection menu loop
+        do while (kval.ne.0) !custom EELS selection menu loop
             write(*,*) char(10),'Ionization choices',char(10)
             write(*,200)
+            write(*,201)
             do i=1, ncustom
                 do j=1,norbitals
                     if (0<INDEX(cus_orb(i),shell_name_EELS(j))) exit
@@ -851,15 +972,26 @@ module m_potential
             end do
             write(*,212)
             write(*,120)
+            write(*,201)
             call get_input('Shell choice <0> continue', kval)
             if((kval.gt.0).and.(kval.le.ncustom)) choicus(kval) = .not.choicus(kval)
             if(kval.eq.99) choicus = .not.choicus ! toggle all choices
         end do
+        
+        num_ionizations = count(choices) + count(choicus) ! total number of ionizations (default + custom)
+        
+    else ! either EDX or ncustom==0
+        ncustom = 0 ! no custom ionization data for EDX
     end if
     
-    num_ionizations = count(choices) + count(choicus) ! total number of ionizations (default + custom)
+    if (num_ionizations.eq.0) then
+        write(*,*) char(10),'You need to choose at least 1 ionization.',char(10)
+    end if
     
-	allocate(ionization_mu(nopiy,nopix,num_ionizations),atm_indices(num_ionizations), &
+    enddo ! loop user EELS/EDX/SE ionization choices
+    
+    write(*,*) char(10),'Number of ionization scattering factors:',num_ionizations,char(10)
+    allocate(ionization_mu(nopiy,nopix,num_ionizations),atm_indices(num_ionizations), &
                 & Ion_description(num_ionizations))
     ionization_mu = 0
     ii=1
@@ -868,18 +1000,19 @@ module m_potential
     do i = 1, nt; ZZ=nint(ATF(1,i))
       do j=1,norbitals
         if(get_ionization_shell_line(shell_name_EELS(j),ZZ)>-1) then; if(choices(ii)) then
-          ionization_mu(:,:,iii) = make_fz_EELS_EDX(shell_name_EELS(j),zz,DE(ii),EDX,0)* atf(2,i)*fz_DWF(:,:,i)
+          ionization_mu(:,:,iii) = make_fz_EELS_EDX(shell_name_EELS(j),zz,DE(ii),0)* atf(2,i)*fz_DWF(:,:,i)
           atm_indices(iii) = i ! store atom type index for this ionization, to be used for output
           ion_description(iii) = shell_name_EELS(j) ! store shell name for this ionization, to be used for output
           iii=iii+1;endif; ii=ii+1; endif
       enddo
-      enddo
+    enddo
     !... and now for the custom ionization data sets
 300 format(a2,'_',I0.4,'-',I0.4,'eV')
+    if ((.NOT.EDX).AND.(ncustom>0)) then ! only if custom EELS data is available and not EDX
     do i=1, ncustom
       if (choicus(i)) then ! only if the user selected this data set
         zz = nint(atf(1,cus_aty(i))) ! atom type index -> atomic number
-        ionization_mu(:,:,iii) = make_fz_EELS_EDX(cus_orb(i),zz,cus_de(2,i),.false.,cus_line(i))* &
+        ionization_mu(:,:,iii) = make_fz_EELS_EDX(cus_orb(i),zz,cus_de(2,i),cus_line(i))* &
                 & atf(2,cus_aty(i))*fz_DWF(:,:,cus_aty(i))
         atm_indices(iii) = cus_aty(i) ! store atom type index for this ionization, to be used for output
         ! store shell name and energy window for this ionization, to be used for output
@@ -887,13 +1020,15 @@ module m_potential
         iii=iii+1
       end if
     end do
+    endif
  
-    end subroutine
+  end subroutine
       
   !Subroutine to make the Fz_mu needs to have prefactors accounted for (volume fo the unit cell etc.)
   !needs to be multiplied by the DWF for the pertinent atom type
   !Modified interface by adding lc to allow for custom ionization data (2025-05-21 JB)
-  function make_fz_EELS_EDX(orbital,zz,DE,EDX,lc) result(fz_mu)
+  !Modified interface, EDX flag removed as this is now in global_variables module
+  function make_fz_EELS_EDX(orbital,zz,DE,lc) result(fz_mu)
 	use m_precision
     use global_variables
 	use m_numerical_tools, only: cubspl,ppvalu
@@ -904,7 +1039,6 @@ module m_potential
     character(2),intent(in)::orbital
     integer*4,intent(in)::zz,lc
     real(fp_kind),intent(in)::DE
-    logical,intent(in)::EDX
     real(fp_kind):: g_vec_array(3,nopiy,nopix)
     
     complex(fp_kind):: fz_mu(nopiy,nopix)
@@ -974,7 +1108,7 @@ module m_potential
     real(8)::thmin,thmax,phmin,phmax
     complex(fp_kind)::fz_adf(nopiy,nopix,nt,ndet)
 
-    write(6,134)        
+    write(*,134)        
 134 format(/,' Calculating effective inelastic potentials.',/)
 
     if(allocated(adf_potential)) deallocate(adf_potential)
@@ -1001,24 +1135,24 @@ module m_potential
 	    vol = ss_slice(7,j)
 	    !calculate the ionization potential
 	    if(ionization) then
-			  do i=1,num_ionizations
-          nat_ = nat_slice(atm_indices(i),j)
-          ionization_potential(:,:,i,j) = real(potential_from_scattering_factors( &
+		    do i=1,num_ionizations
+                nat_ = nat_slice(atm_indices(i),j)
+                ionization_potential(:,:,i,j) = real(potential_from_scattering_factors( &
                             & ionization_mu(:,:,i),tau_slice(:,atm_indices(i),:nat_,j), &
                             & nat_,nopiy,nopix,high_accuracy)/vol)
   			enddo
-      endif  
+        endif  
 	    !calculate the ADF potential
-      if(adf.and.complex_absorption) then  
-        do i=1,nt
-          nat_ = nat_slice(i,j)
-          do k=1,ndet
-            adf_potential(:,:,j,k) = adf_potential(:,:,j,k) + real( &
+        if(adf.and.complex_absorption) then  
+            do i=1,nt
+                nat_ = nat_slice(i,j)
+                do k=1,ndet
+                    adf_potential(:,:,j,k) = adf_potential(:,:,j,k) + real( &
                             & potential_from_scattering_factors(fz_adf(:,:,i,k), &
                             & tau_slice(:,i,:nat_,j),nat_,nopiy,nopix,high_accuracy)/vol*ss(7)*4*pi)
-          enddo
-        enddo
-      endif
+                enddo
+            enddo
+        endif
     enddo	!ends loop over the number of potential subslices
       
   end subroutine
@@ -1061,85 +1195,186 @@ module m_potential
 		!stop
         slice_potential = site_term*scattering_factor
         ! Get realspace potential
-        call ifft2(nopiy,nopix,slice_potential,nopiy,slice_potential,nopiy)
+        call ifft2(nopiy,nopix,slice_potential,slice_potential)
         slice_potential = slice_potential*sqrt(float(nopiy*nopix))
     endif
     
-    end function
-    function make_absorptive_grates(nopiy,nopix,n_slices) result(projected_potential)
+  end function
+  
+  
+  function make_absorptive_grates(nopiy,nopix,n_slices) result(projected_potential)
     
-        use m_precision, only: fp_kind
-	    use cufft_wrapper, only: fft2, ifft2
-        use global_variables, only: ig1,ig2,ifactory,ifactorx,nt, relm, tp, ak, atf, high_accuracy, ci, pi, bwl_mat,fz,fz_DWF,ss,a0,nat,orthog
-        use m_absorption!, only: transf_absorptive,fz_abs
-        use m_multislice, only: nat_slice, ss_slice, tau_slice ! JB 2022-08-03 error fixed for ifort compile
-        use m_string, only: to_string
-        use output
+    use m_precision, only: fp_kind
+	use cufft_wrapper, only: fft2, ifft2
+    use global_variables, only: ig1,ig2,ifactory,ifactorx,nt, relm, tp, ak, atf, high_accuracy, ci, pi, bwl_mat,fz,fz_DWF,ss,a0,nat,orthog
+    use m_absorption!, only: transf_absorptive,fz_abs
+    use m_multislice, only: nat_slice, ss_slice, tau_slice ! JB 2022-08-03 error fixed for ifort compile
+    use m_string, only: to_string
+    use output
         
-        implicit none
+    implicit none
         
-        integer*4,intent(in)::nopiy,nopix,n_slices
-        complex(fp_kind)::projected_potential(nopiy,nopix,n_slices)
+    integer*4,intent(in)::nopiy,nopix,n_slices
+    complex(fp_kind)::projected_potential(nopiy,nopix,n_slices)
         
-        integer(4) :: j, m, n,nat_layer
-        real(fp_kind) :: ccd_slice,V_corr
-        complex(fp_kind),dimension(nopiy,nopix) :: scattering_pot,temp,effective_scat_fact
-        complex(fp_kind)::fz_abs(nopiy,nopix,nt)
+    integer(4) :: j, m, n,nat_layer
+    real(fp_kind) :: ccd_slice,V_corr
+    complex(fp_kind),dimension(nopiy,nopix) :: scattering_pot,temp,effective_scat_fact
+    complex(fp_kind)::fz_abs(nopiy,nopix,nt)
     
-        real(fp_kind) :: t1, delta,amplitude(nopiy,nopix),phase(nopiy,nopix)
+    real(fp_kind) :: t1, delta,amplitude(nopiy,nopix),phase(nopiy,nopix)
     
-        procedure(make_site_factor_generic),pointer :: make_site_factor
-        projected_potential= 0 
-        t1 = secnds(0.0_fp_kind)
-        fz_abs=0
-        if(include_absorption) fz_abs = absorptive_scattering_factors(ig1,ig2,ifactory,ifactorx,nopiy,nopix,nt,a0,ss,atf,nat, ak, relm, orthog, 0.0_8, 4.0d0*atan(1.0d0))*2*ak
+    procedure(make_site_factor_generic),pointer :: make_site_factor
+    projected_potential= 0 
+    t1 = secnds(0.0_fp_kind)
+    fz_abs=0
+    if(include_absorption) fz_abs = absorptive_scattering_factors(ig1,ig2,ifactory,ifactorx,nopiy,nopix,nt,a0,ss,atf,nat, ak, relm, orthog, 0.0_8, 4.0d0*atan(1.0d0))*2*ak
             
-        do j = 1, n_slices
-	        write(*,'(1x, a, a, a, a, a)') 'Calculating transmission functions for slice ', to_string(j), '/', to_string(n_slices), '...'
+    do j = 1, n_slices
+        write(*,'(1x, a, a, a, a, a)') 'Calculating transmission functions for slice ', to_string(j), '/', to_string(n_slices), '...'
         
-    198	    write(6,199) to_string(sum(nat_slice(:,j)))
-    199     format(1x, 'Number of atoms in this slice: ', a, /) 
+198	    write(*,199) to_string(sum(nat_slice(:,j)))
+199     format(1x, 'Number of atoms in this slice: ', a, /) 
 
-		    ccd_slice = relm / (tp * ak * ss_slice(7,j))
+		ccd_slice = relm / (tp * ak * ss_slice(7,j))
             V_corr = ss(7)/ss_slice(7,j)
-            do m=1,nt
-                nat_layer = nat_slice(m,j)
-                effective_scat_fact = CCD_slice*fz(:,:,m)*fz_DWF(:,:,m)+cmplx(0,1)*fz_abs(:,:,m)*V_corr
-                projected_potential(:,:,j) = projected_potential(:,:,j)+potential_from_scattering_factors(effective_scat_fact,tau_slice(:,m,:nat_layer,j),nat_layer,nopiy,nopix,high_accuracy)
-            enddo
+        do m=1,nt
+            nat_layer = nat_slice(m,j)
+            effective_scat_fact = CCD_slice*fz(:,:,m)*fz_DWF(:,:,m)+cmplx(0,1)*fz_abs(:,:,m)*V_corr
+            projected_potential(:,:,j) = projected_potential(:,:,j)+potential_from_scattering_factors(effective_scat_fact,tau_slice(:,m,:nat_layer,j),nat_layer,nopiy,nopix,high_accuracy)
+        enddo
                 
-	    enddo ! End loop over slices
+	enddo ! End loop over slices
 	
-	    delta = secnds(t1)
+	delta = secnds(t1)
         
-		if(timing) then
-            write(*,*) 'The calculation of transmission functions for the absorptive model took ', delta, 'seconds.'
-            write(*,*)
-			open(unit=9834, file=trim(adjustl(output_prefix))//'_timing.txt', access='append')
-			write(9834, '(a, g, a, /)') 'The calculation of transmission functions for the absorptive model took ', delta, 'seconds.'
-			close(9834)
-        endif    
+	if(timing) then
+        write(*,*) 'The calculation of transmission functions for the absorptive model took ', delta, 'seconds.'
+        write(*,*)
+		open(unit=9834, file=trim(adjustl(output_prefix))//'_timing.txt', access='append')
+		write(9834, '(a, g, a, /)') 'The calculation of transmission functions for the absorptive model took ', delta, 'seconds.'
+		close(9834)
+    endif    
         
-    end function make_absorptive_grates
+  end function make_absorptive_grates
+  
+  
+  subroutine make_se_transmission_grates()
+    
+    use m_precision, only: fp_kind
+	use cufft_wrapper, only: fft2
+    use global_variables
+    use m_multislice, only: n_slices, nat_slice, tau_slice, prop_distance, save_grates
+    use m_string, only: to_string
+    use output
+        
+    implicit none
+            
+    integer*4 :: i, j, m, n, nat_layer, ix, iy, jx, jy, nx2, ny2
+    real(fp_kind) :: t1, delta, rad, val, x, y, x0, y0, rinv2
+    real(fp_kind), allocatable :: layer_density(:,:)
+    complex(fp_kind), allocatable :: atom_ff(:,:,:)
+    character(32) :: snum
+    
+    t1 = secnds(0.0_fp_kind)
+    if (ALLOCATED(se_transmission)) deallocate(se_transmission) ! deallocate previous transmission function if it exists
+    allocate(se_transmission(nopiy,nopix,n_slices)) ! allocate new transmission function array
+    allocate(layer_density(nopiy,nopix))
+    allocate(atom_ff(nopiy,nopix,nt))
+    
+    se_transmission = 1.0_fp_kind ! initialize transmission function to 1.0
+    layer_density = 0.0_fp_kind ! initialize layer density to zero
+    nx2 = (nopix + modulo(nopix,2)) / 2 ! x nyquist pixel number 512 -> 256, 513 -> 257, 514 -> 257
+    ny2 = (nopiy + modulo(nopiy,2)) / 2 ! y nyquist pixel number
+    
+    !write(*,*) '  total grid size in A: ', a0(1)*ifactorx, ' x ', a0(2)*ifactory
+    ! prepare the atom form factor (real-space to fourier space)
+    do i = 1, nt ! loop over atom types
+        rad = se_transf_aty_radius(i) * 0.01 ! atomic radius of this atom type in A
+        !write(*,*) '  preparing SE form factor for '//trim(adjustl(substance_atom_types(i)))// &
+        !        &   ' with radius ', rad, ' A'
+        rinv2 = -0.69_fp_kind / rad**2 ! exponential form parameter
+        ! setup the atom form factor for this atom type in real space
+        !$OMP PARALLEL DO PRIVATE(iy, ix, jy, jx, y, x) &
+        !$OMP& SHARED(atom_ff, a0, ifactory, ifactorx, rinv2, nx2, ny2, nopix, nopiy, i) &
+        !$OMP& COLLAPSE(2)
+        do iy=1, nopiy; do ix=1,nopix
+            jy = modulo(iy + ny2 - 1, nopiy) - ny2
+            y = a0(2) * ifactory * jy / nopiy ! y coordinate in A
+            jx = modulo(ix + nx2 - 1, nopix) - nx2
+            x = a0(1) * ifactorx * jx / nopix ! x coordinate in A
+            atom_ff(iy, ix, i) = EXP(rinv2 * (x**2 + y**2)) ! Gaussian form factor
+        enddo; enddo
+        !$OMP END PARALLEL DO
+        call fft2(nopiy, nopix, atom_ff(:,:,i), atom_ff(:,:,i))
+    enddo
+    
+    do j = 1, n_slices ! loop over slices of the supercell
+        write(*,'(1x, a, a, a, a, a)') 'Calculating SE transmission function for slice ', &
+                & to_string(j), '/', to_string(n_slices), '...'
+	    write(*,301) to_string(sum(nat_slice(:,j)))
+301     format(1x, 'Number of atoms in this slice: ', a, /) 
+        layer_density = 0.0_fp_kind ! initialize layer density to zero
+        do m=1,nt ! loop over atom types
+            nat_layer = nat_slice(m,j) ! number of atoms of this type in the slice
+            if (nat_layer == 0) cycle ! skip if no atoms of this type in the slice
+            !write(*,*) '  adding', nat_layer, 'atoms of type ', trim(adjustl(substance_atom_types(m)))
+            ! add the layer density contribution from this atom type
+            layer_density(:,:) = layer_density(:,:) + real(potential_from_scattering_factors( &
+                                & atom_ff(:,:,m),tau_slice(:,m,:nat_layer,j),nat_layer, &
+                                & nopiy,nopix,high_accuracy))
+        enddo
+        layer_density = layer_density / sqrt(REAL(nopiy*nopix,fp_kind)) ! normalize layer density
+        !write(*,*) '  max. layer density for slice ', j, ':', maxval(layer_density(:,:))
+        ! debug storing of the layer density
+        !write(unit=snum,fmt='(i0.4)') j
+        !open(unit=3984, file=trim(adjustl(output_prefix))//"_SE-layer_"//trim(adjustl(snum))// &
+        !                        & ".bin", form='binary', convert='big_endian')
+        !write(3984) layer_density
+        !close(3984)
+        ! calculate SE transmission function from density, slice thickness and inelastic mean free path
+        se_transmission(:,:,j) = exp(-1.0_fp_kind * layer_density * prop_distance(j) / se_imfp)
+	enddo ! End loop over slices
+	
+	delta = secnds(t1)
+        
+	if(timing) then
+        write(*,*) 'The calculation of SE transmission functions took ', delta, 'seconds.'
+        write(*,*)
+		open(unit=9834, file=trim(adjustl(output_prefix))//'_timing.txt', access='append')
+		write(9834, '(a, g, a, /)') 'The calculation of SE transmission functions took ', delta, 'seconds.'
+		close(9834)
+    endif
+    
+    deallocate(layer_density, atom_ff) ! deallocate temporary arrays
+    
+    if (0 < IAND(arg_debug_dump,2)) then ! store the SE transmission functions
+      write(*,*) 'Saving SE transmission functions to file...',char(10)
+      open(unit=3984, file=trim(adjustl(output_prefix))//"_SE-transmission.bin", form='binary', convert='big_endian')
+      write(3984) se_transmission
+      close(3984)
+    endif
+        
+  end subroutine make_se_transmission_grates
     
            
-        integer function seed_rng() result(idum)
+    integer function seed_rng() result(idum)
             
-	        use m_numerical_tools, only: ran1
-            use m_precision, only: fp_kind
+	    use m_numerical_tools, only: ran1
+        use m_precision, only: fp_kind
             
-            implicit none
+        implicit none
 
-            integer :: i
-            real(fp_kind) :: random
+        integer :: i
+        real(fp_kind) :: random
             
-	        idum = -1
+	    idum = -1
             
-	        do i = 1, nran
-		        random = ran1(idum)
-	        enddo
+	    do i = 1, nran
+		    random = ran1(idum)
+	    enddo
             
-        end function seed_rng
+    end function seed_rng
 
       
     subroutine make_propagator(nopiy,nopix,prop,dz,ak1,ss,ig1,ig2,claue,ifactorx,ifactory,exponentiate)
@@ -1159,16 +1394,21 @@ module m_potential
         real(fp_kind),parameter :: pi = atan(1.0d0)*4.0d0
         integer(4) :: ny, nx
         
-		exp_=.true.
+		exp_ = .true.
 		if(present(exponentiate)) exp_ = exponentiate
         
         call make_g_vec_array(g_vec_array,ifactory,ifactorx)
 
         do ny = 1, nopiy;do nx = 1, nopix
-            prop(ny,nx) = cmplx(0.0d0, -pi*dz*trimr(g_vec_array(:,ny,nx)-claue,ss)**2/ak1, fp_kind )
+            ! calculate the propagator phase for each q and write it to the real part of prop            
+            prop(ny,nx) = cmplx(-pi*dz*trimr(g_vec_array(:,ny,nx)-claue,ss)**2/ak1, 0.0d0, fp_kind )
         enddo;enddo
 
-		if(exp_) prop = exp(prop)
+        ! exponentiate the propagator if requested, but calculate exp( i*phase )
+		if(exp_) prop = exp( cmplx(0.0d0, 1.0d0, fp_kind) * prop)
+        
+        ! if exponentiate is not requested, prop is just the phase factor
+        !        sitting in the real part of prop, imaginary part is zero
 
     end subroutine
 	      
@@ -1215,8 +1455,8 @@ module m_potential
         integer(4),intent(inout) :: idum
     
         complex(fp_kind) :: projected_potential(nopiy,nopix,n_qep_grates,n_slices),temp(nopiy,nopix),scattering_pot(nopiy,nopix,nt)
-		    integer(4), allocatable :: handled(:,:)
-		    integer(4):: save_list(2,nt),match_count, i, j, m, n,ii,jj,jjj,kk,iii
+        integer(4), allocatable :: handled(:,:)
+		integer(4):: save_list(2,nt),match_count, i, j, m, n,ii,jj,jjj,kk,iii
         real(fp_kind) :: tau_holder(3),tau_holder2(3),ccd_slice,ums,amplitude(nopiy,nopix),phase(nopiy,nopix)
         real(fp_kind) :: mod_tau(3,nt,maxnat_slice,n_slices,n_qep_grates),t1, delta, msd
         logical::fracocc
@@ -1224,7 +1464,7 @@ module m_potential
         procedure(make_site_factor_generic),pointer :: make_site_factor
         
 	    
- 	 	    !	Search for fractional occupancy
+        ! Search for fractional occupancy
         fracocc = any(atf(2,:).lt.0.99d0)
         
         t1 = secnds(0.0_fp_kind)
@@ -1232,62 +1472,67 @@ module m_potential
         do j = 1, n_slices
 	        write(*,'(1x, a, a, a, a, a)') 'Calculating transmission functions for slice ', to_string(j), '/', to_string(n_slices), '...'
         
-    198	    write(6,199) to_string(sum(nat_slice(:,j)))
+    	    write(*,199) to_string(sum(nat_slice(:,j)))
     199     format(1x, 'Number of atoms in this slice: ', a) 
 
-		      ccd_slice = relm / (tp * ak * ss_slice(7,j))
+            ccd_slice = relm / (tp * ak * ss_slice(7,j))
 
 	        do i = 1, n_qep_grates
-    200	    format(a1, 1x, i3, '/', i3)
-	          write(6,200, advance='no') achar(13), i, n_qep_grates
+#ifdef GPU
+    200	        format(a1, 1x, i3, '/', i3)
+	            write(*,200, advance='no') achar(13), i, n_qep_grates
+#else
+    201         format(1h+, 2x, i3, '/', i3)
+                write(*,201) i, n_qep_grates
+#endif
           
-        ! Randomly displace the atoms
+                ! Randomly displace the atoms
 				if (.not.fracocc) then ! no fractional occ. displace all atoms
- 	        do m = 1, nt
-	          do n = 1, nat_slice(m,j)
-              msd = atf(3,m) ! (default) init from structure model
-              !
-			        call displace(tau_slice(1:3,m,n,j),mod_tau(1:3,m,n,j,i),sqrt(msd),a0_slice,idum)
-	          end do
-          end do
+ 	                do m = 1, nt
+	                    do n = 1, nat_slice(m,j)
+                            msd = atf(3,m) ! (default) init from structure model
+                            !
+			                call displace(tau_slice(1:3,m,n,j),mod_tau(1:3,m,n,j,i),sqrt(msd),a0_slice,idum)
+	                    end do
+                    end do
 				else ! displace but handle shared sites
 					allocate( handled(nt,maxnat_slice) )
 					handled = 0
 					do ii=1, nt
            
-					 do jj = 1, nat_slice(ii,j)
-						 if (handled(ii,jj).eq.1) cycle ! skip, shared site has been handled
-						 tau_holder(1:3) = tau_slice(1:3,ii,jj,j)
+					    do jj = 1, nat_slice(ii,j)
+						    if (handled(ii,jj).eq.1) cycle ! skip, shared site has been handled
+						    tau_holder(1:3) = tau_slice(1:3,ii,jj,j)
 
-						 save_list = 0
-						 match_count = 0
-             msd = atf(3,ii) ! (default) init from structure model
-             !
-						 ums = msd ! atf(3,ii)
-						 do iii=ii+1,nt
-              do jjj=1,nat_slice(iii,j)
-						 	  if (same_site(tau_holder,tau_slice(1:3,iii,jjj,j))) then
+						    save_list = 0
+						    match_count = 0
+                            msd = atf(3,ii) ! (default) init from structure model
+                            !
+						    ums = msd ! atf(3,ii)
+						    do iii=ii+1,nt
+                            do jjj=1,nat_slice(iii,j)
+						 	if (same_site(tau_holder,tau_slice(1:3,iii,jjj,j))) then
 						 	    match_count = match_count+1
 							    save_list(1,match_count)=iii
 							    save_list(2,match_count)=jjj
-                  msd = atf(3,iii) ! (default) init from structure model
-                  !
+                                msd = atf(3,iii) ! (default) init from structure model
+                                !
 							    ums = ums + msd ! atf(3,iii)
 							    cycle
-							  end if
-              end do
-						 end do
+                            end if
+                            end do
+                            end do
 
-						 ums = ums / dfloat(match_count+1)
-					   call displace(tau_holder(1:3),tau_holder2(1:3),sqrt(ums),a0_slice,idum)
-						 mod_tau(1:3,ii,jj,j,i) = tau_holder2(1:3)
-						 handled(ii,jj) = 1
-						 do kk=1,match_count
-							 mod_tau(1:3,save_list(1,kk),save_list(2,kk),j,i) = tau_holder2(1:3)
-							 handled(save_list(1,kk),save_list(2,kk)) = 1
-						 enddo
+						    ums = ums / dfloat(match_count+1)
+					        call displace(tau_holder(1:3),tau_holder2(1:3),sqrt(ums),a0_slice,idum)
+						    mod_tau(1:3,ii,jj,j,i) = tau_holder2(1:3)
+						    handled(ii,jj) = 1
+						    do kk=1,match_count
+							    mod_tau(1:3,save_list(1,kk),save_list(2,kk),j,i) = tau_holder2(1:3)
+							    handled(save_list(1,kk),save_list(2,kk)) = 1
+						    enddo
 						   
-					  enddo
+					    enddo
 					enddo
 
 					deallocate( handled )
@@ -1295,40 +1540,44 @@ module m_potential
 				
 				projected_potential(:,:,i,j) = 0
 				do m = 1, nt
-					projected_potential(:,:,i,j) = projected_potential(:,:,i,j) &
-            + real(potential_from_scattering_factors(CCD_slice*fz(:,:,m), &
-                  mod_tau(:,m,1:nat_slice(m,j),j,i),nat_slice(m,j),nopiy,nopix,high_accuracy))
-        enddo
-	    enddo ! End loop over grates
+					projected_potential(:,:,i,j) = projected_potential(:,:,i,j) + &
+                        & real(potential_from_scattering_factors(CCD_slice*fz(:,:,m), &
+                        & mod_tau(:,m,1:nat_slice(m,j),j,i),nat_slice(m,j),nopiy,nopix,high_accuracy))
+                enddo
+	        enddo ! End loop over grates
         
-      write(*,*)
-      write(*,*)
+            write(*,*)
+            write(*,*)
         
-	  enddo ! End loop over slices
+	    enddo ! End loop over slices
 	
-	  delta = secnds(t1)
+	    delta = secnds(t1)
         
-    write(*,*) 'The calculation of transmission functions for the QEP model took ', delta, 'seconds.'
-    write(*,*)
+        write(*,*) 'The calculation of transmission functions for the QEP model took ', delta, 'seconds.'
+        write(*,*)
 
-  	if(timing) then
+  	    if(timing) then
 			open(unit=9834, file=trim(adjustl(output_prefix))//'_timing.txt', access='append')
 			write(9834, '(a, g, a, /)') 'The calculation of transmission functions for the QEP model took ', delta, 'seconds.'
 			close(9834)
-    endif    
+        endif    
     
-  end function make_qep_grates
+    end function make_qep_grates
+    
+    
 
 	logical(4) function same_site(site1,site2)
       
-      implicit none
+        implicit none
       
-      real(fp_kind) site1(3),site2(3)
-      real(fp_kind) tol
+        real(fp_kind) site1(3),site2(3)
+        real(fp_kind) tol
       
-      tol = 1.0d-6
-      same_site = all(abs(site1-site2).lt.tol)
+        tol = 1.0d-6
+        same_site = all(abs(site1-site2).lt.tol)
       
-      return
-      end function
+        return
+    end function
+    
+    
 end module

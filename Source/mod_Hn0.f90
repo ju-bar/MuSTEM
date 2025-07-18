@@ -32,13 +32,15 @@ module m_Hn0
     real(fp_kind) :: eval       !Energy of the ejected electron
     integer(4) :: nrad       !number of points that the radial wavefunctions are computed on
     real(fp_kind) :: et         !threshold energy
-    real(fp_kind)  :: FAK(100)                    ! factorials necessary for the cleb3j code
+    real(fp_kind), save  :: FAK(100)  ! factorials necessary for the cleb3j code, save state needed for OMP thread safety
                                                   ! must be run 
     complex(fp_kind) :: alpha_n  !constant for the current conversion factor
     real(fp_kind),allocatable :: qmin(:),gint(:,:,:,:),dgint(:,:,:,:),qpos(:,:)
-	integer*4:: numeels
-	real(fp_kind),allocatable::outerrad(:)
-    real(fp_kind),allocatable :: Hn0_eels_detector(:,:,:)
+    logical :: dc_eels_segments ! EELS segment flag
+    integer*4 :: dc_numeels, dc_eels_nseg ! number of EELS detectors and segments
+    real(fp_kind) :: dc_eels_seg_offset !azimthal offset for the EELS detector segments
+    real(fp_kind),allocatable :: dc_eels_outer(:), dc_eels_inner(:) !EELS detector ranges
+    real(fp_kind),allocatable :: Hn0_eels_detector(:,:,:) ! EELS detector data for the Hn0 calculation
     !complex(fp_kind) :: tmatrix(nopiy,nopix)
     
     !the code constructs transition matrices at the origin and shifts uses the 1D factorisation
@@ -68,19 +70,19 @@ module m_Hn0
       
     subroutine ionizer_init(stem)
 		
-        use m_multislice, only:get_cbed_detector_info
+        use m_multislice, only:get_cbed_detector_info, make_detector
+        use output
         implicit none
     
-        integer(4) :: i,itype,j,order
-        real(fp_kind) :: eels_inner,eels_outer
-		logical::stem
+        integer(4) :: i,itype,j,order,comaindex,nd
+		logical::stem,detectors,outputdetectors
+        character*100::dstring
         !select atom to be ionized
         !calculate the factorials required for the cleb code
         call fakred()
 		
 		call command_line_title_box('Double-channeling ionization menu')
 
-		
 		itype=-1
 		do while(itype<1.or.itype>nt) 
 	 40  write(*,610)
@@ -101,9 +103,9 @@ module m_Hn0
         Z = ATF(1,itype)
 
      66 call numset()   !read in from orb file
-        write(*,*) 'Enter the energy (in eV) above threshold at which the ionization will be calculated.'
-		write(*,*) 'Note: this calculates the differential cross-section at one energy, ie. there is'
-		write(*,*) 'no integration over an energy window.'
+        write(*,*) 'Enter the energy (in eV) above threshold for the ionization calculation.'
+		write(*,*) 'Note: This calculates the differential cross-section at one energy, i.e.,'
+		write(*,*) 'there is no integration over an energy window.'
 		write(*,*)
         call get_input('Ionization energy',eval)
         write(*,*)
@@ -112,20 +114,91 @@ module m_Hn0
         xcells=1
 		!If STEM EELS get detectors
 		if(stem) then
-			write(*,*) 'muSTEM permits the calculation of STEM-EELS images for a number of different'
-			write(*,*) 'sized of EELS detectors simultaneously, how many detectors would you like'
-			write(*,*) 'to consider in simulation?'
-			call get_input('Number of EELS detectors',numeels)
-			if(allocated(outerrad)) deallocate(outerrad)
-			allocate(outerrad(numeels))
-			call get_cbed_detector_info(numeels,ak1,outerrad)
+            dc_numeels=0
+            dc_eels_nseg=1
+            dc_eels_segments=.false.
+            outputdetectors=.false.
+            dc_eels_seg_offset=0.0_fp_kind
+            
+            do while(dc_numeels<1) ! ensure at least one detector
+                
+			write(*,*) 'muSTEM allows you to calculate STEM-EELS images for EELS detectors of'
+			write(*,*) 'different sizes simultaneously.'
+            write(*,*) 'Enter the number of detectors in the diffraction plane:'
+		    write(*,*) "To segment detectors input a comma ',' and then the number"
+		    write(*,*) "of angular segments (eg. for 4 rings and 4 quadrants input '4,4')."
+		    write(*,*) 'To output the detectors for inspection end the input with a '
+		    write(*,*) "question mark ('?'), ie '4,4?'."
+            write(*,*)
+            call get_input('Number of EELS detectors', dstring)
+            write(*,*)
+            
+            !Check if there is a ',' which indicates the user
+		    !wants segmented detectors
+		    comaindex = index(dstring,',')
+		    dc_eels_segments = (comaindex.ne.0)
+            
+            !Check if there is a ?, which indicates the user would
+		    !like to output the detectors
+		    outputdetectors = (index(dstring,'?').ne.0)
+		    !Remove the ? so that it doesn't cause problems later
+		    if (outputdetectors) dstring = dstring(:index(dstring,'?')-1)
+            
+            !Read detector string
+            if(dc_eels_segments) then ! there are segments
+			    read(dstring(:comaindex),*) dc_numeels
+			    read(dstring(comaindex+1:),*) dc_eels_nseg
+                dc_numeels = dc_numeels*dc_eels_nseg
+			    if(dc_eels_nseg>1) then 
+				    write(*,*) 'Please input orientation offset for segmented detectors in degrees:'
+				    call get_input('Segment orientation offset (degrees)', dc_eels_seg_offset)
+				    dc_eels_seg_offset = dc_eels_seg_offset / 180_fp_kind * pi !Convert from degrees to mrad
+                else
+                    dc_eels_segments = .false. ! no segments or one, turn option off
+			    endif
+            else ! no segments
+			    read(dstring,*) dc_numeels
+			    dc_eels_nseg = 1
+            endif
+            
+            if (dc_numeels<1) then
+                write(*,*) 'Error: Number of EELS detectors must be at least 1.'
+                write(*,*) 'Please try again.'
+                write(*,*)
+            endif
+            
+            enddo ! while(dc_numeels<1)
+            
+			if(allocated(dc_eels_outer)) deallocate(dc_eels_outer)
+            if(allocated(dc_eels_inner)) deallocate(dc_eels_inner)
+            nd = int(dc_numeels/dc_eels_nseg)
+			allocate(dc_eels_outer(nd), dc_eels_inner(nd))
+            
+            call get_cbed_detector_info(nd,ak1,dc_eels_outer,dc_eels_inner,.true.)
+
+		    if(outputdetectors) then
+			    do i=1,nd
+			    do j=1,dc_eels_nseg
+				    if(dc_eels_nseg>1) call binary_out_unwrap(nopiy,nopix, &
+                            & make_detector(nopiy,nopix,ifactory,ifactorx,ss,dc_eels_inner(i), &
+                            &   dc_eels_outer(i),2*pi*j/dc_eels_nseg-dc_eels_seg_offset,2*pi/dc_eels_nseg), &
+                            &   'EELSDetector'//to_string((i-1)*dc_eels_nseg+j))
+				    if(dc_eels_nseg==1) call binary_out_unwrap(nopiy,nopix, &
+                            & make_detector(nopiy,nopix,ifactory,ifactorx,ss,dc_eels_inner(i), &
+                            &   dc_eels_outer(i)),&
+                            &   'EELSDetector'//to_string((i-1)*dc_eels_nseg+j))
+			    enddo
+			    enddo
+            endif
+        
 		
 			if(ifactory>1.and.ifactorx>1) then !
-				write(6,140)
-				140 format('In STEM the probe is sufficiently localised such that only a fraction of atoms',/,&
-				         &'in the simulation supercell have significant probability of ionization. ',/,&
-						 &'To speed up calculation, you have the option of choosing the fraction of the ',/,&
-						 &'supercell within which atoms will be ionized',/,/,&
+				write(*,140)
+                140 format('In STEM the probe is sufficiently localised such that only a fraction of atoms',/,&
+				         &'in the simulation supercell have significant probability of ionization.',/,&
+						 &'To speed up calculation with large supercells, you have the option of',/,&
+						 &'choosing the fraction of the supercell within which atoms will be ionized.',/&
+                         &'(Works only well when the number of tiles is big and the unit cell is small.)',/,&
 						 &'Please input the fraction of the supercell that will be ionized.')    
 				call get_input('Fraction of supercell to ionize',ionize_fraction)
 				write(*,*)
@@ -135,21 +208,36 @@ module m_Hn0
 				ycells = ycells + mod(ycells+1,2)
 				xcells = ceiling(ionize_fraction*ifactorx)
 				xcells = xcells + mod(xcells+1,2)
-				write(6,160) ycells,xcells,ifactory,ifactorx
-				160 format(i2,'x',i2,' unit cells will by ionised out of ',i2,'x',i2,' total cells in the supercell.')    
+                if (ycells>= ifactory .or. xcells>=ifactorx) then ! one of the two directions covers the supercell extent
+                    ! fall back to ionization of all atoms
+                    all_atoms = .true.
+                    ycells = ifactory
+                    xcells = ifactorx
+                    write(unit=*,fmt=161)
+161                 format('All atoms in the supercell will be ionised.')    
+                else
+                    all_atoms = .false.
+				    write(unit=*,fmt=160) xcells,ycells,ifactorx,ifactory
+160                 format(i0,'x',i0,' unit cells will be ionised out of ',i0,'x',i0,' total cells in the supercell.')    
+                endif
 				write(*,*)
             endif
         endif
         
         !call make_state_vector()
-		write(*,*) "Please input the maximum angular momentum quantum number (l') for the"
-		write(*,*) "inelastically scattered wave functions. As a rule of thumb, dipole order "
-		write(*,*) "transitions (l'=1) are sufficient for qualitative agreement with experiment,"
-		write(*,*) "but inclusion of higher order quantum numbers such as quadropole transitions "
-		write(*,*) "(l'=2) are necessary for quantitative agreement with experiment"
-        call get_input("maximum angular momentum quantum number (l')",order)
-		call fill_state_vector(order,lorb) 
+        write(*,*) "Please input the maximum order of the transition potential to be calculated,"
+        write(*,*) "with order = abs(l - l') the absolute difference between inital and final"
+        write(*,*) "angular momentum quantum numbers. As a rule of thumb, transitions of order=1"
+        write(*,*) "are sufficient for qualitative agreement with experiment, but inclusion of"
+        write(*,*) "higher order quantum numbers, such as transitions of order=2 or more are"
+		write(*,*) "necessary for quantitative agreement with experiment."
+		call get_input("maximum order of transitions",order)
         write(*,*)
+        
+        !call fill_state_vector(order,lorb) ! old version omitting delta_l=0 transitions for order=1
+        call fill_state_vector_version2(order,lorb) ! 2025-07-17, JB: new version including delta_l=0 transitions for all orders
+        write(*,*)
+        
         !allocate arrays for the hn0 calculations
         if(allocated(qmin)) deallocate(qmin)
         if(allocated(gint)) deallocate(gint)
@@ -178,12 +266,13 @@ module m_Hn0
 	
 
         character(120) :: infile
-
+        ! 2025-07-16, JB: Added AOM check to match implementation limits
+        lorb=-1 ! initialise the angular momentum quantum number to be invalid
+        do while(lorb.lt.0.or.lorb.gt.2) ! ensure a valid angular momentum quantum number is entered
         write(*,300)
     300 format (' Enter Input File   file.orb')
         call get_input("orb file",infile)
         write(*,*) 
-        
         open(66,file=trim(adjustl(infile)),status='old')
         pmax=0.0_fp_kind
         nrad=0
@@ -194,7 +283,14 @@ module m_Hn0
         write(*,100) et,lorb
     100 format(' Ionization Threshold Energy: ',g15.8,' eV',/,' Angular momentum of bound state: ',I3)
         write(*,*) 'Reading bound state wave function...'
-
+        if (lorb.lt.0.OR.lorb.gt.2) then ! handle invalid angular momentum quantum number
+            write(*,*) 'Error: Invalid angular momentum quantum number.'
+            write(*,*) 'muSTEM currently supports l=0 (s-orbital) up to l=2 (d-orbitals).'
+            write(*,*) 'Please try again.'
+            write(*,*)
+            close(66) ! close the file before retrying
+        endif
+        enddo ! loop entering valid orb file
         do i=1,2000
             Pnl(i)=0.0_fp_kind
             read(66,*) dPnl
@@ -246,7 +342,7 @@ module m_Hn0
         integer*4   order,switch,singlestate
         !integer*4   state_counter
      
-        write(6,*) ' Do you want to ionize to a <1> single state <2> otherwise'
+        write(*,*) ' Do you want to ionize to a <1> single state <2> otherwise'
         call get_input('single state <1>',singlestate)
         write(*,*)
         
@@ -255,29 +351,38 @@ module m_Hn0
     100       if(allocated(state_vector)) deallocate(state_vector)
               allocate(state_vector(nstates,3))
               if(lorb.gt.0) then
-    101             write(6,*) 'Enter a value for an initial ml quantum number (-l,l)'
+    101             write(*,*) 'Enter a value for an initial ml quantum number (-l,l)'
                     call get_input('input ml quantum number',state_vector(1,1))
                     if(iabs(state_vector(1,1)).gt. iabs(lorb)) then
-                          write(6,*) 'Error unphysical quantum number please reenter' 
+                          write(*,*) 'Error unphysical quantum number please reenter' 
                           goto 101
                     endif
               elseif(lorb.eq.0) then
                     state_vector(1,1)=0
               endif
-              write(6,*) "Enter the final state quantum numbers l', m_l'"
+              write(*,*) "Enter the final state quantum numbers l', m_l'"
               call get_input("Final state l'",state_vector(1,2))
               call get_input("Final state m_l'",state_vector(1,3))
-              write(6,*) 'Inital l:',lorb,' ml:',state_vector(1,1),'l_pr',state_vector(1,2),'ml_pr',state_vector(1,3)
-              write(6,*) '<1> Continue'
+              write(*,*) 'Inital l:',lorb,' ml:',state_vector(1,1),'l_pr',state_vector(1,2),'ml_pr',state_vector(1,3)
+              write(*,*) '<1> Continue'
               write(*,*) '<2> Choose again'
               call get_input('<1> accept quantum numbers',switch)
               if(switch.ne.1) goto 100
               
         elseif(singlestate.ne.1) then 
-              
-              
-              call fill_state_vector(order,lorb) 
-              
+            
+            write(*,*) "Please input the maximum order of the transition potential to be calculated,"
+            write(*,*) "with order = abs(l - l') the absolute difference between inital and final"
+            write(*,*) "angular momentum quantum numbers. As a rule of thumb, dipole transitions"
+            write(*,*) "(order=1) are sufficient for qualitative agreement with experiment,"
+            write(*,*) "but inclusion of higher order quantum numbers such as quadrupole transitions"
+		    write(*,*) "(order=2) are necessary for quantitative agreement with experiment."
+		    call get_input("maximum order of transitions",order)
+            write(*,*)
+        
+            call fill_state_vector(order,lorb) 
+            write(*,*)
+        
         endif 
     
     
@@ -289,6 +394,57 @@ module m_Hn0
 !     Calculates the number of states for a given input l
 !     and a given order for transitions
 !-------------------------------------------------------------------------------
+    ! This version does not exclude transitions with l=l_p for order=1.
+    subroutine fill_state_vector_version2(order, l_input)
+    
+        implicit none
+
+        integer(4) ::   ml,l_p,ml_p,l_input
+        integer(4) ::   l_p_max,ml_max,ml_p_max
+        integer(4) ::   order,i,j
+        integer(4) ::   state_vector_temp(10000,3)
+    
+        ml_max=l_input ! this the initial state angular momentum quantum number, sets max initial ml
+        l_p_max=l_input+order ! maximum l' quantum number for the final state, order the transition order (delta l)
+    
+    
+        ml=-l_input !initialise the first ml of the initial state
+        j=1   !start the counter on the state_vector
+        do while(ml.le.ml_max)                       ! limit sum over ml
+            l_p=l_input-order                        ! initialise l' quantum number to l - order
+            if(l_p.lt.0) l_p=0                       ! limit l' to 0
+            do while(l_p.le.l_p_max)                 ! loop over l'
+                ml_p=-l_p                            ! initialise ml' loop counter
+                ml_p_max=l_p                         ! set max ml' for loop counter
+                do while(ml_p.le.ml_p_max)           ! loop over ml'
+                    state_vector_temp(j,:)=[ml,l_p,ml_p]
+                    j=j+1                            ! increment state_vector counter
+                    ml_p=ml_p+1                      ! increment ml' loop counter
+                    if(j.gt.9999) PAUSE 'Too many states (out of vector bounds), program will HALT'
+                enddo
+                l_p=l_p+1                            ! increment l' loop counter
+            enddo
+            ml=ml+1                                  ! increment ml to next state
+        enddo
+        nstates=j-1                                  ! set the number of states
+        
+        if (nstates==0) then
+            write(*,*) 'Error: No states found for the given input parameters.'
+            write(*,*) 'Please check the input values for l and order.'
+            stop 1
+        endif
+    
+        if(allocated(state_vector)) deallocate(state_vector)
+        allocate(state_vector(nstates,3))
+        do i = 1,nstates
+              state_vector(i,:) = state_vector_temp(i,:)
+			  write(*,200) i,nstates,lorb,state_vector(i,:)
+        enddo
+		write(*,*)
+    200 format('State: ',i3,'/',i3,' l = ',i3,' ml = ',i3," l' = ",i3," ml' = ",i3,"  ")
+    end subroutine
+    
+    ! This version does exclude transitions with l=l_p for order=1 but not for order>1.
     subroutine fill_state_vector(order, l_input)
     
         implicit none
@@ -300,7 +456,7 @@ module m_Hn0
 
     
         ml_max=l_input
-        l_p_max=lorb+order
+        l_p_max=lorb+order ! don't understand why lorb and not l_input is used here
     
     
         ml=-l_input !initialise the first ml
@@ -358,11 +514,11 @@ module m_Hn0
         allocate(state_vector(nstates,3))
         do i = 1,nstates
               state_vector(i,:) = state_vector_temp(i,:)
-			  write(6,200) i,nstates,lorb,state_vector(i,:)
+			  write(*,200) i,nstates,lorb,state_vector(i,:)
         enddo
-		write(6,*)
-    200 format('State: ',i3,'/',i3,' l = ',i3,' ml = ',i3," l' = ",i3," ml' = ",i3)
-    end subroutine     
+		write(*,*)
+    200 format('State: ',i3,'/',i3,' l = ',i3,' ml = ',i3," l' = ",i3," ml' = ",i3,"  ")
+    end subroutine 
     
 
       
@@ -370,8 +526,12 @@ module m_Hn0
     !
     subroutine fakred
         !  Calculate factorials required for CLEB code 
-        !  AJD removed the common block designation and placed the
-        !  result in the module global_variables        
+        !  JB: FAK is declared in this module
+        !      Declaration is using save state
+        !      to achieve thread-safety in OpenMP
+        !
+        !      This calculates FAK(N) = GAMMA(N)*10**(-N+1)
+        !                               GAMMA(N) = (N-1)!
     
         implicit none
         
@@ -625,8 +785,8 @@ module m_Hn0
     implicit none
     
     integer(4) :: ml,lpr,mlpr   !l is in the module
-    integer(4) :: lammax,lammin,lprmax
-    integer(4) :: mono =1        !flag to kill the monopole contribution
+    integer(4) :: lammax,lprmax!,lammin
+    integer(4),parameter :: mono = 1 !flag to kill the monopole contribution
     
     !real(fp_kind) :: Z             !atomic number
     real(fp_kind) :: ztmp   = 1     !flag for wavfuncsolo subroutine (1 for non hydrogenic potential)
@@ -641,12 +801,13 @@ module m_Hn0
     real(fp_kind) :: delq           !deltaq, qrange/3150 works out the q spacing to evaluate the sbessel's on
                                     !of the sbessels
                                     !for each block 50 in the overlap integral the spacing doubles for evaluation
-    real(fp_kind) :: qpos_local(300)       !keeps a record of the qpositions that the sbessels are evaluated on.   
-    real(fp_kind) :: gint_local(0:numwve,nsplpts,-1:1),dgint_local(0:numwve,nsplpts,-1:1) !interpolation data for the g integrals (d is derivative calculated by gspline)
-    real(fp_kind) :: g(3)            !test for the largest gvector 
+    real(fp_kind) :: qpos_local(300) !keeps a record of the qpositions that the sbessels are evaluated on.   
+    real(fp_kind) :: gint_local(0:numwve,nsplpts,-1:1) !interpolation data for the g integrals
+    real(fp_kind) :: dgint_local(0:numwve,nsplpts,-1:1) !derivative calculated by gspline
+    real(fp_kind) :: g(3)           !test for the largest gvector 
  !   real(fp_kind) :: VA(10000),Pnl(2000)    !Potential and target wavefunction
-    real(fp_kind) :: sbess(2000,0:numwve)   !spherical bessels
-    real(fp_kind) :: Rel(0:2000)            !continuum wavefunction calculated by wavfunc_solo
+    real(fp_kind) :: sbess(2000,0:numwve) !spherical bessels
+    real(fp_kind) :: Rel(0:2000)          !continuum wavefunction calculated by wavfunc_solo
     !integer(4)   nrad
     
     !counters 
@@ -657,66 +818,147 @@ module m_Hn0
     !calculate the factorials required for the cleb code
     !call fakred()
     
-    tpb=tp*bohr     !two pi * bohr radius
-    sbess=0.0_fp_kind
+    tpb = tp * bohr !two pi * bohr radius
+    sbess = 0.0_fp_kind ! init bessel functions
     ! determine maximum reciprocal lattice vector
-    g(1:3)=float(ig1(1:3))*float(nopix)/float(2*ifactorx) + float(ig2(1:3))*float(nopiy)/float(2*ifactory)
-    qmax=trimr(g,SS)
+    g(1:3) = float(ig1(1:3))*float(nopix)/float(2*ifactorx) &
+            & + float(ig2(1:3))*float(nopiy)/float(2*ifactory)
+    qmax = trimr(g,SS) ! maximum reciprocal space vector in 1/A
     
-    lammax = lorb + lpr
-    lammin = abs(lorb - lpr)
-    lprmax = lammax
-    kappa = wavev(eval)     
+    lammax = lorb + lpr ! maximum order included
+    !lammin = abs(lorb - lpr) ! minimum order required (not used, we always start from lam=0)
+    lprmax = lammax ! maximum order copy
+    kappa = wavev(eval)                 ! wave number of the ejected electron 1/A
     
-    call wavfunc_solo((eval/RYD),lpr,Ztmp,Rel)    !calculate continuum wave function Ztmp= 1 for non hydrogenic potential
-    Rel = Rel * sqrt(bohr*kappa/(2.0_fp_kind*eval))             !Wavefunction in eV 
-140 eloss = eval + et                                       
-    eka=1000.0_fp_kind * ekv - eloss                              
+    call wavfunc_solo((eval/RYD),lpr,Ztmp,Rel) ! calculate continuum wave function Ztmp= 1 for non hydrogenic potential
+    Rel = Rel * sqrt(bohr*kappa/(2.0_fp_kind*eval)) ! Wavefunction in eV 
+140 eloss = eval + et                   ! energy loss in eV = energy of the ejected electron + threshold energy
+    eka = 1000.0_fp_kind * ekv - eloss  ! energy of the scattered electron in eV
     if (abs(eka).le.0.01_fp_kind) then 
-        akd=0.0_fp_kind
+        akd = 0.0_fp_kind               ! ionization onset case
     else
-        akd = wavev(eka)
+        akd = wavev(eka)                ! wavenumber of the scattered electron 1/A
     endif
-    qmin_local = ak - akd                                        !qmin = momentum transfer q=k-k' between 
-                                                           !the incident and scattered electrons 
-    qminr=qmin_local*tpb                                         !determine maximum and minimum values for spline of G integrals
-    if(qminr.lt.0.001_fp_kind) qminr=0.001_fp_kind
-    qmaxr=(qmin_local+qmax)*tpb
-    qrange=qmaxr-qminr
-    delq=qrange/3150.0_fp_kind
-    qtmp=qminr-delq
-    do iqblk=1,6
-          do iq=1,50
-                qtmp=qtmp+delq
-                call sbessel(qtmp,lprmax,sbess)                    !Calculate the Sbessels at qtmp
-                if(mono.eq.1) sbess(:,0)=sbess(:,0)-1.0_fp_kind    !kill the spurious monopole contribution
-                iqstep=(iqblk-1)*50+iq  
-                qpos_local(iqstep)=qtmp                                  !store value of qtmp
-                call ovlapint_solo(lpr,iqstep,Pnl,Rel,gint_local,sbess)!calculate overlap integrals
-          enddo
-          delq=delq+delq
+    qmin_local = ak - akd               ! qmin = momentum transfer q=k-k' between 
+                                        !        the incident and scattered electrons 
+    ! q***r variables below are in units of k * 2 pi * bohr radius (no dimension)
+    qminr = qmin_local * tpb            ! determine maximum and minimum values for spline of G integrals
+    if(qminr.lt.0.001_fp_kind) qminr = 0.001_fp_kind ! limit qmin
+    qmaxr = (qmin_local+qmax) * tpb     ! adjust qmaxr
+    qrange = qmaxr - qminr              ! set qr range
+    delq = qrange / 3150.0_fp_kind      ! set qr step of range / (1000 pi)
+    qtmp = qminr - delq                 ! initialize qr for calculation of sbessels
+    do iqblk=1, 6                       ! run in 6 blocks of ...
+        do iq=1, 50                     !  .. 50 q steps (in total 300 q steps)
+            qtmp = qtmp + delq          ! increment qtmp
+            call sbessel(qtmp,lprmax,sbess) ! Calculate the Sbessels at qtmp
+            if(mono.eq.1) sbess(:,0)=sbess(:,0)-1.0_fp_kind ! kill the spurious monopole contribution
+            iqstep = (iqblk-1)*50 + iq 
+            qpos_local(iqstep) = qtmp   ! store value of qtmp
+            call ovlapint_solo_new(lpr,iqstep,Pnl,Rel,gint_local,sbess) ! calculate overlap integrals
+        enddo
+        delq=delq+delq
     enddo
-    !call spline to set up cubic spline (these use the triange relation to determine
-    do lpr_temp=0,lprmax                !the values of lambda that are non zero)
-          ! S orbital calculation
-          if(lorb.eq.0) then
-                call gspline(qpos_local,nsplpts,lpr_temp,0,gint_local,dgint_local)
-          endif
-          ! P orbital calculation
-          if(lorb.eq.1) then
-                call gspline(qpos_local,nsplpts,lpr_temp,1,gint_local,dgint_local)
-                call gspline(qpos_local,nsplpts,lpr_temp,-1,gint_local,dgint_local)
-          endif
-          ! D orbital calculation
-          if(lorb.eq.2) then
-                call gspline(qpos_local,nsplpts,lpr_temp,1,gint_local,dgint_local)
-                call gspline(qpos_local,nsplpts,lpr_temp,0,gint_local,dgint_local)
-                call gspline(qpos_local,nsplpts,lpr_temp,-1,gint_local,dgint_local)
-          endif
+    ! call spline to set up cubic spline (these use the triange relation to determine
+    !   the values of lambda that are non zero, an good approximation for spherically
+    !   symmetric scattering, ie. we do not consider directional bonding here.
+    !   the triangle relations are from the angular part)
+    !   * |l-l'| <= lam <= l+l' for the integral to be non zero, 
+    !        note that we start from lam=0 here, we do too much work? Yes, but only for one case
+    !   * some lam values will fail parity check and are also excluded here
+    !   * handles all cases well up to l=2 (d orbitals)
+    do lpr_temp=0,lprmax ! loop over lam from 0 to l + l'
+        ! S orbital calculation
+        if(lorb.eq.0) then ! only lam = lpr
+            call gspline(qpos_local,nsplpts,lpr_temp,0,gint_local,dgint_local)
+        endif
+        ! P orbital calculation
+        if(lorb.eq.1) then ! only lam = lpr-1, lpr+1 (lam=lpr fails parity since lorb is odd)
+            call gspline(qpos_local,nsplpts,lpr_temp,1,gint_local,dgint_local)
+            call gspline(qpos_local,nsplpts,lpr_temp,-1,gint_local,dgint_local)
+        endif
+        ! D orbital calculation
+        if(lorb.eq.2) then ! only lam = lpr-2, lpr, lpr+2 (other lam fail parity)
+            call gspline(qpos_local,nsplpts,lpr_temp,1,gint_local,dgint_local)
+            call gspline(qpos_local,nsplpts,lpr_temp,0,gint_local,dgint_local)
+            call gspline(qpos_local,nsplpts,lpr_temp,-1,gint_local,dgint_local)
+        endif
+        ! F orbitals are not supported by this code. It would require more than 3
+        ! slots in the multipole expansion.
     enddo   !end loop over lpr
     return
     end subroutine
     
+    ! --------------------------------------------------------------------------------
+    ! This function calculates the integral of the product of the arrays Rel, sbess_col and Pnl
+    ! using Simpson's rule with a grid spacing of h.
+    ! This is used for the overlap integral calculation.
+    ! The number of radial points nrad is assumed to be even and a module variable.
+    function simpsonrad(Rel, sbess_col, Pnl, h) result(integral)
+        real(fp_kind), intent(in) :: Rel(0:), sbess_col(:), Pnl(:)
+        real(fp_kind), intent(in) :: h
+        real(fp_kind) :: integral
+
+        integer :: I
+        real(8) :: sumod, sumev, sumd
+        integer :: nstpev, nstpod
+
+        sumod = 0.0d0
+        sumev = 0.0d0
+        nstpev = 2
+        nstpod = 1
+
+        ! Even-indexed points
+        do I = nrad - 2, nstpev, -2
+            sumd = real(Rel(I) * sbess_col(I) * Pnl(I), kind=8) ! Use double precision for better accuracy
+            sumev = sumev + sumd
+        end do
+
+        ! Odd-indexed points
+        do I = nrad - 1, nstpod, -2
+            sumd = real(Rel(I) * sbess_col(I) * Pnl(I), kind=8) ! Use double precision for better accuracy
+            sumod = sumod + sumd
+        end do
+
+        integral = h * real((4.0d0 * sumod + 2.0d0 * sumev) / 3.0d0, fp_kind) ! Convert back to single precision
+    end function
+
+    
+    
+    !--------------------------------------------------------------------------------
+    ! This subroutine calculates the overlap integral for a given lpr and iqstp.
+    ! This version is shorter but does the same as the original.
+    ! The simpsonrad function is used to calculate the integral.
+    subroutine ovlapint_solo_new(lpr, iqstp, Pnl, Rel, gint_local, sbess)
+      implicit none
+    
+      integer(4), parameter :: numwve = 100, nsplpts = 300
+      integer(4) :: lpr, iqstp
+      real(fp_kind), parameter :: h = 0.0015_fp_kind
+      real(fp_kind) :: Pnl(2000), Rel(0:2000)
+      real(fp_kind) :: gint_local(0:numwve, nsplpts, -1:1)
+      real(fp_kind) :: sbess(2000, 0:numwve)
+      integer(4) :: midx, bessel_idx
+    
+      do midx = -1, 1
+        bessel_idx = lpr + midx * lorb ! read as lpr + dlam with dlam = midx * lorb
+        ! Exclude cases where the bessel_idx is out of bounds
+        if (bessel_idx < 0 .or. bessel_idx > numwve) cycle
+    
+        ! For lorb=0, only dlam=0 allowed
+        if (lorb == 0 .and. midx /= 0) cycle
+    
+        ! For lorb=1, dlam=0 typically omitted (fails parity check)
+        if (lorb == 1 .and. midx == 0) cycle
+    
+        gint_local(lpr, iqstp, midx) = simpsonrad(Rel, sbess(:, bessel_idx), Pnl, h)
+      end do
+    
+    end subroutine ovlapint_solo_new
+
+
+    ! Old version of the overlap integral calculation with inline simpson integration.
+    ! changed summation to run with double precision
     !--------------------------------------------------------------------------------
     ! This subroutine calculates the integral of the product of the arrays Pel and
     ! Pnl with a spherical bessel funtion sbess using simpsons rule and a grid 
@@ -731,8 +973,8 @@ module m_Hn0
     !integer(4) :: l	!angular momentum of bound state
     integer(4) :: iqstp
     real(fp_kind) :: h    !grid spacing
-    real(fp_kind) :: sumod(-1:1),sumev(-1:1) 
-    real(fp_kind) :: sumd
+    real(8) :: sumod(-1:1),sumev(-1:1) 
+    real(8) :: sumd
     integer(4) I
     integer(4) nstpev,nstpod
     !integer(4) nrad
@@ -744,12 +986,8 @@ module m_Hn0
     
     h=0.0015_fp_kind
     
-    !do i=-1,1
-    !   sumev(i)=0.0_fp_kind
-    !   sumod(i)=0.0_fp_kind
-    !enddo
-    sumev = 0.0_fp_kind
-    sumod = 0.0_fp_kind
+    sumev = 0.0d0
+    sumod = 0.0d0
     
     nstpev=2
     nstpod=1
@@ -758,32 +996,32 @@ module m_Hn0
     do I=nrad-2,nstpev,-2
     
           if(lorb.eq.0) then
-                sumd=(Rel(I))*(sbess(I,lpr))*(Pnl(I))
+                sumd=real((Rel(I))*(sbess(I,lpr))*(Pnl(I)), kind=8)
                 sumev(0)=sumev(0)+(sumd)
           endif
     
           if(lorb.eq.1) then
                 if(lpr.ne.0) then
-                      sumd=(Rel(I))*(sbess(I,lpr-1))*(Pnl(I))
+                      sumd=real((Rel(I))*(sbess(I,lpr-1))*(Pnl(I)), kind=8)
                 else
-                      sumd=0.0_fp_kind
+                      sumd=0.0d0
                 endif
                 sumev(-1)=sumev(-1)+(sumd)
-                sumd=(Rel(I))*(sbess(I,lpr+1))*(Pnl(I))
+                sumd=real((Rel(I))*(sbess(I,lpr+1))*(Pnl(I)), kind=8)
                 sumev(1)=sumev(1)+(sumd)
           endif
     
           if(lorb.eq.2) then
                 if(lpr.gt.1) then
-                      sumd=(Rel(I))*(sbess(I,lpr-2))*(Pnl(I))
+                      sumd=real((Rel(I))*(sbess(I,lpr-2))*(Pnl(I)), kind=8)
                 else
-                      sumd=0.0_fp_kind
+                      sumd=0.0d0
                 endif
                 sumev(-1)=sumev(-1)+(sumd)
     
-                sumd=(Rel(I))*(sbess(I,lpr))*(Pnl(I))
+                sumd=real((Rel(I))*(sbess(I,lpr))*(Pnl(I)), kind=8)
                 sumev(0)=sumev(0)+(sumd)
-                sumd=(Rel(I))*(sbess(I,lpr+2))*(Pnl(I))
+                sumd=real((Rel(I))*(sbess(I,lpr+2))*(Pnl(I)), kind=8)
                 sumev(1)=sumev(1)+(sumd)
           endif
     enddo
@@ -793,55 +1031,55 @@ module m_Hn0
     do I=nrad-1,nstpod,-2
     
           if(lorb.eq.0) then
-                sumd=(Rel(I))*(sbess(I,lpr))*(Pnl(I))
+                sumd=real((Rel(I))*(sbess(I,lpr))*(Pnl(I)), kind=8)
                 sumod(0)=sumod(0)+(sumd)
           endif
     
           if(lorb.eq.1) then
                 if(lpr.ne.0) then
-                      sumd=(Rel(I))*(sbess(I,lpr-1))*(Pnl(I))
+                      sumd=real((Rel(I))*(sbess(I,lpr-1))*(Pnl(I)), kind=8)
                 else
-                      sumd=0.0_fp_kind
+                      sumd=0.0d0
                 endif
                 sumod(-1)=sumod(-1)+(sumd)
-                sumd=(Rel(I))*(sbess(I,lpr+1))*(Pnl(I))
+                sumd=real((Rel(I))*(sbess(I,lpr+1))*(Pnl(I)), kind=8)
                 sumod(1)=sumod(1)+(sumd)
           endif
     
           if(lorb.eq.2) then
                 if(lpr.gt.1) then
-                      sumd=(Rel(I))*(sbess(I,lpr-2))*(Pnl(I))
+                      sumd=real((Rel(I))*(sbess(I,lpr-2))*(Pnl(I)), kind=8)
                 else
-                      sumd=0.0_fp_kind
+                      sumd=0.0d0
                 endif
                 sumod(-1)=sumod(-1)+(sumd)
-                sumd=(Rel(I))*(sbess(I,lpr))*(Pnl(I))
+                sumd=real((Rel(I))*(sbess(I,lpr))*(Pnl(I)), kind=8)
                 sumod(0)=sumod(0)+(sumd)
-                sumd=(Rel(I))*(sbess(I,lpr+2))*(Pnl(I))
+                sumd=real((Rel(I))*(sbess(I,lpr+2))*(Pnl(I)), kind=8)
                 sumod(1)=sumod(1)+(sumd)
           endif
     enddo
     
     ! calculate integral
     if(lorb.eq.0) then
-          gint_local(lpr,iqstp,0)=h*(4.0_fp_kind*sumod(0)+2.0_fp_kind*sumev(0))/3.0_fp_kind
+        gint_local(lpr,iqstp, 0)=h*real((4.0d0*sumod( 0)+2.0d0*sumev( 0))/3.0d0,kind=fp_kind)
     endif
     
     if(lorb.eq.1) then
-          gint_local(lpr,iqstp,-1)=h*(4.0_fp_kind*sumod(-1)+2.0_fp_kind*sumev(-1))/3.0_fp_kind
-          gint_local(lpr,iqstp,1)=h*(4.0_fp_kind*sumod(1)+2.0_fp_kind*sumev(1))/3.0_fp_kind
+        gint_local(lpr,iqstp,-1)=h*real((4.0d0*sumod(-1)+2.0d0*sumev(-1))/3.0d0,kind=fp_kind)
+        gint_local(lpr,iqstp, 1)=h*real((4.0d0*sumod( 1)+2.0d0*sumev( 1))/3.0d0,kind=fp_kind)
     endif
     
     if(lorb.eq.2) then
-          gint_local(lpr,iqstp,-1)=h*(4.0_fp_kind*sumod(-1)+2.0_fp_kind*sumev(-1))/3.0_fp_kind
-          gint_local(lpr,iqstp,0)=h*(4.0_fp_kind*sumod(0)+2.0_fp_kind*sumev(0))/3.0_fp_kind
-          gint_local(lpr,iqstp,1)=h*(4.0_fp_kind*sumod(1)+2.0_fp_kind*sumev(1))/3.0_fp_kind
+        gint_local(lpr,iqstp,-1)=h*real((4.0d0*sumod(-1)+2.0d0*sumev(-1))/3.0d0,kind=fp_kind)
+        gint_local(lpr,iqstp, 0)=h*real((4.0d0*sumod( 0)+2.0d0*sumev( 0))/3.0d0,kind=fp_kind)
+        gint_local(lpr,iqstp, 1)=h*real((4.0d0*sumod( 1)+2.0d0*sumev( 1))/3.0d0,kind=fp_kind)
     endif
 301 continue
 
     return
     end subroutine
-
+    
     
     !--------------------------------------------------------------------------------
     ! This subroutine calculates continuum wavefunctions on a 0.0015 a.u. grid 
@@ -1107,28 +1345,32 @@ module m_Hn0
     ypn=1.0e31_fp_kind
 
     if (yp1.gt.0.99e30_fp_kind) then
-          dgint_local(lpr,1,ilam)=0.0_fp_kind
-          u(1)=0.0_fp_kind
+        dgint_local(lpr,1,ilam)=0.0_fp_kind
+        u(1)=0.0_fp_kind
     else
-          dgint_local(lpr,1,ilam)=-0.5_fp_kind
-          u(1)=(3.0_fp_kind/(x(2)-x(1)))*((gint_local(lpr,2,ilam)-gint_local(lpr,1,ilam))/(x(2)-x(1))-yp1)
+        dgint_local(lpr,1,ilam)=-0.5_fp_kind
+        u(1)=(3.0_fp_kind/(x(2)-x(1)))*((gint_local(lpr,2,ilam)-gint_local(lpr,1,ilam)) &
+                & /(x(2)-x(1))-yp1)
     endif
     do i=2,n-1
-          sig=(x(i)-x(i-1))/(x(i+1)-x(i-1))
-          p=sig*dgint_local(lpr,i-1,ilam)+2.0_fp_kind
-          dgint_local(lpr,i,ilam)=(sig-1.0_fp_kind)/p
-          u(i)=(6.0_fp_kind*((gint_local(lpr,i+1,ilam)-gint_local(lpr,i,ilam))/(x(i+1)-x(i))-(gint_local(lpr,i,ilam)-gint_local(lpr,i-1,ilam))/(x(i)-x(i-1)))/(x(i+1)-x(i-1))-sig*u(i-1))/p
+        sig=(x(i)-x(i-1))/(x(i+1)-x(i-1))
+        p=sig*dgint_local(lpr,i-1,ilam)+2.0_fp_kind
+        dgint_local(lpr,i,ilam)=(sig-1.0_fp_kind)/p
+        u(i)=(6.0_fp_kind*((gint_local(lpr,i+1,ilam)-gint_local(lpr,i,ilam)) &
+                & /(x(i+1)-x(i))-(gint_local(lpr,i,ilam)-gint_local(lpr,i-1,ilam)) &
+                & /(x(i)-x(i-1)))/(x(i+1)-x(i-1))-sig*u(i-1))/p
     enddo
     if (ypn.gt..99e30_fp_kind) then
-          qn=0.0_fp_kind
-          un=0.0_fp_kind
+        qn=0.0_fp_kind
+        un=0.0_fp_kind
     else
-          qn=0.5_fp_kind
-          un=(3.0_fp_kind/(x(n)-x(n-1)))*(ypn-(gint_local(lpr,n,ilam)-gint_local(lpr,n-1,ilam))/(x(n)-x(n-1)))
+        qn=0.5_fp_kind
+        un=(3.0_fp_kind/(x(n)-x(n-1)))*(ypn-(gint_local(lpr,n,ilam)-gint_local(lpr,n-1,ilam)) &
+                & /(x(n)-x(n-1)))
     endif
     dgint_local(lpr,n,ilam)=(un-qn*u(n-1))/(qn*dgint_local(lpr,n-1,ilam)+1.)
     do k=n-1,1,-1
-          dgint_local(lpr,k,ilam)=dgint_local(lpr,k,ilam)*dgint_local(lpr,k+1,ilam)+u(k)
+        dgint_local(lpr,k,ilam)=dgint_local(lpr,k,ilam)*dgint_local(lpr,k+1,ilam)+u(k)
     enddo
     continue
     return
@@ -1290,7 +1532,7 @@ module m_Hn0
     E2MM1 = ETA*ETA + XLM*XLM + XLM
     XLTURN= X*(X - TWO*ETA) .LT. XLM*XLM + XLM
     DELL  = XLMAX - XLMIN + ACC
-    IF( ABS(MOD(DELL,ONE)) .GT. ACC) continue !WRITE(6,2040)XLMAX,XLMIN,DELL    !commented out dangerous error
+    IF( ABS(MOD(DELL,ONE)) .GT. ACC) continue !write(*,2040)XLMAX,XLMIN,DELL    !commented out dangerous error
     LXTRA =   INT(DELL)
     XLL   = XLM +  float(LXTRA)
     ! ***       LXTRA IS NUMBER OF ADDITIONAL LAMBDA VALUES TO BE COMPUTED
@@ -1462,7 +1704,7 @@ module m_Hn0
 ! ***    ERROR MESSAGES
 !
 100 IFAIL = -1
-      WRITE(6,2000) XX,ACCH
+      write(*,2000) XX,ACCH
 2000  FORMAT(' FOR XX = ',1PD12.3,' TRY SMALL-X  SOLUTIONS',' OR X NEGATIVE'/ ,' SQUARE ROOT ACCURACY PARAMETER =  ',D12.3/)
       RETURN
 105 IFAIL = -2
@@ -1553,7 +1795,7 @@ module m_Hn0
     real(fp_kind) :: qx_min,qy_min
     real(fp_kind) :: qx_mag,qy_mag,q_perp_mag,qz_mag,q_vec_mag
     real(fp_kind) :: q_perp(3), q_vec(3)
-    real(fp_kind) :: qtmp1
+    real(fp_kind) :: qtmp1, ifx, ify
     real(fp_kind) :: lpr_temp, ilam_temp, l_temp, m_lam_temp, m_l_temp
     !calculation summing variables
     complex(fp_kind) :: csum,cval,fq
@@ -1561,79 +1803,88 @@ module m_Hn0
     real(fp_kind) :: theta,phi
     !output variables
     complex(fp_kind) :: tmatrix(nopiy,nopix)
-      
+    
+    ifx = 1.0_fp_kind / real(ifactorx,fp_kind)
+    ify = 1.0_fp_kind / real(ifactory,fp_kind)
     lammax = lorb + lpr
     lammin = abs(lorb - lpr)
-    shifty = (nopiy-1)/2-1
-    shiftx = (nopix-1)/2-1
+    shifty = (nopiy-mod(nopiy,2))/2
+    shiftx = (nopix-mod(nopix,2))/2
     
     qz(1:3) = qmin_local * orthog(1:3,3) / trimr(orthog(1:3,3),ss)
     qz_mag = qmin_local
-    qx_min = trimi(ig1,ss) / float(ifactorx)
-    qy_min = trimi(ig2,ss) / float(ifactory)
+    qx_min = trimi(ig1,ss) *ifx
+    qy_min = trimi(ig2,ss) *ify
     
-    !$OMP PARALLEL DO PRIVATE(m1,m2,qx,qx_mag,qy,qy_mag,q_perp,q_perp_mag,q_vec,q_vec_mag,csum,m_lam,theta,ilam,cval,ilamp,qtmp1,threej,phi,spherical_harm,fq,tgint), SHARED(tmatrix)
+    !$OMP PARALLEL DO &
+    !$OMP& PRIVATE(m1, m2, qx, qx_mag, qy, qy_mag, q_perp, q_perp_mag, q_vec, q_vec_mag, &
+    !$OMP&         csum, m_lam, theta, ilam, cval, ilamp, qtmp1, threej, phi, spherical_harm, &
+    !$OMP&         fq, tgint, lpr_temp, ilam_temp, l_temp, m_lam_temp, m_l_temp) &
+    !$OMP& SHARED(tmatrix)
     do ny=1,nopiy
-          m2 = mod( ny+shifty, nopiy) - shifty -1
-          qy(1:3) = float(m2 * ig2(1:3))
-          qy_mag = trimr(qy,ss)
-          qy(1:3) = qy(1:3)/float(ifactory)
-          do nx=1,nopix
-                m1 = mod( nx+shiftx, nopix) - shiftx -1
-                qx(1:3) = float(m1 * ig1(1:3))
-                qx_mag = trimr(qx,ss)
+        m2 = mod( ny-1+shifty, nopiy) - shifty
+        qy(1:3) = real(m2 * ig2(1:3), fp_kind)
+        qy_mag = trimr(qy,ss)
+        qy(1:3) = qy(1:3) * ify
+        do nx=1,nopix
+            m1 = mod( nx-1+shiftx, nopix) - shiftx
+            qx(1:3) = real(m1 * ig1(1:3), fp_kind)
+            qx_mag = trimr(qx,ss)
                 
-                !q_perp(1:3) = qy(1:3) + qx(1:3)/float(ifactory)      !qx has been divided by ifactor in the outer loop
-                ! BDF FIXED 2016/02/22: changed to ifactorx
-                q_perp(1:3) = qy(1:3) + qx(1:3)/float(ifactorx)      !qx has been divided by ifactor in the outer loop
+            !q_perp(1:3) = qy(1:3) + qx(1:3) * ifx      !qx has been divided by ifactor in the outer loop
+            ! BDF FIXED 2016/02/22: changed to ifactorx
+            q_perp(1:3) = qy(1:3) + qx(1:3) * ifx      !qx has been divided by ifactor in the outer loop
                 
-                q_perp_mag = trimr(q_perp,ss)
-                q_vec(1:3) = q_perp(1:3) + qz(1:3)
-                q_vec_mag = trimr(q_vec,ss)
-                !BWL addition 
-                if (q_vec_mag.ge.bwl_rad) then
-                      tmatrix(ny,nx)= 0.0_fp_kind !czero
-                      cycle
+            q_perp_mag = trimr(q_perp,ss)
+            q_vec(1:3) = q_perp(1:3) + qz(1:3)
+            q_vec_mag = trimr(q_vec,ss)
+            !BWL addition 
+            if (q_vec_mag.ge.bwl_rad) then
+                tmatrix(ny,nx)= 0.0_fp_kind !czero
+                cycle
+            endif
+            !BWL addition - end
+            csum = 0.0_fp_kind !czero
+            m_lam = m_l - m_lpr
+            theta = pi/2.0_fp_kind + atan2(qmin_local,q_perp_mag)
+            do ilam = lammin,lammax
+                if (mod(ilam+lorb+lpr,2).ne.0) cycle
+                if (abs(m_lam).gt.ilam) cycle
+                cval = (-ci) ** real(ilam,fp_kind) * sqrt(real(2*ilam+1,fp_kind))
+                if (ilam.eq.lpr) then
+                    ilamp = 0
+                elseif (ilam.eq.(lpr-lorb)) then
+                    ilamp = -1
+                elseif (ilam.eq.(lpr+lorb)) then
+                    ilamp = 1
                 endif
-                !BWL addition - end
-                csum = 0.0_fp_kind !czero
-                m_lam = m_l - m_lpr
-                theta = pi/2.0_fp_kind + atan2(qmin_local,q_perp_mag)
-                do ilam = lammin,lammax
-                      if (mod(ilam+lorb+lpr,2).ne.0) cycle
-                      if (abs(m_lam).gt.ilam) cycle
-                      cval = (-ci) ** float(ilam) * sqrt(2.0_fp_kind*float(ilam)+1)
-                      if (ilam.eq.lpr) then
-                            ilamp = 0
-                      elseif (ilam.eq.(lpr-lorb)) then
-                            ilamp = -1
-                      elseif (ilam.eq.(lpr+lorb)) then
-                            ilamp = 1
-                      endif
-                      qtmp1 = q_vec_mag * tpb
-                      !numerics to make function call cleb work
-                      lpr_temp = float(lpr)
-                      ilam_temp = float(ilam)
-                      l_temp = float(lorb)
-                      m_lam_temp = float(m_lam)
-                      m_l_temp = float(m_l)
-                      call gsplint(qpos_local,nsplpts,qtmp1,tgint,lpr,ilamp,gint_local,dgint_local)
-                      threej = cleb(lpr_temp,ilam_temp,l_temp,0.0_fp_kind,0.0_fp_kind)* (-1.0_fp_kind)**(lpr-ilam)/ sqrt(2.0_fp_kind*float(lorb)+1.0_fp_kind)
-                      cval = cval * threej * tgint
-                      threej = cleb(lpr_temp,ilam_temp,l_temp,-m_lam_temp,-m_l_temp)*(-1.0_fp_kind)**(-m_l+lpr-ilam) / sqrt(2.0_fp_kind*float(lorb)+1.0_fp_kind)
-                      phi = atan2(sign(qy_mag,real(m2,fp_kind)),sign(qx_mag,real(m1,fp_kind)))
-                      spherical_harm=sph_harm2(ilam,m_lam,theta,phi)
-                      cval = cval * threej * conjg(spherical_harm)
-                      csum = csum + cval
-                enddo
-                fq = ((-1)**m_lpr)*((-1)**m_lam)*sqrt( 2.0_fp_kind*tp*real(2*lpr+1,fp_kind)*real(2*lorb+1,fp_kind) ) * csum
-                tmatrix(ny,nx) = (fq / (q_vec_mag*q_vec_mag))
-          enddo
+                qtmp1 = q_vec_mag * tpb
+                !numerics to make function call cleb work
+                lpr_temp = real(lpr, fp_kind)
+                ilam_temp = real(ilam, fp_kind)
+                l_temp = real(lorb, fp_kind)
+                m_lam_temp = real(m_lam, fp_kind)
+                m_l_temp = real(m_l, fp_kind)
+                call gsplint(qpos_local,nsplpts,qtmp1,tgint,lpr,ilamp,gint_local,dgint_local)
+                threej = cleb(lpr_temp,ilam_temp,l_temp,0.0_fp_kind,0.0_fp_kind)* &
+                            & (-1.0_fp_kind)**(lpr-ilam)/ sqrt(real(2*lorb+1,fp_kind))
+                cval = cval * threej * tgint
+                threej = cleb(lpr_temp,ilam_temp,l_temp,-m_lam_temp,-m_l_temp)* &
+                            & (-1.0_fp_kind)**(-m_l+lpr-ilam) / sqrt(real(2*lorb+1,fp_kind))
+                phi = atan2(sign(qy_mag,real(m2,fp_kind)),sign(qx_mag,real(m1,fp_kind)))
+                spherical_harm=sph_harm2(ilam,m_lam,theta,phi)
+                cval = cval * threej * conjg(spherical_harm)
+                csum = csum + cval
+            enddo
+            fq = ((-1)**m_lpr)*((-1)**m_lam)*sqrt( 2.0_fp_kind*tp* &
+                            & real(2*lpr+1,fp_kind)*real(2*lorb+1,fp_kind) ) * csum
+            tmatrix(ny,nx) = (fq / (q_vec_mag*q_vec_mag))
+        enddo
     enddo
     !$OMP END PARALLEL DO
     !The tmatrix in k-space at 0,0 need to shift for atom positions
     !Potential now in units of Angstrom . sqrt(eV)
-    tmatrix = tmatrix * sqrt(float(nopiy*nopix))
+    tmatrix = tmatrix * sqrt(real(nopiy*nopix,fp_kind))
     const = sqrt(2.0_fp_kind)* qx_min * qy_min * fsc * hbarc / pi
 	tmatrix = const*tmatrix     ! (the extra factor of dsqrt(2) accounts for spin)
     !call ifft2(nopiy,nopix,tmatrix,nopiy,tmatrix,nopiy)    !Fourier transform to get it back to real space
@@ -1664,8 +1915,8 @@ module m_Hn0
         integer(4) :: atom,natoms
         integer(4) :: ss_atomx,ss_atomy
         integer(4) :: counter
-        real(fp_kind) :: x_coord,y_coord
-        real(fp_kind),dimension(nopiy,nopix) :: effective_potential
+        real(fp_kind) :: x_coord,y_coord,x_cell,y_cell,ifx,ify
+        !real(fp_kind),dimension(nopiy,nopix) :: effective_potential
 
         complex(fp_kind)   :: c_1 = 9.7846113e-07_fp_kind ! c_1 = 1/(2mc^2) in eV^(-1)
 
@@ -1673,7 +1924,7 @@ module m_Hn0
         alpha_n= (ci*relm)/(4.0_fp_kind*c_1*(hbarc**2)*pi*ak)   !this should be k_n
         
         !make the transition matrix elements and the 1D shift arrays
-        effective_potential = 0.0_fp_kind
+        !effective_potential = 0.0_fp_kind
 
         write(*,*) 'Calculating transition potentials...';write(*,*)
         
@@ -1682,14 +1933,22 @@ module m_Hn0
             lpr=state_vector(i,2)
             mlpr=state_vector(i,3)
             write(6,100,ADVANCE='NO') achar(13),i,nstates,lorb,ml,lpr,mlpr
-    100     format(a1,' State:',i3,'/',i3,' l',i3,' ml',i3,' lpr',i3,' mlpr',i3)
-            call calc_gsplint(ml,lpr,mlpr,qpos(:,i),qmin(i),gint(:,:,:,i),dgint(:,:,:,i))  
-            call fill_tmatrix(tmatrix_states(:,:,i),ml,lpr,mlpr,qpos(:,i),qmin(i),gint(:,:,:,i),dgint(:,:,:,i)) !make the Hn0
-            effective_potential = effective_potential + abs(tmatrix_states(:,:,i))**2
+            flush(6)
+100 format(a1,' State: ',i0,'/',i0,':  [l,m]=[',i0,',',i0,"] ->  [l',m']=[",i0,',',i0,']   ')
+            call calc_gsplint(ml,lpr,mlpr,qpos(:,i),qmin(i),gint(:,:,:,i),dgint(:,:,:,i))
+            call fill_tmatrix(tmatrix_states(:,:,i),ml,lpr,mlpr,qpos(:,i),qmin(i), &
+                    & gint(:,:,:,i),dgint(:,:,:,i)) !make the Hn0
+            !effective_potential = effective_potential + abs(tmatrix_states(:,:,i))**2
         enddo
-
         write(*,*)
-        
+        if (0 < IAND(arg_debug_dump, 1)) then
+            write(*,*) 'Creating dump of transition potentials (y,x,tran) [dump_tmat.bin]'
+            open(unit=456,file='dump_tmat.bin',form='binary',status='replace',convert='big_endian')
+            write(456) tmatrix_states
+            close(456)
+        endif
+        write(*,*)
+        write(*,*) 'Preparing shift factors ...';
         
         !number of atoms in a slice
 		if(allocated(natoms_slice_total)) deallocate(natoms_slice_total)
@@ -1703,44 +1962,65 @@ module m_Hn0
         allocate(Hn0_shiftx_coord(nopix,maxval(natoms_slice_total),n_slices))
         allocate(Hn0_shifty_coord(nopiy,maxval(natoms_slice_total),n_slices))
 		allocate(ion_tau(2,sum(natoms_slice_total)))
+        ifx = 1.0_fp_kind / real(ifactorx, fp_kind)
+        ify = 1.0_fp_kind / real(ifactory, fp_kind)
+!102     format('(dbg)  ',a,'= [',F6.3,',',F6.3,']')
+!        write(*,102) 'tiling[x,y]', real(ifactorx), real(ifactory)
         do j=1,n_slices
-            counter = 0
-            do atom=1,nat_slice_unitcell(target_atom,j)     !loop over ionization species in unit cell
-                if(pw_illum) then                           !if plane wave we only need to shift over the unit cell
-                    x_coord = tau_slice_unitcell(1,target_atom,atom,j)/float(ifactorx)
-                    y_coord = tau_slice_unitcell(2,target_atom,atom,j)/float(ifactory)
-                    counter = counter+1
-					ion_tau(:,counter) = [x_coord,y_coord]
-                    call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
-                    call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
-                elseif(all_atoms) then                                     !if focussed probe we need to shift over supercell
-                    do ss_atomx=1,ifactorx                  !tile the unit cell atom over the supercell
-                        do ss_atomy=1,ifactory              !tile the unit cell atom over the supercell
-                            x_coord = (tau_slice_unitcell(1,target_atom,atom,j)+(float(ss_atomx)-1.0_fp_kind))/float(ifactorx)
-                            y_coord = (tau_slice_unitcell(2,target_atom,atom,j)+(float(ss_atomy)-1.0_fp_kind))/float(ifactory)
-                            counter = counter+1
-							ion_tau(:,counter) = [x_coord,y_coord]
-                            call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
-                            call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
-                        enddo
-                    enddo
+          counter = 0
+          do atom=1,nat_slice_unitcell(target_atom,j)     !loop over ionization species in unit cell
+            if(pw_illum) then                           !if plane wave we only need to shift over the unit cell
+              x_coord = tau_slice_unitcell(1,target_atom,atom,j)*ifx
+              y_coord = tau_slice_unitcell(2,target_atom,atom,j)*ify
+              counter = counter+1
+              ion_tau(:,counter) = [x_coord,y_coord]
+              call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
+              call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
+            elseif(all_atoms) then                      !if focussed probe we need to shift ionization potentials over supercell
+              do ss_atomx=1,ifactorx                  !tile the unit cell atom over the supercell
+                x_cell = real(ss_atomx-1,fp_kind)
+                do ss_atomy=1,ifactory              !tile the unit cell atom over the supercell
+                  y_cell = real(ss_atomy-1,fp_kind)
+!                  write(*,102) "[xc,yc]", x_cell, y_cell
+                  x_coord = (tau_slice_unitcell(1,target_atom,atom,j)+x_cell)*ifx
+                  y_coord = (tau_slice_unitcell(2,target_atom,atom,j)+y_cell)*ify
+                  counter = counter+1
+                  ion_tau(:,counter) = [x_coord,y_coord]
+                  call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
+                  call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
+!                  write(*,102) " UC-pos", tau_slice_unitcell(1,target_atom,atom,j), &
+!                        & tau_slice_unitcell(2,target_atom,atom,j)
+!                  write(*,102) " SC-pos", x_coord, y_coord
+
+                enddo
+              enddo
+            else      !user decided to only shift ionization potentials over a fraction small than the supercell
+              do ss_atomx=-xcells/2,xcells/2         !tile the unit cell atom over the supercell
+                if (ss_atomx.ge.0) then
+                  x_cell = real(ifactorx+ss_atomx,fp_kind)
                 else
-                    do ss_atomx=-xcells/2,xcells/2                  !tile the unit cell atom over the supercell
-                        do ss_atomy=-ycells/2,ycells/2              !tile the unit cell atom over the supercell
-                            x_coord = (tau_slice_unitcell(1,target_atom,atom,j)+(float(ifactorx+ss_atomx)))/float(ifactorx)
-                            if (ss_atomx.ge.0) x_coord = (tau_slice_unitcell(1,target_atom,atom,j)+(float(ss_atomx)))/float(ifactorx)
-                            y_coord = (tau_slice_unitcell(2,target_atom,atom,j)+(float(ifactorx+ss_atomy)))/float(ifactorx)
-                            if (ss_atomy.ge.0) y_coord = (tau_slice_unitcell(2,target_atom,atom,j)+(float(ss_atomy)))/float(ifactory)
-                            counter = counter+1
-							ion_tau(:,counter) = [x_coord,y_coord]
-                            call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
-                            call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
-                        enddo
-                    enddo
-               endif
-            enddo
+                  x_cell = real(ss_atomx,fp_kind)
+                endif
+                do ss_atomy=-ycells/2,ycells/2       !tile the unit cell atom over the supercell
+                  if (ss_atomy.ge.0) then
+                    y_cell = real(ifactory+ss_atomy,fp_kind)
+                  else
+                    y_cell = real(ss_atomy,fp_kind)
+                  endif
+                  y_cell = real(ifactorx+ss_atomy,fp_kind)
+                  x_coord = (tau_slice_unitcell(1,target_atom,atom,j)+x_cell)*ifx
+                  y_coord = (tau_slice_unitcell(2,target_atom,atom,j)+y_cell)*ify
+                  counter = counter+1
+                  ion_tau(:,counter) = [x_coord,y_coord]
+                  call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
+                  call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
+                enddo
+              enddo
+            endif
+          enddo
         enddo 
-		write(*,*) achar(10),' Transition potentials have been calculated',achar(10)
+		write(*,*) 'Transition potentials have been calculated.'
+        write(*,*)
     end function
     
     
@@ -1767,7 +2047,7 @@ module m_Hn0
     
         !Get the FFT of the input array
         array = cmplx(arrayin,kind = fp_kind)
-        call fft2(y,x,array,y,array,y)
+        call fft2(y,x,array,array)
     
         !Make the 1d shift arrays
         call make_shift_oned(shift_arrayy,y,yshift/y)
@@ -1781,7 +2061,7 @@ module m_Hn0
         array=array*shift_array
     
         !Inverse fourier transform
-        call ifft2(y,x,array,y,array,x)
+        call ifft2(y,x,array,array)
         arrayout = real(array,kind = fp_kind) 
     
     end function
@@ -1834,7 +2114,7 @@ module m_Hn0
 		write(*,*) 'Diffraction patterns will be outputted for the target atoms'
 		write(*,*) 'located at the following fractional coordinates).'
 		do k=1,size(targets)
-			if(targets(k)) write(6,800) k,char(10), mod(ion_tau(1,k)*ifactorx,1.0_fp_kind), mod(ion_tau(2,k)*ifactory,1.0_fp_kind), floor(ion_tau(1,k)*ifactorx,fp_kind)+1,ifactorx, floor(ion_tau(2,k)*ifactory,fp_kind)+1,ifactory
+			if(targets(k)) write(*,800) k,char(10), mod(ion_tau(1,k)*ifactorx,1.0_fp_kind), mod(ion_tau(2,k)*ifactory,1.0_fp_kind), floor(ion_tau(1,k)*ifactorx,fp_kind)+1,ifactorx, floor(ion_tau(2,k)*ifactory,fp_kind)+1,ifactory
 		enddo
 		write(*,*)
 800     format('Target no. = ',I3,':',a1,'  x = ',f5.2,'  y = ',f5.2,'  unit cell x: ', i2,'/',i2,'  unit cell y: ', i2,'/',i2)

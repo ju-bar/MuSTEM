@@ -168,7 +168,7 @@ module plasmon
 			if (i==0) then
 				doplasm = .true.
 			else
-				write(6,101) 'during plasmon scattering setup', i
+				write(*,101) 'during plasmon scattering setup', i
 				write(*,*) '  ',trim(pl_msg_err)
 				write(*,*) 'Plasmon scattering deactivated.'
 				write(*,*)
@@ -192,7 +192,7 @@ module plasmon
 			if (i==0) then
 				doplasm = .true.
 			else
-				write(6,101) 'during plasmon scattering setup', i
+				write(*,101) 'during plasmon scattering setup', i
 				write(*,*) '  ',trim(pl_msg_err)
 				write(*,*) 'Plasmon scattering deactivated.'
 				write(*,*)
@@ -203,10 +203,10 @@ module plasmon
 		if (doplasm) then
 			write(*,*) 'Plasmon scattering setup'
 			write(*,*) '----------------------------------------------'
-			write(6,102) pl_lmfp, 'A'
-			write(6,103) pl_theta_char * 1000.0_fp_kind
-			write(6,104) pl_theta_crit * 1000.0_fp_kind
-			write(6,105) pl_npemax
+			write(*,102) pl_lmfp, 'A'
+			write(*,103) pl_theta_char * 1000.0_fp_kind
+			write(*,104) pl_theta_crit * 1000.0_fp_kind
+			write(*,105) pl_npemax
 			write(*,*) '----------------------------------------------'
 			write(*,*) '<0> Proceed without changes.'
 			write(*,*) '<1> Repeat plasmon setup.'

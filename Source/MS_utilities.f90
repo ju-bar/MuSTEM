@@ -100,7 +100,7 @@
       integer(4) izone1(3),i,j,jm,icount,itrue,zindex,k
 
       iunit = 15
-100   write(6,101)
+100   write(*,101)
 101   format(1x, 'Please enter the name of the input .xtl file.')
       call get_input("Input crystal file name", xtl_fnam)
       open(unit=iunit,file=xtl_fnam,status='old',err=998)
@@ -143,44 +143,44 @@
 
 102   format( a20 )
       read(iunit,102) substance
-      write(6,111) substance
+      write(*,111) substance
 111   format(/,1x,a20)
 
       read(iunit,*) a0(1:3), deg(1:3)
-      write(6,121) a0(1:3), 'A', deg(1:3)
+      write(*,121) a0(1:3), 'A', deg(1:3)
 121   format(4x,' a = ',f9.4,7x,'b = ',f9.4,6x,'c = ',f9.4,1x,a1,/,&
      &' alpha = ',f9.4,2x,'  beta = ',f9.4,2x,'gamma = ',f9.4,&
      &' degrees',/)
      
       if(contains_kev) then
         read(iunit,*) ekv
-        write(6,131) ekv
+        write(*,131) ekv
 131   format(' Incident beam energy = ',f12.3,' keV',/)
       endif
 
       read(iunit,*) nt
-      write(6,141) nt
-141   format(' Number of atom atom types = ',i2,/)
+      write(*,141) nt
+141   format(' Number of atom types = ',i2,/)
 
       do i = 1, nt
         read(iunit,*) substance_atom_types(i)
         if (ionic) then
-			    read(iunit,*) nat(i), atf(1:3,i),dz(i)
-		    else
-			    read(iunit,*) nat(i), atf(1:3,i)
-			  endif
+            read(iunit,*) nat(i), atf(1:3,i), dz(i)
+        else
+		    read(iunit,*) nat(i), atf(1:3,i)
+		endif
         if(nat(i).gt.nm.or.nat(i).lt.0) then
-          write(6,171) i,nat(i)
+          write(*,171) i,nat(i)
 171       format(' Type ',i3,2x,' nat = ',i5,' this is wrong - EXIT')
           go to 999
         endif
 
-        write(6,181) i,substance_atom_types(i),atf(1:3,i)
-        if (ionic) write(6,182) dz(i)
+        write(*,181) i,substance_atom_types(i),atf(1:3,i)
+        if (ionic) write(*,182) dz(i)
 181     format(' Type ',i2,2x,a10,8X,' Z = ',F5.0,/,'   Occupancy = ',f6.3,2x,' <us> ** 2 = ',g12.5)
 182     format('   Charge = ',f6.3)
         jm = nat(i)
-        write(6,191)
+        write(*,191)
 191     format('      x    ',5x,'y',9x,'z')
 
         icount = 0
@@ -189,7 +189,7 @@
           read(iunit,*) tau(1:3,i,j)
 
           if (icount.le.100) then
-            write(6,201) icount,tau(1:3,i,j)
+            write(*,201) icount,tau(1:3,i,j)
 201         format(i5, 3f10.6)
           elseif (icount.eq.101) then
             write(*,*) 'Number of atoms exceeds 100.'
@@ -205,7 +205,7 @@
           endif
           !if(icount.gt.12) then
             !icount = 0
-            !write(6,191)
+            !write(*,191)
           !endif
         enddo
         write(*,*)
@@ -219,13 +219,13 @@
       ig1 = [1, 0, 0]
       ig2 = [0, 1, 0]
 
-      write(6,231) izone1(1:3)
+      write(*,231) izone1(1:3)
 231   format(' Zone Axis = [ ', 3i4, ' ]')
 
-      write(6,241) ig1(1:3)
+      write(*,241) ig1(1:3)
 241   format(' X-scan reciprocal lattice vector = ( ', 3i4, ' )')
 
-      write(6,251) ig2(1:3)
+      write(*,251) ig2(1:3)
 251   format(' Y-scan reciprocal lattice vector = ( ', 3i4, ' )')
 
       ag1 = trimi(ig1,ss)
@@ -234,7 +234,7 @@
       call angle(ig1,ig2,ss,thetad)
       
       if(abs(thetad).lt.0.1_fp_kind.or.abs(thetad-180.0_fp_kind).lt.0.1_fp_kind) then
-            write(6,261)
+            write(*,261)
 261         format(' Scan vectors form a linear array',/,&
      &          ' You need two vectors that are NOT co-linear',/,&
      &          ' Please terminate the program and ammend your',&
@@ -249,7 +249,7 @@
       enddo
 
       if(itrue.eq.1) then
-            write(6,271) izone1(1:3),izone(1:3)
+            write(*,271) izone1(1:3),izone(1:3)
 271         format(' Entered zone = [',3i5,'] is incorrect',/,&
      &          ' New zone defined by scan vectors is [',3i5,' ]')
       endif
@@ -281,7 +281,7 @@
             atomf(1:13,i)=xrayFF(2:14,int(atf(1,i)))
       enddo
 
-      write(6,321)
+      write(*,321)
 321   format(' Successfully read all atomic X-ray scattering factors',/,&
      &' from D. Waasmaier & A. Kirfel Acta. Cryst. A51, 416 (1995)',/,  &
      &' Mott formula used for conversion to electron form factors', /)
@@ -290,7 +290,7 @@
       
       close(iunit)
       goto 999
-998   write(6,*) 'ERROR: Crystal file ', trim(xtl_fnam), ' does not exist!'
+998   write(*,*) 'ERROR: Crystal file ', trim(xtl_fnam), ' does not exist!'
       goto 100     
 999   continue
       
@@ -342,13 +342,13 @@
         endif
         
         if(abs(volts).gt.50.0_fp_kind) then
-            write(6,102) volts
+            write(*,102) volts
 102         format(/,' Inner potential = ',g16.9,' volts. This is unrealistic.',/,&
                    & ' Resetting inner potential to 20 volts.')
             volts = 20.0_fp_kind
         endif
 
-        write(6,101) volts
+        write(*,101) volts
 101     format(/,' Inner potential = ', g16.9,' volts')
 
     end
@@ -378,7 +378,7 @@
         chosen=.false.
         do while(.not.chosen)
     131 format( ' Enter the integer by which to tile the unit cell in the ', a1,' direction:')
-    110 write(6,131) 'x'
+    110 write(*,131) 'x'
         call get_input('Tile supercell x', ifactorx)
         write(*,131) 'y'
         call get_input('Tile supercell y', ifactory)
@@ -398,11 +398,11 @@
             endif
         endif
         
-        write(6,111) 'x'
+        write(*,111) 'x'
     111 format(' Enter number of pixels in the ', a1, ' direction:')
         call get_input('Number of pixels in x',nopix)
 
-        write(6,111) 'y'
+        write(*,111) 'y'
         call get_input('Number of pixels in y',nopiy)
         write(*,*)
 
@@ -422,9 +422,9 @@
         ! (and if unit cell is actually tiled in both directions)
         quick_shift = mod(nopiy,ifactory).eq.0 .and. (mod(nopix,ifactorx)).eq.0 .and. (ifactory.gt.1 .or. ifactorx.gt.1)
         
-            write(6,161) nopix_ucell, nopiy_ucell
-            if (.not.quick_shift) write(6,162)
-            write(6,163) ifactorx, ifactory, nopix, nopiy, max_qx, 'A',&
+            write(*,161) nopix_ucell, nopiy_ucell
+            if (.not.quick_shift) write(*,162)
+            write(*,163) ifactorx, ifactory, nopix, nopiy, max_qx, 'A',&
                          &max_qy, 'A',max_mradx, max_mrady
             
 161  format(  '                                x               y', /, &
@@ -472,12 +472,12 @@
 		logical::detectors,outputdetectors
     
         call command_line_title_box(' Diffraction plane detectors')
-        write(6,*) 'Enter the number of detectors in the diffraction plane:'
-        write(6,*) '(e.g. 3 if you wish to simulate BF/ABF/ADF simultaneously.)'
-		write(6,*) "To segment detectors input a comma ',' and then the number"
-		write(6,*) "of angular segments (eg. for 4 rings and 4 quadrants input '4,4')."
-		write(6,*) 'To output the detectors for inspection end the input with a '
-		write(6,*) "question mark ('?'), ie '4,4?'."
+        write(*,*) 'Enter the number of detectors in the diffraction plane:'
+        write(*,*) '(e.g. 3 if you wish to simulate BF/ABF/ADF simultaneously.)'
+		write(*,*) "To segment detectors input a comma ',' and then the number"
+		write(*,*) "of angular segments (eg. for 4 rings and 4 quadrants input '4,4')."
+		write(*,*) 'To output the detectors for inspection end the input with a '
+		write(*,*) "question mark ('?'), ie '4,4?'."
         call get_input('Number of detectors', dstring)
         write(*,*)
 
@@ -518,8 +518,10 @@
 		if(outputdetectors) then
 			do i=1,ndet/nseg
 			do j=1,nseg
-				if(nseg>1) call binary_out_unwrap(nopiy,nopix,make_detector(nopiy,nopix,ifactory,ifactorx,ss,inner(i),outer(i),2*pi*j/nseg-seg_det_offset,2*pi/nseg),'detector_'//to_string((i-1)*nseg+j))
-				if(nseg==1) call binary_out_unwrap(nopiy,nopix,make_detector(nopiy,nopix,ifactory,ifactorx,ss,inner(i),outer(i)),'detector_'//to_string((i-1)*nseg+j))
+				if(nseg>1) call binary_out_unwrap(nopiy,nopix,make_detector(nopiy,nopix,ifactory,ifactorx, &
+                    & ss,inner(i),outer(i),2*pi*j/nseg-seg_det_offset,2*pi/nseg),'Detector'//to_string((i-1)*nseg+j))
+				if(nseg==1) call binary_out_unwrap(nopiy,nopix,make_detector(nopiy,nopix,ifactory,ifactorx, &
+                    & ss,inner(i),outer(i)),'Detector'//to_string((i-1)*nseg+j))
 			enddo
 			enddo
 		endif
@@ -544,7 +546,7 @@
 		character*120::thickness_string
       
         call command_line_title_box('Specimen thickness')
-    10  write(6,11)
+    10  write(*,11)
     11  format( ' Enter the specimen thickness in Angstroms:')
 		call Series_prompt('thickness')
 		call get_input("Thickness", thickness_string)
@@ -559,7 +561,7 @@
         n_cells = nint(thickness/a0(3))
         thickness = n_cells*a0(3)
 		do i=1,nz
-			write(6, 15) ncells(i), zarray(i), 'A'	
+			write(*, 15) ncells(i), zarray(i), 'A'	
 		enddo
 	15  format(' This corresponds to ', i5, ' unit cells with a total thickness of ', f6.1, ' ', a1, '.')
    
@@ -697,7 +699,7 @@
         complex(fp_kind),dimension(nopiy,nopix),intent(out) :: output
     
         output = input*spread(shiftx,dim=1,ncopies=nopiy)*spread(shifty,dim=2,ncopies = nopix)
-        call ifft2(nopiy, nopix, output, nopiy, output, nopiy)
+        call ifft2(nopiy, nopix, output, output)
     
     end
     
@@ -727,7 +729,7 @@
             write(*,*)'Option                                       | Included(y/n)'
 			write(*,*)'-----------------------------------------------------------'
             write(*,*)'<1> Conventional STEM (ADF,ABF,BF etc.)      | ',logical_to_yn(STEM)
-            write(*,*)'<2> Ionization based STEM (EELS and EDX)     | ',logical_to_yn(ionization)
+            write(*,*)'<2> Ionization based STEM (EELS, EDX, SE)    | ',logical_to_yn(ionization) ! 2025-06-07 JB, added SEI
             write(*,*)'<3> Diffraction (PACBED and 4D-STEM)         | ',logical_to_yn(PACBED)
 			write(*,*)'<4> Imaging STEM (iSTEM)                     | ',logical_to_yn(istem)
 			if(dc_init)&

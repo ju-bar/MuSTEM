@@ -39,7 +39,7 @@
 			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
 		</Configuration>
 		<Configuration Name="Release|x64" UseCompiler="ifxCompiler">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT25)\include\fftw" PreprocessorDefinitions="single_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" EnableOpenMPSupport="OpenMPParallelCodeIFX" ByteRECL="true" UseMkl="mklParallel"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="$(MKL_ROOT25)\include\fftw" PreprocessorDefinitions="single_precision" EnableRecursion="true" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" EnableOpenMPSupport="OpenMPParallelCodeIFX" ByteRECL="true" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" SubSystem="subSystemConsole"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -54,11 +54,34 @@
 		<Filter Name="Header Files" Filter="fi;fd;h;inc"/>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+			<Filter Name="cuda">
+				<File RelativePath=".\GPU_routines\mod_cuda_array_library.f90">
+					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
+				</File>
+				<File RelativePath=".\GPU_routines\mod_cuda_ms.f90">
+					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
+				</File>
+				<File RelativePath=".\GPU_routines\mod_cuda_potential.f90">
+					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
+				</File>
+				<File RelativePath=".\GPU_routines\mod_cuda_setup.f90">
+					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
+				</File>
+				<File RelativePath=".\GPU_routines\mod_cufft.f90">
+					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
+				</File>
+			</Filter>
 			<File RelativePath=".\m_absorption.f90"/>
 			<File RelativePath=".\m_crystallography.f90"/>
 			<File RelativePath=".\m_electron.f90"/>
 			<File RelativePath=".\m_lens.f90"/>
-			<File RelativePath=".\m_multislice.f90"/>
+			<File RelativePath=".\m_multislice.f90">
+			</File>
 			<File RelativePath=".\m_numerical_tools.f90"/>
 			<File RelativePath=".\m_plasmon.f90"/>
 			<File RelativePath=".\m_potential.f90"/>
@@ -71,11 +94,9 @@
 			<File RelativePath=".\mod_Hn0.f90"/>
 			<File RelativePath=".\mod_output.f90"/>
 			<File RelativePath=".\MS_utilities.f90"/>
-			<File RelativePath=".\muSTEM.f90">
-			</File>
+			<File RelativePath=".\muSTEM.f90"/>
 			<File RelativePath=".\quadpack.f90"/>
-			<File RelativePath=".\s_absorptive_stem.f90">
-			</File>
+			<File RelativePath=".\s_absorptive_stem.f90"/>
 			<File RelativePath=".\s_absorptive_tem.f90"/>
 			<File RelativePath=".\s_qep_stem.f90"/>
 			<File RelativePath=".\s_qep_tem.f90"/>
@@ -89,7 +110,8 @@
 			<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
 			</FileConfiguration>
 		</File>
-		<File RelativePath="..\Readme.md"/>
+		<File RelativePath="..\Readme.md">
+		</File>
 	</Files>
 	<Globals/>
 </VisualStudioProject>

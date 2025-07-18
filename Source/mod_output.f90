@@ -91,7 +91,7 @@ module output
         implicit none
         character(120)::dir,fnam
    
-10      write(6,*) 'Enter the prefix for all outputted filenames:'
+10      write(*,*) 'Enter the prefix for all outputted filenames:'
         call get_input("Output filename", output_prefix)
         write(*,*)
       
@@ -384,7 +384,7 @@ module output
         
         a1 = a
         
-        call fft2(nopiy_a, nopix_a, a1, nopiy_a, a2, nopix_a)
+        call fft2(nopiy_a, nopix_a, a1, a2)
         a2 = a2 * sqrt(float(nopiy_a*nopix_a))
         
         Npos_y = int(floor(float(nopiy_a)/2))
@@ -404,7 +404,7 @@ module output
 
         b2 = cshift(cshift(b1, -shifty, 1), -shiftx, 2)
         
-        call ifft2(nopiy_b, nopix_b, b2, nopiy_b, b1, nopix_b)
+        call ifft2(nopiy_b, nopix_b, b2, b1)
         b1 = b1 / sqrt(float(nopiy_b*nopix_b))
                 
         b = real(b1) * float(product(shape(b))) / float(product(shape(a)))

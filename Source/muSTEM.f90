@@ -18,7 +18,7 @@
 !   Date:           August 2017
 !   Requirements:   PGI Fortran
 !
-!   version:        6.1  
+!   version:        6.2  
 !  
 !  Copyright (C) 2025  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes, J. Barthel
 !
@@ -72,7 +72,7 @@
         arg_num_threads          = 0
         pnam                     = "single"
         if(fp_kind==Double) pnam = "double"
-108     write(6,109) trim(pnam)
+108     write(*,109) trim(pnam)
         109     format(&
        &1x,'|----------------------------------------------------------------------------|',/,&
        &1x,'|              Melbourne University (scanning) transmission electron         |',/,&
@@ -98,9 +98,9 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.1 (branch https://github.com/ju-bar 2025-06-04)        |',/,&
+       &1x,'|       GPU Version 6.2 (branch https://github.com/ju-bar 2025-07-18)        |',/,&
 #else
-       &1x,'|       CPU only Version 6.1 (branch https://github.com/ju-bar 2025-06-04)   |',/,&
+       &1x,'|       CPU only Version 6.2 (branch https://github.com/ju-bar 2025-07-18)   |',/,&
 #endif
        &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&
@@ -119,28 +119,36 @@
             end if
             select case (trim(adjustl(command_argument)))
             case ('options')
-                    write(*,*) 
-                    write(*,*) '  List of options for muSTEM:    e.g.  muSTEM nopause'
-                    write(*,*) '    nopause      - avoids program pauses'
-                    write(*,*) '    ionic        - applies ionic form factors (requires charge input via xtl)'
-                    write(*,*) '    linpoleels   - applies linear interpolation on EELS energy windows'
-                    write(*,*) '    omp_num_threads={n} sets number of OpenMP threads, e.g. omp_num_threads=3'
-                    write(*,*)
-                    stop
-                case ('nopause')
-                    nopause = .true.
-			    case ('timing')
-				    timing = .true.
-			    case ('ionic')
-                    ionic = .true.
-                case ('linpoleels')
-                    linpoleels = .true.
-                !case ('mmouse_wave')
-                !    arg_debug_wave = 1
-                !case ('mmouse_intens')
-                !    arg_debug_intens = 1
-                !case ('mmouse_stemdet')
-                !    arg_debug_stemdet = 1
+                write(*,*) 
+                write(*,*) '  List of options for muSTEM:    e.g.  muSTEM nopause'
+                write(*,*) '    nopause      - avoids program pauses'
+                write(*,*) '    ionic        - applies ionic form factors (requires charge input via xtl)'
+                write(*,*) '    linpoleels   - applies linear interpolation on EELS energy windows'
+                write(*,*) '    omp_num_threads={n} sets number of OpenMP threads, e.g. omp_num_threads=3'
+                write(*,*) '    dump_tmat    - dumps transition potentials used in double-channeling code'
+                write(*,*) '    dump_setf    - dumps transmission function simulating SE absorption'
+                write(*,*)
+                stop
+            case ('nopause')
+                nopause = .true.
+			case ('timing')
+				timing = .true.
+			case ('ionic')
+                ionic = .true.
+            case ('linpoleels')
+                linpoleels = .true.
+            !case ('mmouse_wave')
+            !    arg_debug_wave = 1
+            !case ('mmouse_intens')
+            !    arg_debug_intens = 1
+            !case ('mmouse_stemdet')
+            !    arg_debug_stemdet = 1
+            case ('dump_tmat')
+                arg_debug_dump = arg_debug_dump + 1
+                write(*,*) '    Dump of T-matrix requested.'
+            case ('dump_setf')
+                arg_debug_dump = arg_debug_dump + 2
+                write(*,*) '    Dump of SE transmission functions requested.'
             end select
         enddo
         
@@ -251,8 +259,8 @@
         write(*,*) ' Options for output of inelastically and elastically scattered components'
         write(*,*) ' <1> Only output total signal (ie that measured in experiment)'
         write(*,*) ' <2> Separately output elastic, inelastic and total signal'
-        write(*,*) 'Note: option <2> does not apply to EELS or EDX output'
-        if(complex_absorption.and.include_absorption) write(*,*) 'Note: option <2> only applies to STEM imaging'
+        write(*,*) '     * only for STEM imaging, but not for STEM-EELS or EDX'
+        !if(complex_absorption.and.include_absorption) write(*,*) 'Note: option <2> only applies to STEM imaging'
         write(*,*)
         call get_input('Elastic and inelastic scattering output choice', i_tds_model)
         write(*,*)
@@ -300,7 +308,7 @@
             call command_line_title_box('Calculation type')
             write(*,*) 'Choose a calculation type:'
 115         write(*,*) '<1> CBED pattern'
-            write(*,*) '<2> STEM (BF/ABF/ADF/EELS/EDX/PACBED/4D-STEM)'
+            write(*,*) '<2> STEM (BF/ABF/ADF/EELS/EDX/SE/PACBED/4D-STEM)' ! 2025-06-07 JB, added SEI
             
             call get_input('<1> CBED <2> STEM/PACBED', i_cb_calc_type)
             write(*,*)
@@ -309,7 +317,7 @@
                 case (1)
                     ! CBED pattern
                     call place_probe(probe_initial_position)
-					          double_channeling=.false.
+                    double_channeling=.false.
                 case (2)
                     ! STEM images
                     call STEM_options(STEM,ionization,PACBED,istem,double_channeling)
@@ -319,12 +327,12 @@
                     call prompt_output_probe_intensity
                     if(STEM) call setup_integration_measurements
                     adf = STEM.and.(.not.qep)
-					          if(istem) call setup_lens_parameters('Image',imaging_aberrations,imaging_cutoff)
+                    if(istem) call setup_lens_parameters('Image',imaging_aberrations,imaging_cutoff)
                     
                     ! Precalculate the scattering factors on a grid
                     call precalculate_scattering_factors()
-                    if(ionization) call setup_inelastic_ionization_types
-					          if(double_channeling) call ionizer_init(.true.)
+                    if(ionization) call setup_inelastic_ionization_types()
+                    if(double_channeling) call ionizer_init(.true.)
                     
                 case default
                     goto 115
@@ -375,14 +383,16 @@
    
    
     subroutine setup_threading(nthreads)
-    
+        use omp_lib
+#ifndef GPU
+        use mkl_service
+#endif
         use m_string, only: to_string,command_line_title_box
     
         implicit none
       
         integer, intent(in) :: nthreads
         integer*4 :: num_cores, num_threads
-        integer*4 :: omp_get_max_threads, omp_get_num_procs
     
         num_cores = omp_get_num_procs()
         if (nthreads > 0) then
@@ -393,11 +403,11 @@
         num_threads = max(1, num_threads) ! Ensure at least one thread is used.
         
         call omp_set_num_threads(num_threads)
-#ifdef GPU
-#else
-        call dfftw_init_threads()
-        call dfftw_plan_with_nthreads(num_threads)
+#ifndef GPU
+        call mkl_set_num_threads(num_threads)
+        call mkl_set_dynamic(0)
 #endif
+
         call command_line_title_box('CPU multithreading')
         write(*,*) 'The number of available logical cores is: ' // to_string(num_cores)
         write(*,*) 'The number of threads being used on the CPU is: ' // to_string(num_threads)

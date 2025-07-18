@@ -207,7 +207,7 @@ subroutine qep_tem
 	      psi_initial = 1.0_fp_kind / sqrt(float(npixels))
 	else
         psi_initial = make_ctf(probe_initial_position,probe_df(1),probe_cutoff,probe_aberrations,probe_apodisation)
-        call ifft2(nopiy, nopix, psi_initial, nopiy, psi_initial, nopiy)
+        call ifft2(nopiy, nopix, psi_initial, psi_initial)
         psi_initial = psi_initial/sqrt(sum(abs(psi_initial)**2))
 	endif
     
@@ -220,9 +220,9 @@ subroutine qep_tem
         if(.not.on_the_fly) then
 		qep_grates(:,:,:,i) = exp(ci*pi*a0_slice(3,i)/Kz(ntilt)*projected_potential(:,:,:,i))
 		do j=1,n_qep_grates
-		call fft2(nopiy,nopix,qep_grates(:,:,j,i),nopiy,psi,nopiy)
+		call fft2(nopiy,nopix,qep_grates(:,:,j,i),psi)
 		if(qep_mode == 3) qep_grates(:,:,j,i)= psi*bwl_mat
-		if(qep_mode .ne. 3) call ifft2(nopiy,nopix,psi*bwl_mat,nopiy,qep_grates(:,:,j,i),nopiy)
+		if(qep_mode .ne. 3) call ifft2(nopiy,nopix,psi*bwl_mat,qep_grates(:,:,j,i))
 		enddo
 		endif
     enddo
@@ -356,7 +356,7 @@ psi_initial_d = psi_initial
 		if (plasmonmc) call pl_populate(pl_exc_num)
 		
         intensity = get_sum(psi_d)
-		write(6,900,advance='no') achar(13), i_qep_pass, n_qep_passes, intensity
+		write(*,900,advance='no') achar(13), i_qep_pass, n_qep_passes, intensity
     900 format(a1, 1x, 'QEP pass:', i4, '/', i4, ' Intensity: ', f8.3)	
 #else
     cbed = 0.0_fp_kind
@@ -393,7 +393,7 @@ psi_initial_d = psi_initial
 			if (any(i_cell==ncells)) then
 				
 				!Transform into diffraction space
-				call fft2(nopiy,nopix,psi,nopiy,psi_out,nopiy)
+				call fft2(nopiy,nopix,psi,psi_out)
 				temp = abs(psi_out)**2
 				z_indx = minloc(abs(ncells-i_cell))
 
@@ -411,7 +411,7 @@ psi_initial_d = psi_initial
 				if(pw_illum) then
 					do i=1,imaging_ndf
 						psi_temp = ctf(:,:,i)*psi_out
-						call ifft2(nopiy,nopix,psi_temp,nopiy,psi_temp,nopiy)
+						call ifft2(nopiy,nopix,psi_temp,psi_temp)
 						tem_image(:,:,z_indx(1),i) = tem_image(:,:,z_indx(1),i)+abs(psi_temp)**2
 					enddo
 				endif
@@ -424,7 +424,7 @@ psi_initial_d = psi_initial
 		
         intensity = sum(abs(psi)**2)
 		
-        write(6,900) i_qep_pass, n_qep_passes, intensity
+        write(*,900) i_qep_pass, n_qep_passes, intensity
 900     format(1h+,  'QEP pass:', i4, '/', i4, ' Intensity: ', f8.3)
 #endif
 	enddo ! End loop over QEP passes
@@ -473,7 +473,7 @@ psi_initial_d = psi_initial
 			if(pw_illum) call binary_out(nopiy, nopix, total_intensity(:,:,i), trim(filename)//'_ExitSurface_Intensity')
 		else
 			call binary_out_unwrap(nopiy, nopix, cbed(:,:,i), trim(filename)//'_DiffractionPattern_Total')
-			call fft2(nopiy, nopix, psi_elastic(:,:,i), nopiy, psi, nopiy)
+			call fft2(nopiy, nopix, psi_elastic(:,:,i), psi)
 			image = abs(psi)**2
 			call binary_out_unwrap(nopiy, nopix, image, trim(filename)//'_DiffractionPattern_Elastic')
 			
@@ -492,9 +492,9 @@ psi_initial_d = psi_initial
 		if(pw_illum) then
 		do j=1,imaging_ndf
 			! Elastic image
-			call fft2 (nopiy, nopix, psi_elastic(:,:,i), nopiy, psi, nopiy)
+			call fft2 (nopiy, nopix, psi_elastic(:,:,i), psi)
 			psi = psi * ctf(:,:,j)
-			call ifft2 (nopiy, nopix, psi, nopiy, psi, nopiy)
+			call ifft2 (nopiy, nopix, psi, psi)
 			image = abs(psi)**2
 				
 			if(imaging_ndf>1) then

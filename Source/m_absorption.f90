@@ -201,10 +201,10 @@ module m_absorption
             ! Status
 #ifdef GPU            
         131 format(a1,' Calculating absorptive scattering factor ', i5, ' of ', i5, '...' )
-            write(6,131, advance='no') achar(13),ipa, max_int
+            write(*,131, advance='no') achar(13),ipa, max_int
 #else
         131 format(1h+,' Calculating absorptive scattering factor ', i5, ' of ', i5, '...' )
-            write(6,131) ipa, max_int
+            write(*,131) ipa, max_int
 #endif
             !flush(unit=6)
 
@@ -219,11 +219,7 @@ module m_absorption
                 dwf = exp( - tp2 * g2 * atf(3, i_species) )
 												
                 ! Integrate over theta and phi
-                !if (thmin<1e-2.and.thmax>pi-1e-2) then
-                !    sum1= imag(FSCATT(real(sqrt(g2)*2*pi,kind=4),sqrt(atf(3,i_species)),Z,element(Z),300.0_4,1,.false.,.false.))/(16*2*pi*pi)**2
-                !else
-				    call qag ( tds_calc_theta, thmin, thmax, abs_tol, rel_tol, 1, sum1, abserr, m, ier )
-                !endif
+				call qag(tds_calc_theta, thmin, thmax, abs_tol, rel_tol, 1, sum1, abserr, m, ier)
 				
                 ! Fractional occupancy
                 sum1 = sum1 * atf(2,i_species)
@@ -293,7 +289,7 @@ module m_absorption
         call angler(zx,zy,ss,degree)
 
         if(abs(degree-90.0_fp_kind).gt.0.1_fp_kind) then
-            write(6,821) degree
+            write(*,821) degree
       821   format(' The angle between the x and y directions is ', f12.3, ' degrees.', /, &
                   &' These vectors are not mutually perpendicular.')
             write(*,*) 'Calculation cannot proceed.'
@@ -305,7 +301,7 @@ module m_absorption
         call angler(zx,zz,ss,degree)
 
         if(abs(degree-90.0_fp_kind).gt.0.1_fp_kind) then
-           write(6,831) degree
+           write(*,831) degree
       831    format(' The angle between the x and z directions is ', f12.3, ' degrees.', /, &
                   &' These vectors are not mutually perpendicular.')
             write(*,*) 'Calculation cannot proceed.'
@@ -315,7 +311,7 @@ module m_absorption
 
         call angler(zy,zz,ss,degree)
         if(abs(degree-90.0_fp_kind).gt.0.1_fp_kind) then
-           write(6,841)
+           write(*,841)
       841    format(' The angle between the y and z directions is ', f12.3, ' degrees.', /, &
                   &' These vectors are not mutually perpendicular.')
             write(*,*) 'Calculation cannot proceed.'
