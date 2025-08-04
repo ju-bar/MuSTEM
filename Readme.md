@@ -80,7 +80,7 @@ Click [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com
 ## Compiling source code
 
 ### Linux
-A makefile is provided in the repository that can be used to compile the source code on Linux systems. The makefile supports both the CPU and GPU versions of μSTEM. To compile the code, run `make` in the terminal from the root directory of the repository. Adopt to your system / compiler installations. The distributed version assumes (CPU) the Intel oneAPI (ifx) and (GPU) the Nvidia HPC SDK (nvfortran).
+A makefile is provided in the repository that can be used to compile the source code on Linux systems. The makefile supports both the CPU and GPU versions of μSTEM. To compile the code running on CPU only, run `make` in the terminal from the root directory of the repository. For compiling code running on GPU run `make mode=GPU`. It is recommended to clean previous object files using 'make clean' and 'make MODE=GPU clean' before compilking a new version. Adopt to your system / compiler installations. The distributed version assumes (CPU) the Intel oneAPI (ifx) and (GPU) the Nvidia HPC SDK (nvfortran).
 
 ### Windows
 A compile_gpu.bat is provided with the repository to produce a GPU version of μSTEM. This script assumes that the PGI Fortran compiler is installed.
