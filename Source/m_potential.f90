@@ -1480,12 +1480,13 @@ module m_potential
 	        do i = 1, n_qep_grates
 #ifdef GPU
     200	        format(a1, 1x, i3, '/', i3)
-	            write(*,200, advance='no') achar(13), i, n_qep_grates
+	            write(6,200, advance='no') achar(13), i, n_qep_grates
 #else
     201         format(1h+, 2x, i3, '/', i3)
-                write(*,201) i, n_qep_grates
+                write(6,201) i, n_qep_grates
 #endif
-          
+                flush(6)
+                
                 ! Randomly displace the atoms
 				if (.not.fracocc) then ! no fractional occ. displace all atoms
  	                do m = 1, nt

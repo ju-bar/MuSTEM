@@ -98,9 +98,9 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.2 (branch https://github.com/ju-bar 2025-07-18)        |',/,&
+       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2025-08-01)        |',/,&
 #else
-       &1x,'|       CPU only Version 6.2 (branch https://github.com/ju-bar 2025-07-18)   |',/,&
+       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2025-08-01)   |',/,&
 #endif
        &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&
@@ -180,10 +180,10 @@
 #ifdef GPU
         ! Set up GPU
         call setup_GPU
-		double_channeling =.true. !Double channeling possible with GPU calculation
+		tp_eels =.true. !Transition potential calculation enabled with GPU
 #else
         open(6,carriagecontrol ='fortran')
-		double_channeling =.false. !Double channeling not possible with CPU calculation
+		tp_eels =.false. !Transition potential calculation disabled with CPU
 #endif
         
         call command_line_title_box('Dataset output')
@@ -295,8 +295,8 @@
 #ifdef GPU
 			write(*,*) 'Calculate an energy-filtered TEM (EFTEM) image? <1> Yes <2> No'
 			call get_input('Do EFTEM? <1> Yes <2> No',ieftem)
-			double_channeling = ieftem == 1
-			if(double_channeling) call ionizer_init(.false.)
+			tp_eels = ieftem == 1
+			if(tp_eels) call ionizer_init(.false.)
 #endif
 		else
 			imaging_ndf = 1
@@ -308,7 +308,7 @@
             call command_line_title_box('Calculation type')
             write(*,*) 'Choose a calculation type:'
 115         write(*,*) '<1> CBED pattern'
-            write(*,*) '<2> STEM (BF/ABF/ADF/EELS/EDX/SE/PACBED/4D-STEM)' ! 2025-06-07 JB, added SEI
+            write(*,*) '<2> STEM (BF/ABF/ADF/EELS/EDX/SE/PACBED/4D-STEM)' ! 2025-06-07 JB, added SE
             
             call get_input('<1> CBED <2> STEM/PACBED', i_cb_calc_type)
             write(*,*)
@@ -317,10 +317,10 @@
                 case (1)
                     ! CBED pattern
                     call place_probe(probe_initial_position)
-                    double_channeling=.false.
+                    tp_eels = .false.
                 case (2)
                     ! STEM images
-                    call STEM_options(STEM,ionization,PACBED,istem,double_channeling)
+                    call STEM_options(STEM,ionization,PACBED,istem,tp_eels)
                     fourdSTEM= .false.
                     if(pacbed) call fourD_STEM_options(fourdSTEM,nopiyout,nopixout,nopiy,nopix)
                     call setup_probe_scan(PACBED.and.(.not.(ionization.or.STEM)))
@@ -332,7 +332,7 @@
                     ! Precalculate the scattering factors on a grid
                     call precalculate_scattering_factors()
                     if(ionization) call setup_inelastic_ionization_types()
-                    if(double_channeling) call ionizer_init(.true.)
+                    if(tp_eels) call ionizer_init(.true.)
                     
                 case default
                     goto 115

@@ -1271,5 +1271,75 @@ contains
     end if
   
   end function
+  
+  
+  subroutine heapsort_indices_only(values, indices, n)
+  ! Sorts indices such that values(indices) are in ascending order, smallest first
+  implicit none
+  integer, intent(in) :: n
+  real(fp_kind), intent(in) :: values(n)
+  integer, intent(out) :: indices(n)
+
+  integer :: i, tmp
+
+  ! Initialize index array
+  do i = 1, n
+    indices(i) = i
+  end do
+
+  ! Build the heap
+  do i = n / 2, 1, -1
+    call sift_down_index_only(values, indices, i, n)
+  end do
+
+  ! Extract elements from heap
+  do i = n, 2, -1
+    tmp = indices(1)
+    indices(1) = indices(i)
+    indices(i) = tmp
+
+    call sift_down_index_only(values, indices, 1, i - 1)
+  end do
+  end subroutine
+
+  
+  subroutine sift_down_index_only(values, indices, root, end_)
+  implicit none
+  integer, intent(in) :: root, end_
+  real(fp_kind), intent(in) :: values(:)
+  integer, intent(inout) :: indices(:)
+
+  integer :: child, swap, current, tmp
+
+  current = root
+
+  do
+    child = 2 * current
+    if (child > end_) exit
+
+    swap = current
+
+    if (values(indices(swap)) < values(indices(child))) then
+      swap = child
+    end if
+
+    if (child + 1 <= end_) then
+      if (values(indices(swap)) < values(indices(child + 1))) then
+        swap = child + 1
+      end if
+    end if
+
+    if (swap == current) exit
+
+    tmp = indices(current)
+    indices(current) = indices(swap)
+    indices(swap) = tmp
+
+    current = swap
+  end do
+  end subroutine
+
+
+
 
 end module

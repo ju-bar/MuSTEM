@@ -703,12 +703,12 @@
     
     end
     
-    subroutine STEM_options(STEM,ionization,PACBED,istem,double_channeling)
+    subroutine STEM_options(STEM,ionization,PACBED,istem,tp_eels)
         use m_string
         use m_user_input
         logical,intent(out)::STEM,ionization,PACBED,istem
-		logical,intent(inout)::double_channeling
-		logical::dc_init
+		logical,intent(inout)::tp_eels
+		logical::tp_init
         
         integer*4::i
         
@@ -716,8 +716,8 @@
         ionization = .false.
         PACBED = .false.
 		istem = .false.
-		dc_init = double_channeling
-		double_channeling=.false.
+		tp_init = tp_eels
+		tp_eels = .false.
         
         i=-1
         
@@ -728,12 +728,12 @@
             write(*,*)'-----------------------------------------------------------'
             write(*,*)'Option                                       | Included(y/n)'
 			write(*,*)'-----------------------------------------------------------'
-            write(*,*)'<1> Conventional STEM (ADF,ABF,BF etc.)      | ',logical_to_yn(STEM)
-            write(*,*)'<2> Ionization based STEM (EELS, EDX, SE)    | ',logical_to_yn(ionization) ! 2025-06-07 JB, added SEI
+            write(*,*)'<1> Conventional STEM (ADF, ABF, BF etc.)    | ',logical_to_yn(STEM)
+            write(*,*)'<2> Local potential STEM (EELS, EDX, SE)     | ',logical_to_yn(ionization) ! 2025-06-07 JB, added SE,  2025-07-30, changed to LP EELS
             write(*,*)'<3> Diffraction (PACBED and 4D-STEM)         | ',logical_to_yn(PACBED)
 			write(*,*)'<4> Imaging STEM (iSTEM)                     | ',logical_to_yn(istem)
-			if(dc_init)&
-		   &write(*,*)'<5> STEM EELS with double channeling         | ',logical_to_yn(double_channeling)
+			if(tp_init)&
+		   &write(*,*)'<5> Transition potential STEM EELS           | ',logical_to_yn(tp_eels) ! 2025-07-30, changed to TP EELS
             write(*,*)'<0> Continue',char(10)
             write(*,*)'-----------------------------------------------------------'
             
@@ -744,8 +744,8 @@
             if(i==2) ionization = .not.ionization
             if(i==3) PACBED = .not.PACBED
 			if(i==4) istem = .not.istem
-			if(dc_init.and.i==5) double_channeling = .not.double_channeling
-            if(i==0.and.(.not.any([STEM,ionization,PACBED,double_channeling,istem]))) then
+			if(tp_init.and.i==5) tp_eels = .not.tp_eels
+            if(i==0.and.(.not.any([STEM,ionization,PACBED,tp_eels,istem]))) then
                 write(*,*) "You must choose at least one imaging mode to proceed"
                 i=-1
             endif

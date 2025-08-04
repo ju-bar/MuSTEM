@@ -158,7 +158,7 @@ subroutine absorptive_tem
           call cufftPlan(plan,nopix,nopiy,CUFFT_C2C)
     endif
 
-	if(double_channeling) then
+	if(tp_eels) then
         allocate(tmatrix_states_d(nopiy,nopix,nstates),psi_inel_d(nopiy,nopix),cbed_inel_dc_d(nopiy,nopix),tmatrix_states(nopiy,nopix,nstates))
 		allocate(shiftarray(nopiy,nopix),tmatrix_d(nopiy,nopix),q_tmatrix_d(nopiy,nopix),temp_d(nopiy,nopix))
         tmatrix_states_d = setup_ms_hn0_tmatrices(nopiy,nopix,nstates)*alpha_n
@@ -223,71 +223,64 @@ subroutine absorptive_tem
         do i_slice = 1, n_slices
 			k =  i_slice+(i_cell-1)*n_slices
 			if( modulo(k,10)==0) write(*,900,advance='no') achar(13), k, intensity
-			if(double_channeling) then
+			if(tp_eels) then
                 do i_target = 1, natoms_slice_total(i_slice) ! Loop over targets
-                ! Calculate inelastic transmission matrix
+                    ! calculate the shift array for the target atom
 					call cuda_make_shift_array<<<blocks,threads>>>(shiftarray,Hn0_shifty_coord_d(:,i_target,i_slice),Hn0_shiftx_coord_d(:,i_target,i_slice),nopiy,nopix)
-					
 					do k = 1, nstates
-							
+                    if (state_use(k) == 0) cycle ! skip unused states, Hn0 strength filter, 2025-07-28 JB
+                    ! shift the Hn0 matrix to the position of the target atom
 					call cuda_multiplication<<<blocks,threads>>>(tmatrix_states_d(:,:,k),shiftarray, q_tmatrix_d,1.0_fp_kind,nopiy,nopix)
+                    ! transform the Hn0 matrix to real space
                     call cufftExec(plan,q_tmatrix_d,tmatrix_d,CUFFT_INVERSE)
+                    ! calculate the inelastic wave function (product of Hn0 and wave function) -> psi_inel_d = inelastic wave function
 					call cuda_multiplication<<<blocks,threads>>>(psi_d,tmatrix_d,psi_inel_d,sqrt(normalisation),nopiy,nopix)
 					starting_slice = i_slice
-                    ! Scatter the inelastic wave through the remaining cells
-                    do ii = i_cell, n_cells
-                        do jj = starting_slice, n_slices;call cuda_multislice_iteration(psi_inel_d, transf_d(:,:,jj),prop_d,prop_distance(jj),even_slicing, normalisation, nopiy, nopix,plan);enddo
-							
-						if (any(ii==ncells)) then
+                    do ii = i_cell, n_cells ! Scatter the inelastic wave through the remaining cells
+                        do jj = starting_slice, n_slices ! Loop over slices
+                            call cuda_multislice_iteration(psi_inel_d, transf_d(:,:,jj),prop_d,prop_distance(jj), &
+                                & even_slicing, normalisation, nopiy, nopix,plan) ! multislice iteration
+                        enddo
+						if (any(ii==ncells)) then ! output thickness ?
 							z_indx = minloc(abs(ncells-ii))
 							call cufftExec(plan, psi_inel_d, tmatrix_d, CUFFT_FORWARD)
-								
 							! Accumulate EFTEM images
 							do l = 1, imaging_ndf
 								call cuda_image(tmatrix_d,ctf_d(:,:,l),temp_d,normalisation, nopiy, nopix,plan,.false.)
-									 
-								call cuda_addition<<<blocks,threads>>>(eftem_image_d(:,:,l,z_indx(1)), temp_d, eftem_image_d(:,:,l,z_indx(1)), 1.0_fp_kind, nopiy, nopix)
+								call cuda_addition<<<blocks,threads>>>(eftem_image_d(:,:,l,z_indx(1)), temp_d, &
+                                    & eftem_image_d(:,:,l,z_indx(1)), 1.0_fp_kind, nopiy, nopix)
 							enddo
 						endif
 						starting_slice=1
-                    enddo
-					enddo
-				enddo
-			endif  ! End loop over cells,targets and states and end double_channeling section
+                    enddo ! ii over cells
+					enddo ! k over states
+                enddo ! i_target over target atoms
+			endif ! end tp_eels section
 
             if(on_the_fly) then
-				if(.not.factorized_propagator) call cuda_on_the_fly_abs_multislice(psi_d,ccd_slice_array(i_slice),tau_slice(:,:,:,i_slice),nat_slice(:,i_slice),prop_distance(i_slice),even_slicing,plan,Vg,Volume_array(i_slice),prop_d = prop_d)
-				if(factorized_propagator) call cuda_on_the_fly_abs_multislice(psi_d,ccd_slice_array(i_slice),tau_slice(:,:,:,i_slice),nat_slice(:,i_slice),prop_distance(i_slice),even_slicing,plan,Vg,Volume_array(i_slice),propy_d, propx_d)
-				
+				if(.not.factorized_propagator) call cuda_on_the_fly_abs_multislice(psi_d,ccd_slice_array(i_slice), &
+                    & tau_slice(:,:,:,i_slice),nat_slice(:,i_slice),prop_distance(i_slice),even_slicing,plan, &
+                    & Vg,Volume_array(i_slice),prop_d = prop_d)
+				if(factorized_propagator) call cuda_on_the_fly_abs_multislice(psi_d,ccd_slice_array(i_slice), &
+                    & tau_slice(:,:,:,i_slice),nat_slice(:,i_slice),prop_distance(i_slice),even_slicing,plan, &
+                    & Vg,Volume_array(i_slice),propy_d, propx_d)
             else
-				call cuda_multislice_iteration(psi_d, transf_d(:,:,i_slice), prop_d,prop_distance(i_slice),even_slicing, normalisation, nopiy, nopix,plan)
+				call cuda_multislice_iteration(psi_d, transf_d(:,:,i_slice), prop_d,prop_distance(i_slice),even_slicing, &
+                    & normalisation, nopiy, nopix,plan)
             endif
         enddo ! End loop over slices
         
 		!If this thickness corresponds to any of the output values then output images
 		if (any(i_cell==ncells)) then
 			psi = psi_d
-		!	
-		!	call fft2(nopiy, nopix, psi, nopiy, psi, nopiy)
-		!	cbed = abs(psi)**2
-		!	z_indx = minloc(abs(ncells-i_cell))
-		!	call output_TEM_result(output_prefix,cbed,'Diffraction_pattern',nopiy,nopix,manyz,.false.,manytilt,z=zarray(z_indx(1))&
-		!						&,lengthz=lengthz,lengthdf=lengthdf,tiltstring = tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)&
-		!						&,nopiyout=nopiy*2/3,nopixout=nopix*2/3)				
-		!	if(pw_illum) then
-		!	do i=1,imaging_ndf
-		!		tem_image = make_image(nopiy,nopix,psi,lens_ctf(:,:,i),.false.)
-		!		call output_TEM_result(output_prefix,tem_image,'Image',nopiy,nopix,manyz,imaging_ndf>1,manytilt,z=zarray(z_indx(1))&
-		!						&,lengthz=lengthz,lengthdf=lengthdf,tiltstring = tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2),df = imaging_df(i))
-				if(double_channeling) then
+				if(tp_eels) then
 				do l = 1, imaging_ndf
 				tem_image = eftem_image_d(:,:,l,z_indx(1))
-				call output_TEM_result(output_prefix,tile_out_image(tem_image,ifactory,ifactorx),'energy_filtered_image',nopiy,nopix,manyz,imaging_ndf>1,manytilt,z=zarray(z_indx(1))&
-								&,lengthz=lengthz,lengthdf=lengthdf,tiltstring = tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2),df = imaging_df(l))
+				call output_TEM_result(output_prefix,tile_out_image(tem_image,ifactory,ifactorx),'energy_filtered_image', &
+                        & nopiy,nopix,manyz,imaging_ndf>1,manytilt,z=zarray(z_indx(1)),lengthz=lengthz, &
+						& lengthdf=lengthdf,tiltstring = tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2),df = imaging_df(l))
 				enddo
 				endif
-		!	enddo
-		!	endif
 		endif
         
 #else	

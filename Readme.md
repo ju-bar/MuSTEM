@@ -11,16 +11,17 @@ Ultramicroscopy, Vol. 151, pp. 11-22, (2015).](http://www.sciencedirect.com/scie
 
 This is a fork of the [original µSTEM repository](https://github.com/HamishGBrown/MuSTEM).
 
+
 ## Precompiled executables
 
-### [µSTEM v6.2 GPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CUDA_muSTEM_x64_v6.2_single_precision.zip)
+### [µSTEM v6.3 GPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CUDA_muSTEM_x64_v6.3_single_precision.zip)
 
 #### Prerequisites
 * 64-bit Windows OS
 * A CUDA enabled GPU with compute class 3.0 up to 7.5, GPU compute classes >7.5 are only supported on Linux with the Nvidia HPC SDK.
 * Version 10.1 of the [Nvidia CUDA toolkit](https://developer.nvidia.com/cuda-toolkit-archive), this installs the .dll files necessary to run the GPU versions of μSTEM.
 
-### [µSTEM v6.2 CPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CPU_muSTEM_x64_v6.2_single_precision.zip)
+### [µSTEM v6.3 CPU single precision](https://github.com/ju-bar/MuSTEM/blob/master/Executables/CPU_muSTEM_x64_v6.3_single_precision.zip)
 
 #### Prerequisites
 * 64-bit Windows OS
@@ -32,6 +33,16 @@ Executables of previous versions can be found in the [Executables](https://githu
 
 
 ## Version changes
+
+### Version 6.3
+* Double-channeling code has been revisited and improved. Some of the input keys have been changed and old runfiles may be invalid now.
+* There is now an option to calculate STEM EELS with transition potentials but single channeling (faster but less accurate for thick samples and small detectors). Single channeling transition potential STEM-EELS output files are labelled "single_channeling".
+* New filters to reduce transition potential computation costs have been implemented:
+  - transition potentials can be filtered by strength, affecting EFTEM and STEM EELS calculations
+  - inelastic wave functions can be filtered by strength, affecting only STEM EELS double-channeling calculations
+  Both filters can be used together or separately. The filters are turned off by setting the filter strength to 0.
+* The old filter to calculate for a fraction of the supercell in STEM EELS is removed.
+* Parts of the code have been reformatted and commented to improve readability and maintainability.
 
 ### Version 6.2
 * Added STEM secondary electron imaging based on ionization tables also used for STEM EELS simulations. An iosotropic model is used to estimate the secondary electron emission into a user specified detector acceptance angle, and a user specified inelastic mean free path is used to estimate the decay of the SE signal towards the detector placed in the backwards direction.
@@ -64,6 +75,7 @@ Executables of previous versions can be found in the [Executables](https://githu
 ## Tutorial
 
 Click [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/ju-bar/MuSTEM/tree/master/Tutorial) to download the μSTEM tutorial calculations, powerpoint and activity sheet.
+
 
 ## Compiling source code
 

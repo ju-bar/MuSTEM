@@ -23,7 +23,8 @@ module m_Hn0
     integer(4) :: numwve = 100
     integer(4) :: nsplpts = 300 !continuum wavefunction para
     integer(4) :: nstates                        !number of atomic states used in a calculation
-    integer(4), allocatable :: state_vector(:,:) !lists the states as, ml,lpr,ml_pr 
+    integer(4), allocatable :: state_vector(:,:) !lists the states as, ml,lpr,ml_pr
+    integer(4), allocatable :: state_use(:) !lists the states used in the calculation, 1 if used, 0 if not used
     !real(fp_kind)  ::  bwl_rad  !band width limiting radius (in q space)
     real(fp_kind) :: VA(10000)  !potential of the atom seen by the ejected electron
     real(fp_kind) :: Pnl(2000)  !Bound state wavefunction of the target electron to be ionized
@@ -47,7 +48,7 @@ module m_Hn0
     ! shift arrays for the atoms in the unit cell
     integer(4),allocatable :: natoms_slice_total(:) !the number of target atoms per slice
     complex(fp_kind),allocatable :: Hn0_shiftx_coord(:,:,:),Hn0_shifty_coord(:,:,:)
-    integer*4::ycells,xcells
+    !integer*4::ycells,xcells
     
     logical :: all_atoms
     real(fp_kind) :: ionize_fraction
@@ -74,14 +75,15 @@ module m_Hn0
         use output
         implicit none
     
-        integer(4) :: i,itype,j,order,comaindex,nd
+        integer(4) :: i,itype,j,order,comaindex,nd,idc
 		logical::stem,detectors,outputdetectors
+        real(fp_kind) :: str_filter
         character*100::dstring
         !select atom to be ionized
         !calculate the factorials required for the cleb code
         call fakred()
 		
-		call command_line_title_box('Double-channeling ionization menu')
+		call command_line_title_box('Ionization transition-potential menu')
 
 		itype=-1
 		do while(itype<1.or.itype>nt) 
@@ -110,8 +112,8 @@ module m_Hn0
         call get_input('Ionization energy',eval)
         write(*,*)
 		
-        ycells=1
-        xcells=1
+        !ycells=1
+        !xcells=1
 		!If STEM EELS get detectors
 		if(stem) then
             dc_numeels=0
@@ -119,6 +121,25 @@ module m_Hn0
             dc_eels_segments=.false.
             outputdetectors=.false.
             dc_eels_seg_offset=0.0_fp_kind
+            
+            ! single or double channeling
+            write(*,*) "Calculating STEM-EELS with transition potentials can include the effect"
+            write(*,*) "of further elastic and thermal-diffuse scattering after the ionization,"
+            write(*,*) "aka. double channeling. Double-channeling effects become more important"
+            write(*,*) "for thicker specimens, smaller EELS detectors and strong dynamical"
+            write(*,*) "diffraction conditions. However, double-channeling requires much more"
+            write(*,*) "additional computation."
+            idc = -1
+            do while (idc<0.OR.idc>1)
+              write(*,*) "Do you want to do double-channeling or run a faster but approximate"
+              write(*,*) "single-channeling calculation?"
+              write(*,*) "Select  <0> for single-channeling  or  <1> for double-channeling."
+              call get_input('<0> single-channeling or <1> double-channeling', idc)
+              write(*,*)
+            enddo
+            single_channeling = (idc == 0) ! set single channeling switch
+            if (single_channeling) iwf_filter_threshold = 0.0_fp_kind ! do not filter inelastic wave functions with single-channeling
+            
             
             do while(dc_numeels<1) ! ensure at least one detector
                 
@@ -190,38 +211,55 @@ module m_Hn0
 			    enddo
 			    enddo
             endif
+            
+            if (.NOT.single_channeling) then ! iwf filter setup
+                ! insert setup of Hn0-strength filter here
+                write(*,*) "To speed up STEM-EELS double channeling, muSTEM can omit weak inelastic"
+                write(*,*) "wave functions. The quality of the simulation may be reduced when this"
+                write(*,*) "filter is too strong. Using zero filter strength completely deactivates it."
+                write(*,*) "This filter analyses the overlaps between the probe wave function and the"
+                write(*,*) "transition potentials of all atoms in a slice."
+                str_filter = -1.0_fp_kind
+                do while(str_filter < 0.0_fp_kind .or. str_filter >= 1.0_fp_kind)
+                    write(*,*) "Please, enter the fraction of total overlap intensity that is removed"
+                    write(*,*) "by omitting the weakest contributions (typical range: 0.01 to 0.1)."
+                    call get_input("inelastic wavefunction filter strength",str_filter)
+                    write(*,*)
+                enddo
+                iwf_filter_threshold = str_filter
+            endif
         
 		
-			if(ifactory>1.and.ifactorx>1) then !
-				write(*,140)
-                140 format('In STEM the probe is sufficiently localised such that only a fraction of atoms',/,&
-				         &'in the simulation supercell have significant probability of ionization.',/,&
-						 &'To speed up calculation with large supercells, you have the option of',/,&
-						 &'choosing the fraction of the supercell within which atoms will be ionized.',/&
-                         &'(Works only well when the number of tiles is big and the unit cell is small.)',/,&
-						 &'Please input the fraction of the supercell that will be ionized.')    
-				call get_input('Fraction of supercell to ionize',ionize_fraction)
-				write(*,*)
-            
-				!Round this number up so that an odd integer number of unit cells are ionized
-				ycells = ceiling(ionize_fraction*ifactory)
-				ycells = ycells + mod(ycells+1,2)
-				xcells = ceiling(ionize_fraction*ifactorx)
-				xcells = xcells + mod(xcells+1,2)
-                if (ycells>= ifactory .or. xcells>=ifactorx) then ! one of the two directions covers the supercell extent
-                    ! fall back to ionization of all atoms
-                    all_atoms = .true.
-                    ycells = ifactory
-                    xcells = ifactorx
-                    write(unit=*,fmt=161)
-161                 format('All atoms in the supercell will be ionised.')    
-                else
-                    all_atoms = .false.
-				    write(unit=*,fmt=160) xcells,ycells,ifactorx,ifactory
-160                 format(i0,'x',i0,' unit cells will be ionised out of ',i0,'x',i0,' total cells in the supercell.')    
-                endif
-				write(*,*)
-            endif
+!			if(ifactory>1.and.ifactorx>1) then ! deprecated with new filters: remove this section and the related code using ycells, xcells, all_atoms
+!				write(*,140)
+!                140 format('In STEM the probe is sufficiently localised such that only a fraction of atoms',/,&
+!				         &'in the simulation supercell have significant probability of ionization.',/,&
+!						 &'To speed up calculation with large supercells, you have the option of',/,&
+!						 &'choosing the fraction of the supercell within which atoms will be ionized.',/&
+!                         &'(Works only well when the number of tiles is big and the unit cell is small.)',/,&
+!						 &'Please input the fraction of the supercell that will be ionized.')    
+!				call get_input('Fraction of supercell to ionize',ionize_fraction)
+!				write(*,*)
+!            
+!				!Round this number up so that an odd integer number of unit cells are ionized
+!				ycells = ceiling(ionize_fraction*ifactory)
+!				ycells = ycells + mod(ycells+1,2)
+!				xcells = ceiling(ionize_fraction*ifactorx)
+!				xcells = xcells + mod(xcells+1,2)
+!                if (ycells>= ifactory .or. xcells>=ifactorx) then ! one of the two directions covers the supercell extent
+!                    ! fall back to ionization of all atoms
+!                    all_atoms = .true.
+!                    ycells = ifactory
+!                    xcells = ifactorx
+!                    write(unit=*,fmt=161)
+!161                 format('All atoms in the supercell will be ionised.')    
+!                else
+!                    all_atoms = .false.
+!				    write(unit=*,fmt=160) xcells,ycells,ifactorx,ifactory
+!160                 format(i0,'x',i0,' unit cells will be ionised out of ',i0,'x',i0,' total cells in the supercell.')    
+!                endif
+!				write(*,*)
+!            endif
         endif
         
         !call make_state_vector()
@@ -237,6 +275,19 @@ module m_Hn0
         !call fill_state_vector(order,lorb) ! old version omitting delta_l=0 transitions for order=1
         call fill_state_vector_version2(order,lorb) ! 2025-07-17, JB: new version including delta_l=0 transitions for all orders
         write(*,*)
+        
+        ! setup of Hn0-strength filter
+        write(*,*) "To speed up calculations with transition potentials, muSTEM can omit weak"
+        write(*,*) "transitions. The quality of the simulation may be reduced when this"
+        write(*,*) "filter is too strong. Using zero filter strength completely deactivates it."
+        str_filter = -1.0_fp_kind
+        do while(str_filter < 0.0_fp_kind .or. str_filter >= 1.0_fp_kind)
+            write(*,*) "Please, enter the fraction of total transition strength that is removed"
+            write(*,*) "by omitting the weakest transitions (typical range: 0.001 to 0.1)."
+            call get_input("transition filter strength",str_filter)
+            write(*,*)
+        enddo
+        Hn0_filter_threshold = str_filter
         
         !allocate arrays for the hn0 calculations
         if(allocated(qmin)) deallocate(qmin)
@@ -441,7 +492,7 @@ module m_Hn0
 			  write(*,200) i,nstates,lorb,state_vector(i,:)
         enddo
 		write(*,*)
-    200 format('State: ',i3,'/',i3,' l = ',i3,' ml = ',i3," l' = ",i3," ml' = ",i3,"  ")
+    200 format('Transition ',i3,'/',i3,': l = ',i3,' ml = ',i3," l' = ",i3," ml' = ",i3,"  ")
     end subroutine
     
     ! This version does exclude transitions with l=l_p for order=1 but not for order>1.
@@ -517,7 +568,7 @@ module m_Hn0
 			  write(*,200) i,nstates,lorb,state_vector(i,:)
         enddo
 		write(*,*)
-    200 format('State: ',i3,'/',i3,' l = ',i3,' ml = ',i3," l' = ",i3," ml' = ",i3,"  ")
+    200 format('Transition ',i3,'/',i3,': l = ',i3,' ml = ',i3," l' = ",i3," ml' = ",i3,"  ")
     end subroutine 
     
 
@@ -1769,6 +1820,55 @@ module m_Hn0
     RETURN
     END subroutine
     
+    !--------------------------------------------------------------------------------
+    ! This routine sets up the filter for significant transitions based on their 
+    ! intensities. The transitions with lowest intensities are filtered out.
+    ! The cutoff is set by the relative input threshold. This threshold sets the
+    ! fraction of the total intensity that is omitted.
+    ! Threshold is expected to be in the range [0,1] and usually less than 1.
+    subroutine strength_filter(strength, valid, n, threshold)
+    
+    use m_numerical_tools
+    
+    implicit none
+    
+    real(fp_kind), parameter :: eps = 1.0e-6_fp_kind ! Small filter threshold
+    
+    integer(4), intent(in) :: n
+    integer(4), intent(out) :: valid(n)
+    real(fp_kind), intent(in) :: strength(n), threshold
+    
+    integer(4) :: i
+    integer(4) :: index_sorted(n) ! Sorted indices (ascending by strength)
+    real(fp_kind) :: sum_strength, cutoff_strength, accum
+    
+    if (n<1) return ! no items, nothing to filter
+    
+    ! Initialize valid array
+    valid = 1 ! initialize all to be valid
+    if (threshold < eps) return ! no filtering if threshold is too small
+    
+    ! Sort indices based on intensity (values remain unchanged)
+    call heapsort_indices_only(strength, index_sorted, n)
+    
+    ! Compute total intensity and cutoff value
+    sum_strength = SUM(strength)
+    cutoff_strength = sum_strength * threshold
+    accum = 0.0_fp_kind
+    
+    ! Accumulate from the least significant intensity upward
+    do i = 1, n
+        accum = accum + strength(index_sorted(i))
+        if (accum < cutoff_strength) then
+            valid(index_sorted(i)) = 0 ! mark this index as not valid
+        else
+            exit ! stop when threshold is reached
+        end if
+    end do
+        
+    return
+    end subroutine strength_filter
+    
     
     
     subroutine fill_tmatrix(tmatrix,m_l,lpr,m_lpr,qpos_local,qmin_local,gint_local,dgint_local)
@@ -1916,6 +2016,7 @@ module m_Hn0
         integer(4) :: ss_atomx,ss_atomy
         integer(4) :: counter
         real(fp_kind) :: x_coord,y_coord,x_cell,y_cell,ifx,ify
+        real(fp_kind) :: state_intens(nstates) ! intensity of each state
         !real(fp_kind),dimension(nopiy,nopix) :: effective_potential
 
         complex(fp_kind)   :: c_1 = 9.7846113e-07_fp_kind ! c_1 = 1/(2mc^2) in eV^(-1)
@@ -1926,34 +2027,65 @@ module m_Hn0
         !make the transition matrix elements and the 1D shift arrays
         !effective_potential = 0.0_fp_kind
 
-        write(*,*) 'Calculating transition potentials...';write(*,*)
+        write(*,*) 'Calculating transition potentials...'
         
+        state_intens = 0.0_fp_kind
         do i =1,nstates
             ml=state_vector(i,1)
             lpr=state_vector(i,2)
             mlpr=state_vector(i,3)
             write(6,100,ADVANCE='NO') achar(13),i,nstates,lorb,ml,lpr,mlpr
             flush(6)
-100 format(a1,' State: ',i0,'/',i0,':  [l,m]=[',i0,',',i0,"] ->  [l',m']=[",i0,',',i0,']   ')
+100         format(a1,'   Transition ',i0,'/',i0,':  [',i0,',',i0,"]  ->  [",i0,',',i0,']   ')
+101         format(a1,'                                                           ')            
             call calc_gsplint(ml,lpr,mlpr,qpos(:,i),qmin(i),gint(:,:,:,i),dgint(:,:,:,i))
             call fill_tmatrix(tmatrix_states(:,:,i),ml,lpr,mlpr,qpos(:,i),qmin(i), &
                     & gint(:,:,:,i),dgint(:,:,:,i)) !make the Hn0
+            state_intens(i) = sum(abs(tmatrix_states(:,:,i))**2) !calculate the total intensity of the Hn0
             !effective_potential = effective_potential + abs(tmatrix_states(:,:,i))**2
         enddo
-        write(*,*)
+        write(6,101,ADVANCE='NO') achar(13)
+        flush(6)
+        
         if (0 < IAND(arg_debug_dump, 1)) then
-            write(*,*) 'Creating dump of transition potentials (y,x,tran) [dump_tmat.bin]'
+            write(*,*)
+            write(*,*) '  Creating dump of transition potentials (y,x,tran) [dump_tmat.bin]'
             open(unit=456,file='dump_tmat.bin',form='binary',status='replace',convert='big_endian')
             write(456) tmatrix_states
             close(456)
         endif
+        
+        ! Hn0 strength filter
+        if (Hn0_filter_threshold > 0.0_fp_kind .and. Hn0_filter_threshold < 1.0_fp_kind) then
+          write(*,*)
+          write(*,*) '  Filtering insignificant transition ...'
+          if (ALLOCATED(state_use)) deallocate(state_use)
+          allocate(state_use(nstates))
+          state_use = 1 ! initialize all states to be used
+          call strength_filter(state_intens, state_use, nstates, Hn0_filter_threshold)
+          if (SUM(state_use) < nstates) then
+110         format('   ',i0,' of ',i0,' transitions used, filtered with rel. threshold ',E9.2)
+            write(*,110) SUM(state_use), nstates, Hn0_filter_threshold
+            if (SUM(state_use) < nstates) then
+111           format('   The following ',i0,' transitions are ignored (total strength: ',E9.2,')')
+              write(*,111) nstates-SUM(state_use), SUM(state_intens)
+              do i=1, nstates
+112             format('   #',i3,': l=',i3,', ml=',i3,"  ->  l'=",i3,", ml'=",i3,':   strength=',E9.2)
+                if (state_use(i) == 0) write(*,112) i, lorb, state_vector(i,1), state_vector(i,2), &
+                                                             state_vector(i,3), state_intens(i)
+              enddo
+            endif
+          endif
+        endif
+        
         write(*,*)
-        write(*,*) 'Preparing shift factors ...';
+        write(*,*) '  Preparing shift factors ...'
         
         !number of atoms in a slice
 		if(allocated(natoms_slice_total)) deallocate(natoms_slice_total)
         allocate(natoms_slice_total(n_slices))
-        natoms_slice_total = nat_slice_unitcell(target_atom,:)*ycells*xcells
+        !natoms_slice_total = nat_slice_unitcell(target_atom,:)*ycells*xcells
+        natoms_slice_total = nat_slice_unitcell(target_atom,:)*ifactory*ifactorx
     
         !shift arrays
 		if(allocated(Hn0_shiftx_coord)) deallocate(Hn0_shiftx_coord)
@@ -1976,38 +2108,11 @@ module m_Hn0
               ion_tau(:,counter) = [x_coord,y_coord]
               call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
               call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
-            elseif(all_atoms) then                      !if focussed probe we need to shift ionization potentials over supercell
-              do ss_atomx=1,ifactorx                  !tile the unit cell atom over the supercell
+            else
+              do ss_atomx=1,ifactorx                !tile the unit cell atom over the supercell
                 x_cell = real(ss_atomx-1,fp_kind)
                 do ss_atomy=1,ifactory              !tile the unit cell atom over the supercell
                   y_cell = real(ss_atomy-1,fp_kind)
-!                  write(*,102) "[xc,yc]", x_cell, y_cell
-                  x_coord = (tau_slice_unitcell(1,target_atom,atom,j)+x_cell)*ifx
-                  y_coord = (tau_slice_unitcell(2,target_atom,atom,j)+y_cell)*ify
-                  counter = counter+1
-                  ion_tau(:,counter) = [x_coord,y_coord]
-                  call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
-                  call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
-!                  write(*,102) " UC-pos", tau_slice_unitcell(1,target_atom,atom,j), &
-!                        & tau_slice_unitcell(2,target_atom,atom,j)
-!                  write(*,102) " SC-pos", x_coord, y_coord
-
-                enddo
-              enddo
-            else      !user decided to only shift ionization potentials over a fraction small than the supercell
-              do ss_atomx=-xcells/2,xcells/2         !tile the unit cell atom over the supercell
-                if (ss_atomx.ge.0) then
-                  x_cell = real(ifactorx+ss_atomx,fp_kind)
-                else
-                  x_cell = real(ss_atomx,fp_kind)
-                endif
-                do ss_atomy=-ycells/2,ycells/2       !tile the unit cell atom over the supercell
-                  if (ss_atomy.ge.0) then
-                    y_cell = real(ifactory+ss_atomy,fp_kind)
-                  else
-                    y_cell = real(ss_atomy,fp_kind)
-                  endif
-                  y_cell = real(ifactorx+ss_atomy,fp_kind)
                   x_coord = (tau_slice_unitcell(1,target_atom,atom,j)+x_cell)*ifx
                   y_coord = (tau_slice_unitcell(2,target_atom,atom,j)+y_cell)*ify
                   counter = counter+1
@@ -2017,9 +2122,52 @@ module m_Hn0
                 enddo
               enddo
             endif
-          enddo
-        enddo 
-		write(*,*) 'Transition potentials have been calculated.'
+            ! below is code depricated with the implementation of the intensity-based inelastic wave function filter
+!            elseif(all_atoms) then                      !if focussed probe we need to shift ionization potentials over supercell
+!              do ss_atomx=1,ifactorx                  !tile the unit cell atom over the supercell
+!                x_cell = real(ss_atomx-1,fp_kind)
+!                do ss_atomy=1,ifactory              !tile the unit cell atom over the supercell
+!                  y_cell = real(ss_atomy-1,fp_kind)
+!!                  write(*,102) "[xc,yc]", x_cell, y_cell
+!                  x_coord = (tau_slice_unitcell(1,target_atom,atom,j)+x_cell)*ifx
+!                  y_coord = (tau_slice_unitcell(2,target_atom,atom,j)+y_cell)*ify
+!                  counter = counter+1
+!                  ion_tau(:,counter) = [x_coord,y_coord]
+!                  call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
+!                  call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
+!!                  write(*,102) " UC-pos", tau_slice_unitcell(1,target_atom,atom,j), &
+!!                        & tau_slice_unitcell(2,target_atom,atom,j)
+!!                  write(*,102) " SC-pos", x_coord, y_coord
+!
+!                enddo
+!              enddo
+!            else      !user decided to only shift ionization potentials over a fraction small than the supercell
+!              do ss_atomx=-xcells/2,xcells/2         !tile the unit cell atom over the supercell
+!                if (ss_atomx.ge.0) then
+!                  x_cell = real(ifactorx+ss_atomx,fp_kind)
+!                else
+!                  x_cell = real(ss_atomx,fp_kind)
+!                endif
+!                do ss_atomy=-ycells/2,ycells/2       !tile the unit cell atom over the supercell
+!                  if (ss_atomy.ge.0) then
+!                    y_cell = real(ifactory+ss_atomy,fp_kind)
+!                  else
+!                    y_cell = real(ss_atomy,fp_kind)
+!                  endif
+!                  y_cell = real(ifactorx+ss_atomy,fp_kind)
+!                  x_coord = (tau_slice_unitcell(1,target_atom,atom,j)+x_cell)*ifx
+!                  y_coord = (tau_slice_unitcell(2,target_atom,atom,j)+y_cell)*ify
+!                  counter = counter+1
+!                  ion_tau(:,counter) = [x_coord,y_coord]
+!                  call make_shift_oned(Hn0_shiftx_coord(:,counter,j),nopix,x_coord) !this is shifting fractionally on the supercell
+!                  call make_shift_oned(Hn0_shifty_coord(:,counter,j),nopiy,y_coord) !this is shifting fractionally on the supercell
+!                enddo
+!              enddo
+!            endif
+          enddo ! atom in slice
+        enddo ! slices
+        write(*,*)
+		write(*,*) 'Finished with preparing transition potentials.'
         write(*,*)
     end function
     

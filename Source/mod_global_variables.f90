@@ -125,14 +125,19 @@ module global_variables
     real(fp_kind) :: se_det_scale = 1.0_fp_kind ! scale factor for the SE detector, initialised to accept full angular range
     real(fp_kind) :: se_imfp = 0.001_fp_kind ! inelastic mean free path (1/e decay) for secondary electrons, initialised to 0.001 A
     
+    ! inelastic filter thresholds, 2025-07-29, JB
+    real(fp_kind) :: Hn0_filter_threshold = 0.001_fp_kind ! threshold for Hn0 filter, initialised to 0.001
+    real(fp_kind) :: iwf_filter_threshold = 0.01_fp_kind ! threshold for inelastic wavefunctions, initialised to 0.01
+    
     logical :: qep,output_thermal,interpolation,fourdSTEM
     
     logical :: on_the_fly = .false.
     logical :: high_accuracy
     logical :: ionic = .false.
-    logical :: double_channeling,istem
+    logical :: tp_eels,istem
+    logical :: single_channeling = .true. ! tp_eels single-channeling mode flag, 2025-07-29, JB
     logical :: plasmonmc = .false.
-    logical :: linpoleels = .false.                       ! linear eels range interpolation (2025-May-14, JB)
+    logical :: linpoleels = .false.       ! linear eels range interpolation (2025-May-14, JB)
     
     ! arguments for debugging
     integer(4) :: arg_debug_wave = 0    ! 0 = no debug, 1 = print debug values of wave function, triggered by secret option mmouse_wave

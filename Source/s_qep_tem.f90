@@ -132,7 +132,7 @@ subroutine qep_tem
         call cuda_setup_many_phasegrate
     else
 	
-	 if(double_channeling) then
+	 if(tp_eels) then
         allocate(tmatrix_states_d(nopiy,nopix,nstates),psi_inel_d(nopiy,nopix),cbed_inel_dc_d(nopiy,nopix),tmatrix_states(nopiy,nopix,nstates))
 		allocate(shiftarray(nopiy,nopix),tmatrix_d(nopiy,nopix),q_tmatrix_d(nopiy,nopix))
         tmatrix_states_d = setup_ms_hn0_tmatrices(nopiy,nopix,nstates)*alpha_n
@@ -249,18 +249,21 @@ psi_initial_d = psi_initial
         do i_cell = 1,maxval(ncells)
 	        do i_slice = 1, n_slices
 				
-				if(double_channeling) then
+				if(tp_eels) then
                 do i_target = 1, natoms_slice_total(i_slice) ! Loop over targets
-                ! Calculate inelastic transmission matrix
+					! Calculate shift matrix for current target atom
 					call cuda_make_shift_array<<<blocks,threads>>>(shiftarray,Hn0_shifty_coord_d(:,i_target,i_slice),Hn0_shiftx_coord_d(:,i_target,i_slice),nopiy,nopix)
 					
 					do k = 1, nstates
-							
+                    if (state_use(k) == 0) cycle ! skip unused states, Hn0 strength filter, 2025-07-28 JB
+                    ! shift the Hn0 to the position of the current target atom
 					call cuda_multiplication<<<blocks,threads>>>(tmatrix_states_d(:,:,k),shiftarray, q_tmatrix_d,1.0_fp_kind,nopiy,nopix)
+                    ! transform the shifted Hn0 to real space
                     call cufftExec(plan,q_tmatrix_d,tmatrix_d,CUFFT_INVERSE)
+                    ! multiply the shifted Hn0 with the wavefunction --> psi_inel_d = inelastic wavefunction
 					call cuda_multiplication<<<blocks,threads>>>(psi_d,tmatrix_d,psi_inel_d,sqrt(normalisation),nopiy,nopix)
 					starting_slice = i_slice
-					do ii = i_cell, n_cells
+                    do ii = i_cell, n_cells ! scatter the inelastic wavefunction through remaining cells and slices
                         do jj = starting_slice, n_slices;nran = floor(n_qep_grates*ran1(idum)) + 1
 							shiftx = floor(ifactorx*ran1(idum));shifty = floor(ifactory*ran1(idum))
 							if(on_the_fly) then
@@ -274,12 +277,11 @@ psi_initial_d = psi_initial
 								call cuda_multislice_iteration(psi_inel_d, trans_d, prop_d(:,:,jj), normalisation, nopiy, nopix,plan)
 							else
 								call cuda_multislice_iteration(psi_inel_d, transf_d(:,:,nran,jj), prop_d(:,:,jj), normalisation, nopiy, nopix,plan)
-							endif;enddo
-							
-						if (any(ii==ncells)) then
+                            endif
+                        enddo ! jj over slices
+                        if (any(ii==ncells)) then ! output thickness
 							z_indx = minloc(abs(ncells-ii))
 							call cufftExec(plan, psi_inel_d, tmatrix_d, CUFFT_FORWARD)
-								
 							! Accumulate EFTEM images
 							do l = 1, imaging_ndf
 								call cuda_image(tmatrix_d,ctf_d(:,:,l),temp_d,normalisation, nopiy, nopix,plan,.false.)
@@ -288,10 +290,10 @@ psi_initial_d = psi_initial
 							enddo
 						endif
 						starting_slice =1
-                    enddo
-					enddo
-				enddo
-			endif  ! End loop over cells,targets and states and end double_channeling section
+                    enddo ! ii over cells
+                    enddo ! k over states
+				enddo ! i_target over target atoms
+				endif  ! end tp_eels section
 
 				
                 ! QEP multislice
@@ -319,37 +321,37 @@ psi_initial_d = psi_initial
 
             enddo ! End loop over slices
 			
-				!If this thickness is an output thickness then accumulate relevent TEM images and diffraction patterns
-				if (any(i_cell==ncells)) then
+			!If this thickness is an output thickness then accumulate relevent TEM images and diffraction patterns
+			if (any(i_cell==ncells)) then
 					
-					!Transform into diffraction space
-					call cufftExec(plan,psi_d,psi_out_d,CUFFT_FORWARD)
-					call cuda_mod<<<blocks,threads>>>(psi_out_d,temp_d,normalisation,nopiy,nopix)
-					z_indx = minloc(abs(ncells-i_cell))
+				!Transform into diffraction space
+				call cufftExec(plan,psi_d,psi_out_d,CUFFT_FORWARD)
+				call cuda_mod<<<blocks,threads>>>(psi_out_d,temp_d,normalisation,nopiy,nopix)
+				z_indx = minloc(abs(ncells-i_cell))
 
-					! Accumulate elastic wave function
-					call cuda_addition<<<blocks,threads>>>(psi_elastic_d(:,:,z_indx(1)),psi_d,psi_elastic_d(:,:,z_indx(1)),1.0_fp_kind,nopiy,nopix)
+				! Accumulate elastic wave function
+				call cuda_addition<<<blocks,threads>>>(psi_elastic_d(:,:,z_indx(1)),psi_d,psi_elastic_d(:,:,z_indx(1)),1.0_fp_kind,nopiy,nopix)
 
-					! Accumulate exit surface intensity
-					call cuda_mod<<<blocks,threads>>>(psi_d, temp_image_d, 1.0_fp_kind, nopiy, nopix)
-					call cuda_addition<<<blocks,threads>>>(total_intensity_d(:,:,z_indx(1)), temp_image_d, total_intensity_d(:,:,z_indx(1)), 1.0_fp_kind, nopiy, nopix)
+				! Accumulate exit surface intensity
+				call cuda_mod<<<blocks,threads>>>(psi_d, temp_image_d, 1.0_fp_kind, nopiy, nopix)
+				call cuda_addition<<<blocks,threads>>>(total_intensity_d(:,:,z_indx(1)), temp_image_d, total_intensity_d(:,:,z_indx(1)), 1.0_fp_kind, nopiy, nopix)
 					
-					! Accumulate diffaction pattern
-					call cuda_mod<<<blocks,threads>>>(psi_out_d,temp_d,normalisation,nopiy,nopix)
-					call cuda_addition<<<blocks,threads>>>(cbed_d(:,:,z_indx(1)),temp_d,cbed_d(:,:,z_indx(1)),1.0_fp_kind,nopiy,nopix)
+				! Accumulate diffaction pattern
+				call cuda_mod<<<blocks,threads>>>(psi_out_d,temp_d,normalisation,nopiy,nopix)
+				call cuda_addition<<<blocks,threads>>>(cbed_d(:,:,z_indx(1)),temp_d,cbed_d(:,:,z_indx(1)),1.0_fp_kind,nopiy,nopix)
 					
-					if(pw_illum) then
-					! Accumulate image
-					do i=1,imaging_ndf
-						psi_temp_d = psi_out_d
-						call cuda_multiplication<<<blocks,threads>>>(psi_temp_d, ctf_d(:,:,i), psi_temp_d, sqrt(normalisation), nopiy, nopix)
-						call cufftExec(plan, psi_temp_d, psi_temp_d, CUFFT_INVERSE)
-						call cuda_mod<<<blocks,threads>>>(psi_temp_d, temp_image_d, normalisation, nopiy, nopix)
-						call cuda_addition<<<blocks,threads>>>(tem_image_d(:,:,z_indx(1),i), temp_image_d, tem_image_d(:,:,z_indx(1),i), 1.0_fp_kind, nopiy, nopix)
-					enddo
-					endif
-
+				if(pw_illum) then
+				! Accumulate image
+				do i=1,imaging_ndf
+					psi_temp_d = psi_out_d
+					call cuda_multiplication<<<blocks,threads>>>(psi_temp_d, ctf_d(:,:,i), psi_temp_d, sqrt(normalisation), nopiy, nopix)
+					call cufftExec(plan, psi_temp_d, psi_temp_d, CUFFT_INVERSE)
+					call cuda_mod<<<blocks,threads>>>(psi_temp_d, temp_image_d, normalisation, nopiy, nopix)
+					call cuda_addition<<<blocks,threads>>>(tem_image_d(:,:,z_indx(1),i), temp_image_d, tem_image_d(:,:,z_indx(1),i), 1.0_fp_kind, nopiy, nopix)
+				enddo
 				endif
+
+			endif
         enddo ! End loop over cells
         
 		! Plasmon scattering counting
@@ -515,10 +517,12 @@ psi_initial_d = psi_initial
             call binary_out(nopiy, nopix, tem_image(:,:,i,j), trim(fnam_df)//'_Image')
             endif
 #ifdef GPU            
-			if(double_channeling) then
+			if(tp_eels) then
 				image = eftem_image_d(:,:,j,i)
-				call output_TEM_result(output_prefix,tile_out_image(image,ifactory,ifactorx),'energy_filtered_image',nopiy,nopix,manyz,imaging_ndf>1,manytilt,z=zarray(i)&
-								&,lengthz=lengthz,lengthdf=lengthdf,tiltstring = tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2),df = imaging_df(j))
+				call output_TEM_result(output_prefix,tile_out_image(image,ifactory,ifactorx),'energy_filtered_image', &
+									& nopiy,nopix,manyz,imaging_ndf>1,manytilt,z=zarray(i),lengthz=lengthz, &
+									& lengthdf=lengthdf,tiltstring = tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2), &
+									& df = imaging_df(j))
             endif
 #endif
 		enddo

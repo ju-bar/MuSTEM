@@ -126,6 +126,8 @@ subroutine qep_stem(STEM,ionization,PACBED)
   real(fp_kind),device,allocatable :: inelastic_potential_d(:,:)
 
   !Double channeling variables
+  integer,allocatable :: inel_wf_valid(:,:) ! validity flags for inelastic wave functions (1: valid, 0: invalid), result of strength filter, (target atom, state)
+  real(fp_kind),allocatable :: inel_wf_intens(:,:) ! intensity of inelastic wave functions, input for strength filter, (target atom, state)
   complex(fp_kind),device,allocatable,dimension(:,:) ::psi_inel_d,shiftarray,tmatrix_d,q_tmatrix_d
   complex(fp_kind),device,allocatable,dimension(:,:,:)::tmatrix_states_d,ctf_d
   complex(fp_kind),device,allocatable,dimension(:,:,:)::Hn0_shifty_coord_d,Hn0_shiftx_coord_d
@@ -134,6 +136,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
   real(fp_kind),device,allocatable,dimension(:,:,:,:)::efistem_image_d,istem_image_d
   real(fp_kind),allocatable,dimension(:,:,:,:,:)::Hn0_eels_dc
   real(fp_kind),allocatable,dimension(:,:,:)::tmatrix_states
+  !real(fp_kind),allocatable,dimension(:,:,:,:,:) :: inel_intens, inel_intens_valid ! 2025-07-28 JB: (debug) inelastic intensities per atom, transition, z, y, x
   integer::i_target
 #endif
 
@@ -162,7 +165,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
   endif
 
 #ifdef GPU
-  if(double_channeling) then
+  if(tp_eels) then
     allocate(tmatrix_states_d(nopiy,nopix,nstates),psi_inel_d(nopiy,nopix),cbed_inel_dc_d(nopiy,nopix),tmatrix_states(nopiy,nopix,nstates))
     allocate(shiftarray(nopiy,nopix),tmatrix_d(nopiy,nopix),q_tmatrix_d(nopiy,nopix))
     tmatrix_states_d = setup_ms_hn0_tmatrices(nopiy,nopix,nstates)*alpha_n
@@ -170,6 +173,12 @@ subroutine qep_stem(STEM,ionization,PACBED)
     allocate(Hn0_shiftx_coord_d(nopix,maxval(natoms_slice_total),n_slices))
     Hn0_shiftx_coord_d = Hn0_shiftx_coord
     Hn0_shifty_coord_d = Hn0_shifty_coord
+    !allocate(inel_intens(maxval(natoms_slice_total), nstates, n_slices*maxval(ncells), nysample, nxsample))
+    !allocate(inel_intens_valid(maxval(natoms_slice_total), nstates, n_slices*maxval(ncells), nysample, nxsample))
+    !inel_intens = 0.0_fp_kind
+    !inel_intens_valid = 0.0_fp_kind
+    allocate(inel_wf_valid(maxval(natoms_slice_total), nstates)) ! validity flags for inelastic wave functions, 2025-07-30 JB
+    allocate(inel_wf_intens(maxval(natoms_slice_total), nstates)) ! intensity of inelastic wave functions, 2025-07-30 JB
     allocate(Hn0_eels_dc(nysample,nxsample,probe_ndf,nz,dc_numeels))
     allocate(Hn0_eels_detector_d(nopiy,nopix,dc_numeels),Hn0_eels_detector(nopiy,nopix,dc_numeels))
     !do l=1,numeels ! 2025-07-14, JB: replaced by annular and segmented EELS options in DC, see below
@@ -458,23 +467,67 @@ subroutine qep_stem(STEM,ionization,PACBED)
         endif
 
         !Double channeling, i.e., propagation of inelastic wave functions through the specimen
-        if(double_channeling) then
+        if(tp_eels) then
+            
+          inel_wf_intens = 0.0_fp_kind ! init all iwfs intensities with zero, 2025-07-30 JB
+          inel_wf_valid = 1 ! init all iwfs as valid
+          if (.NOT.single_channeling .AND. iwf_filter_threshold > 1.0e-6_fp_kind) then ! prepare data for inel-wf filter only when real double channeling
+          ! This only runs when double-channeling is enabled, i.e., single_channeling is false,
+          ! because the overhead of calculating the intensities of inelastic wavefunctions is
+          ! equal to the cost of calculating single channeling results. This means we would not save
+          ! any computation but actually do more work.
+          ! We may want to skip this section also when exciting close to the exit plane, because
+          ! then double channeling doesn't cost a lot of computation and the filter is usually also
+          ! less effective.
           do i_target = 1, natoms_slice_total(j) ! Loop over targets
-            ! Calculate inelastic transmission matrix
+            ! calculate shift matrix for current target atom
             call cuda_make_shift_array<<<blocks,threads>>>(shiftarray,Hn0_shifty_coord_d(:,i_target,j),&
                             &Hn0_shiftx_coord_d(:,i_target,j),nopiy,nopix)
-					
             do k = 1, nstates
-							
+              if (state_use(k) == 0) cycle ! skip unused states, Hn0 strength filter, 2025-07-28 JB
+              ! shift current Hn0 to atomic position
               call cuda_multiplication<<<blocks,threads>>>(tmatrix_states_d(:,:,k),shiftarray, &
                             &q_tmatrix_d,1.0_fp_kind,nopiy,nopix)
+              ! transform to real space
               call cufftExec(plan,q_tmatrix_d,tmatrix_d,CUFFT_INVERSE)
+              ! multiply with the wave function psi_d * tmatrix_d --> psi_inel_d
               call cuda_multiplication<<<blocks,threads>>>(psi_d,tmatrix_d,psi_inel_d,&
                             &sqrt(normalisation),nopiy,nopix)
+              ! store the inelastic wave function intensity
+              inel_wf_intens(i_target,k) = get_sum(psi_inel_d) ! 2025-07-30 JB: store the intensity of the inelastic wave function
+              ! (debug)calculate the total intensity of the inelastic wave function
+              !ii = j + (i-1)*n_slices ! i.e., the current slice index in the whole specimen
+              !inel_intens(i_target,k,ii,ny,nx) = get_sum(psi_inel_d)
+              !inel_intens_valid(i_target,k,ii,ny,nx) = 1.0_fp_kind
+            enddo
+          enddo
+          ! inelastic wave function strength filter, 2025-07-30 JB
+          call strength_filter(inel_wf_intens, inel_wf_valid, maxval(natoms_slice_total)*nstates, &
+                            &  iwf_filter_threshold)
+          endif
+          
+          do i_target = 1, natoms_slice_total(j) ! Loop over targets
+            ! calculate shift matrix for current target atom
+            call cuda_make_shift_array<<<blocks,threads>>>(shiftarray,Hn0_shifty_coord_d(:,i_target,j),&
+                            &Hn0_shiftx_coord_d(:,i_target,j),nopiy,nopix)
+            do k = 1, nstates
+              if (state_use(k) == 0) cycle ! skip unused states, Hn0 strength filter, 2025-07-28 JB
+              if (inel_wf_valid(i_target,k) == 0) cycle ! skip invalidated (too weak) inelastic wave functions, 2025-07-30 JB
+              ! shift current Hn0 to atomic position
+              call cuda_multiplication<<<blocks,threads>>>(tmatrix_states_d(:,:,k),shiftarray, &
+                            &q_tmatrix_d,1.0_fp_kind,nopiy,nopix)
+              ! transform to real space
+              call cufftExec(plan,q_tmatrix_d,tmatrix_d,CUFFT_INVERSE)
+              ! multiply with the wave function psi_d * tmatrix_d --> psi_inel_d
+              call cuda_multiplication<<<blocks,threads>>>(psi_d,tmatrix_d,psi_inel_d,&
+                            &sqrt(normalisation),nopiy,nopix)
+              
               starting_slice = j
-					
-              ! Scatter the inelastic wave through the remaining cells
-              do ii = i, n_cells
+              
+              do ii = i, n_cells ! Scatter the inelastic wave through the remaining cells
+                ! if the following loop is skipped, then we would calculate single channeling
+                !
+                if (.NOT.single_channeling) then ! 2025-07-28 JB: skipping actual double channeling
                 do jj = starting_slice, n_slices
                   ! QEP multislice
                   nran = floor(n_qep_grates*ran1(idum)) + 1
@@ -497,6 +550,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
                             &normalisation, nopiy, nopix,plan)
                   endif
                 enddo ! jj
+                endif ! skip double channeling propagation 
                 starting_slice=1
                 if (any(ii==ncells)) then
                   z_indx = minloc(abs(ncells-ii))
@@ -520,7 +574,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
               enddo ! ii
             enddo ! k
           enddo ! i_target
-        endif  ! End loop over cells,targets and states and end double_channeling section
+        endif  ! End loop over cells,targets and states and end tp_eels section
 
         ! QEP multislice
         nran = floor(n_qep_grates*ran1(idum)) + 1
@@ -797,13 +851,32 @@ subroutine qep_stem(STEM,ionization,PACBED)
     write(*,*) 'Calculation is finished.'
     write(*,*) 
     write(*,*) 'Time elapsed ', delta, ' seconds.'
-    write(*,*)    
+    write(*,*)
     
     if(timing) then
       open(unit=9834, file=trim(adjustl(output_prefix))//'_timing.txt', access='append')
       write(9834, '(a, g, a, /)') 'The multislice calculation took ', delta, 'seconds.'
       close(9834)
     endif
+    
+!#ifdef GPU
+!    ! debug output of inelastic intensities
+!    if (ALLOCATED(inel_intens)) then
+!        write(*,*) 'Creating dump of gathered inelastic intensities...'
+!        open(unit=456,file='dump_inel_intens.bin',form='binary',status='replace',convert='big_endian')
+!        write(456) inel_intens
+!        close(456)
+!        write(*,*) 'Dump of inelastic intensities written to dump_inel_intens.bin'
+!        write(*,*) '  (target_atom, transition, slice, scan_y, scan_x)'
+!        write(*,*) 'Shape: ', shape(inel_intens)
+!        write(*,*)
+!    endif
+!    if (ALLOCATED(inel_intens_valid)) then
+!        open(unit=457,file='dump_inel_intens_valid.bin',form='binary',status='replace',convert='big_endian')
+!        write(457) inel_intens_valid
+!        close(457)
+!    endif
+!#endif
 
     if (fp_kind.eq.8) then
       write(*,*) 'The following files were outputted (as 64-bit big-endian floating point):'
@@ -884,7 +957,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
 #ifdef GPU
 
         
-    if(double_channeling.and.istem) then ! EFISTEM
+    if(tp_eels.and.istem) then ! EFISTEM
       rnorm = 1.0 / float(n_qep_passes*nysample*nxsample)
       do i=1,nz
         do l=1,imaging_ndf
@@ -897,10 +970,14 @@ subroutine qep_stem(STEM,ionization,PACBED)
       enddo
     endif	
 		
-    if(double_channeling) then ! DC-EELS
+    if(tp_eels) then ! DC-EELS
       rnorm = 1.0 / float(n_qep_passes)
       do l=1,dc_numeels
-        filename =  trim(adjustl(fnam))//'_double_channeling_EELS_'//zero_padded_int(l,2)
+        if (single_channeling) then
+            filename = trim(adjustl(fnam))//'_single_channeling_EELS_'//zero_padded_int(l,2)
+        else
+            filename = trim(adjustl(fnam))//'_double_channeling_EELS_'//zero_padded_int(l,2)
+        endif
         call output_stem_image(Hn0_eels_dc(:,:,:,:,l)*rnorm, filename,probe_df) ! 2025-07-14, JB: QEP normalization added
       enddo
     endif
