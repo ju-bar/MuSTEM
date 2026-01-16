@@ -39,9 +39,11 @@ module m_potential
     real(fp_kind),    allocatable :: eels_correction_detector(:,:)
     real(fp_kind),    allocatable :: se_transf_aty_radius(:) ! list of effective radii for each atom type in the structure for SE transmission functions
     real(fp_kind),    allocatable :: se_transmission(:,:,:) ! SE transmission coefficients for each slice of the supercell
+    real(fp_kind),    allocatable :: se_psf(:,:,:) ! SE point spread function for each slice of the supercell
 	!complex(fp_kind), allocatable :: inverse_sinc_new(:,:)
     
     integer(4) :: n_qep_grates,n_qep_passes,nran ! Start of random number sequence
+    integer(4) :: n_se_psf = 0 ! number of SE point spread functions stored in se_psf
     
     logical :: phase_ramp_shift
     logical(4) :: quick_shift
@@ -797,7 +799,9 @@ module m_potential
 	if(SEI) then
 	    write(*,92)
 92      format(/,1x,'The SE image simulation assumes an isotropic SE emission. A limited', /, &
-                &1x,'acceptance angle for the SE detector is taken into account as scaling factor.',/)
+            &    1x,'acceptance angle for the SE detector is taken into account as scaling factor',/, &
+            &    1x,'and has an influence on the delocalization applied in transmission functions.',/, &
+            &    1x,'Very large semi-angles (< Pi/2) can be assumed, default is 1222 mrad.',/)
 		
         eels_inner = 0.0_fp_kind
 		  
@@ -805,61 +809,100 @@ module m_potential
         call get_input('SE acceptance angle', eels_outer)
 		  
         write(*,*)
-
-        se_det_scale = abs(eels_outer) / 1.256637E+04_fp_kind ! convert to radians and devide by 4pi
+        if (eels_outer <= 0.0_fp_kind) then
+            write(*,*) 'SE detector acceptance angle must be positive, setting to default 1222 mrad.'
+            write(*,*)
+            eels_outer = 1222.4_fp_kind ! default value
+        endif
+        if (eels_outer > 1570.0_fp_kind) then
+            write(*,*) 'SE detector acceptance angle is too large, setting to 1570 mrad.'
+            write(*,*)
+            eels_outer = 1570.0_fp_kind ! maximum value
+        endif
+        se_tht_max = eels_outer
+        se_det_scale = (1.0_fp_kind - cos(se_tht_max*0.001_fp_kind)) * 0.5_fp_kind ! (1-cos(theta_max))/2
         eels_outer = ak1*tan(abs(eels_outer)/1000.0_fp_kind) ! convert to 1/A (only for consistency with EELS)
+        
         
         write(*,93)
 93      format(  1x,'The SE detector usually accepts only slow electrons. Their signal', /, &
 		        &1x,'quickly attenuates depending on the depth of the ionization event', /, &
 		        &1x,'in the material. Effective transmission functions are calculated', /, &
-				&1x,'based on atomic radii and the inelastic mean free path for slow', /, &
-                &1x,'secondary electrons. Figures 1(a) and (d) in  Seah & Dench,', /, &
+				&1x,'based on atomic radii and attenuation length for slow secondary', /, &
+                &1x,'electrons. Figures 1(a) and (d) in  Seah & Dench,', /, &
                 &1x,'Surf. and Interf. Anal. 1 (1979) 2-11 could help to estimate a value.',/)
         
-        se_imfp = 0.001_fp_kind
-        do while(se_imfp < 0.1_fp_kind) ! 2025-06-07 lower limit 0.1 A
-            write(*,*) 'Enter the effective inelastic mean free path (>0.1) in A for SE:'
-            call get_input('SE inelastic mean free path', se_imfp)
-            se_imfp = ABS(se_imfp) ! ensure positive value
+        se_alen = 0.001_fp_kind
+        do while(se_alen < 0.1_fp_kind) ! 2025-06-07 lower limit 0.1 A
+            write(*,*) 'Enter the effective attenuation length (>0.1) in A for SEs:'
+            call get_input('SE attenuation length', se_alen)
+            se_alen = ABS(se_alen) ! ensure positive value
         enddo
         
         write(*,*)
+        
+        se_dens_slice1 = 0
+        se_dens_slice2 = 0
+        write(*,94)
+94      format(  1x,'The attenuation of SE signal takes the local structure density into', /, &
+		        &1x,'account. To reproduce the input attenuation length on average, the', /, &
+		        &1x,'projected structure density must be scaled. This is done using the', /, &
+				&1x,'full input structure model by default. If you want to calculate this', /, &
+                &1x,'estimate from a specific z-fraction of the input structure you can', /, &
+                &1x,'specify this now by a range of structure slices.',/)
+        
+        write(*,*) 'Enter <1> to change the slice range, <0> to use the full structure:'
+        call get_input('<1> to change slice range <0> to continue', kval)
+        if (kval == 0) then
+            se_dens_slice1 = 1
+            se_dens_slice2 = n_slices
+        else
+            do while((se_dens_slice1 < 1).OR.(se_dens_slice1 > n_slices).OR. &
+                &   (se_dens_slice2 < se_dens_slice1).OR.(se_dens_slice2 > n_slices))
+                write(*,*) 'Enter the start of the slice range (1 - '//to_string(n_slices)//'):'
+                call get_input('Start of slice range', se_dens_slice1)
+                write(*,*) 'Enter the end of the slice range ('//to_string(se_dens_slice1)//' - '// &
+                    &   to_string(n_slices)//'):'
+                call get_input('End of slice range', se_dens_slice2)
+            enddo
+        endif
         
         ! setup table of effective atomic radii used for SE transmission
         allocate(se_transf_aty_radius(nt))
         do i = 1, nt
             ZZ=nint(ATF(1,i)); se_transf_aty_radius(i) = bondRadius(ZZ) ! use bond radius as default
         enddo
-        ! implement a menu that allows the user to change the effective atomic radius
-        write(*,94)
-94      format(  1x,'The SE absorption in the structure is modelled by effective radii', /, &
-		        &1x,'defining a Gaussian like peak at the equilibrium position for all', /, &
-		        &1x,'atoms in the input structure. The radii are preset from a table of', /, &
-				&1x,'bond radii, see Pyykkoe and Atsumi, Chem. Eur. J. 2009, 15, 186-192.', /, &
-                &1x,'These radii can be modified now:')
-95      format('Index  Atom| Z  | Radius (pm)')
-96      format('------------------------------')
-97      format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',1x,f6.1)
-        kval = -1
-        do while (kval.ne.0)
-            write(*,*) char(10),'Radii used for SE transmission functions:',char(10)
-            write(*,95)
-            write(*,96)
-            do i=1, nt
-                write(*,97) i,trim(adjustl(substance_atom_types(i))), &
-                    & nint(atf(1,i)), se_transf_aty_radius(i)
-            enddo
-            write(*,120)
-            write(*,96)
-            call get_input('Select to change radius <0> continue', kval)
-            if ((kval>0).AND.(kval<=nt)) then
-                ! get new radius for the selected atom type
-                write(*,*) 'Enter new effective atomic radius in pm:'
-                call get_input('Set atom radius', se_transf_aty_radius(kval))
-            endif
-        enddo
-        write(*,*)
+        !
+        ! commented out, but could be used to set the radii based on the, JB 2025-08-22
+!        ! implement a menu that allows the user to change the effective atomic radius
+!        write(*,94)
+!94      format(  1x,'The SE absorption in the structure is modelled by effective radii', /, &
+!		        &1x,'defining a Gaussian like peak at the equilibrium position for all', /, &
+!		        &1x,'atoms in the input structure. The radii are preset from a table of', /, &
+!				&1x,'bond radii, see Pyykkoe and Atsumi, Chem. Eur. J. 2009, 15, 186-192.', /, &
+!                &1x,'These radii can be modified now:')
+!95      format('Index  Atom| Z  | Radius (pm)')
+!96      format('------------------------------')
+!97      format(1x,'<',i2,'>',2x,a2,2x,'|',1x,i2,1x,'|',1x,f6.1)
+!        kval = -1
+!        do while (kval.ne.0)
+!            write(*,*) char(10),'Radii used for SE transmission functions:',char(10)
+!            write(*,95)
+!            write(*,96)
+!            do i=1, nt
+!                write(*,97) i,trim(adjustl(substance_atom_types(i))), &
+!                    & nint(atf(1,i)), se_transf_aty_radius(i)
+!            enddo
+!            write(*,120)
+!            write(*,96)
+!            call get_input('Select to change radius <0> continue', kval)
+!            if ((kval>0).AND.(kval<=nt)) then
+!                ! get new radius for the selected atom type
+!                write(*,*) 'Enter new effective atomic radius in pm:'
+!                call get_input('Set atom radius', se_transf_aty_radius(kval))
+!            endif
+!        enddo
+!        write(*,*)
         
     endif
     
@@ -1267,27 +1310,43 @@ module m_potential
     use m_multislice, only: n_slices, nat_slice, tau_slice, prop_distance, save_grates
     use m_string, only: to_string
     use output
+    use m_conv2dr ! convolution module
         
     implicit none
             
-    integer*4 :: i, j, m, n, nat_layer, ix, iy, jx, jy, nx2, ny2
+    integer*4 :: i, j, m, n, nat_layer, ix, iy, jx, jy, nx2, ny2, it, itmax
     real(fp_kind) :: t1, delta, rad, val, x, y, x0, y0, rinv2
-    real(fp_kind), allocatable :: layer_density(:,:)
+    real(fp_kind) :: dx, dy, sldz2, r2, r2_max, zcell, zlen, zlendens, sadens
+    real(fp_kind) :: fdens, fdens_step, tatt, catt, ttol
+    real(fp_kind), allocatable :: layer_density(:,:,:), psf(:,:), acctf(:,:), cdens(:,:)
     complex(fp_kind), allocatable :: atom_ff(:,:,:)
     character(32) :: snum
-    
+#ifdef GPU
+    real(fp_kind), device, allocatable :: acctf_d(:,:)
+#endif
+
     t1 = secnds(0.0_fp_kind)
     if (ALLOCATED(se_transmission)) deallocate(se_transmission) ! deallocate previous transmission function if it exists
     allocate(se_transmission(nopiy,nopix,n_slices)) ! allocate new transmission function array
-    allocate(layer_density(nopiy,nopix))
+    allocate(layer_density(nopiy,nopix,n_slices), acctf(nopiy,nopix), cdens(nopiy,nopix))
     allocate(atom_ff(nopiy,nopix,nt))
+#ifdef GPU
+    allocate(acctf_d(nopiy,nopix))
+#endif
+    n_se_psf = n_slices ! number of PSF arrays to be allocated (default is one per slice)
+    if (even_slicing) n_se_psf = 1 ! only one PSF array if even slicing is used
+    allocate(se_psf(nopiy,nopix,n_se_psf)) ! allocate PSF array
+    call conv2dr_init(n_se_psf) ! initialize convolution module with number of PSFs
     
     se_transmission = 1.0_fp_kind ! initialize transmission function to 1.0
     layer_density = 0.0_fp_kind ! initialize layer density to zero
+    se_psf = 0.0_fp_kind ! initialize PSF to zero
     nx2 = (nopix + modulo(nopix,2)) / 2 ! x nyquist pixel number 512 -> 256, 513 -> 257, 514 -> 257
     ny2 = (nopiy + modulo(nopiy,2)) / 2 ! y nyquist pixel number
     
     !write(*,*) '  total grid size in A: ', a0(1)*ifactorx, ' x ', a0(2)*ifactory
+    dx = a0(1) * ifactorx / nopix ! pixel size in x direction in A
+    dy = a0(2) * ifactory / nopiy ! pixel size in y direction in A
     ! prepare the atom form factor (real-space to fourier space)
     do i = 1, nt ! loop over atom types
         rad = se_transf_aty_radius(i) * 0.01 ! atomic radius of this atom type in A
@@ -1295,47 +1354,158 @@ module m_potential
         !        &   ' with radius ', rad, ' A'
         rinv2 = -0.69_fp_kind / rad**2 ! exponential form parameter
         ! setup the atom form factor for this atom type in real space
-        !$OMP PARALLEL DO PRIVATE(iy, ix, jy, jx, y, x) &
-        !$OMP& SHARED(atom_ff, a0, ifactory, ifactorx, rinv2, nx2, ny2, nopix, nopiy, i) &
-        !$OMP& COLLAPSE(2)
+        !$OMP PARALLEL DO PRIVATE(iy, ix, jy, jx, y, x, r2) &
+        !$OMP& SHARED(atom_ff, dx, dy, rinv2, nx2, ny2, nopix, nopiy, i) &
+        !$OMP& COLLAPSE(2) SCHEDULE(static)
         do iy=1, nopiy; do ix=1,nopix
             jy = modulo(iy + ny2 - 1, nopiy) - ny2
-            y = a0(2) * ifactory * jy / nopiy ! y coordinate in A
+            y = dy * jy ! y coordinate in A
             jx = modulo(ix + nx2 - 1, nopix) - nx2
-            x = a0(1) * ifactorx * jx / nopix ! x coordinate in A
-            atom_ff(iy, ix, i) = EXP(rinv2 * (x**2 + y**2)) ! Gaussian form factor
+            x = dx * jx ! x coordinate in A
+            r2 = x**2 + y**2 ! squared distance from the origin
+            atom_ff(iy, ix, i) = EXP(rinv2 * r2) ! Gaussian form factor
         enddo; enddo
         !$OMP END PARALLEL DO
         call fft2(nopiy, nopix, atom_ff(:,:,i), atom_ff(:,:,i))
     enddo
     
-    do j = 1, n_slices ! loop over slices of the supercell
+    
+    zlen = 0.0_fp_kind
+    zlendens = 0.0_fp_kind
+    fdens = 1.0_fp_kind
+    do j = 1, n_slices ! loop over slices of the input structure model
         write(*,'(1x, a, a, a, a, a)') 'Calculating SE transmission function for slice ', &
                 & to_string(j), '/', to_string(n_slices), '...'
 	    write(*,301) to_string(sum(nat_slice(:,j)))
 301     format(1x, 'Number of atoms in this slice: ', a, /) 
-        layer_density = 0.0_fp_kind ! initialize layer density to zero
+        
+        if ((.NOT.even_slicing).OR.(j==1)) then ! PSF calculation per slice or only for the first slice
+            ! calculate the PSF for this slice
+            sldz2 = prop_distance(j)**2 ! slice thickness in A
+            r2_max = (prop_distance(j) * tan(se_tht_max * 0.001))**2
+            !$OMP PARALLEL DO PRIVATE(jy, jx, y, x, r2) &
+            !$OMP& SHARED(psf, dx, dy, sldz2, r2_max, nx2, ny2, nopix, nopiy) &
+            !$OMP& COLLAPSE(2) SCHEDULE(static)
+            do iy=1, nopiy; do ix=1,nopix
+                jy = modulo(iy + ny2 - 1, nopiy) - ny2
+                y = dy * jy ! y coordinate in A
+                jx = modulo(ix + nx2 - 1, nopix) - nx2
+                x = dx * jx ! x coordinate in A
+                r2 = x**2 + y**2 ! squared distance from the origin
+                if (r2 <= r2_max) then ! only calculate PSF within the radius
+                    se_psf(iy, ix, j) = 1.0_fp_kind / (sldz2 + r2)**(1.5_fp_kind)
+                endif
+            enddo; enddo
+            !$OMP END PARALLEL DO
+            se_psf(:,:,j) = se_psf(:,:,j) / real(SUM(se_psf(:,:,j)),fp_kind) ! normalize PSF
+            if (j<=n_se_psf) then ! set kernel in convolution module
+              call conv2dr_set_kernel(j, se_psf(:,:,j), nopiy, nopix) ! set the kernel data
+            endif
+            !
+            if (0 < IAND(arg_debug_dump,2)) then ! dump the SE point-spread functions
+              write(*,*) 'Saving SE point-spread function to file...',char(10)
+              write(unit=snum,fmt='(i0.3)') j
+              open(unit=85, file=trim(adjustl(output_prefix))//"_SE-psf_"// &
+                  & TRIM(ADJUSTL(snum))//".bin", form='binary', convert='big_endian')
+              write(85) se_psf(:,:,j) ! store to file
+              close(85)
+            endif
+        endif
+        
+        layer_density(:,:,j) = 0.0_fp_kind ! initialize layer density to zero
         do m=1,nt ! loop over atom types
             nat_layer = nat_slice(m,j) ! number of atoms of this type in the slice
             if (nat_layer == 0) cycle ! skip if no atoms of this type in the slice
             !write(*,*) '  adding', nat_layer, 'atoms of type ', trim(adjustl(substance_atom_types(m)))
             ! add the layer density contribution from this atom type
-            layer_density(:,:) = layer_density(:,:) + real(potential_from_scattering_factors( &
+            layer_density(:,:,j) = layer_density(:,:,j) + real(potential_from_scattering_factors( &
                                 & atom_ff(:,:,m),tau_slice(:,m,:nat_layer,j),nat_layer, &
                                 & nopiy,nopix,high_accuracy))
         enddo
-        layer_density = layer_density / sqrt(REAL(nopiy*nopix,fp_kind)) ! normalize layer density
-        !write(*,*) '  max. layer density for slice ', j, ':', maxval(layer_density(:,:))
-        ! debug storing of the layer density
-        !write(unit=snum,fmt='(i0.4)') j
-        !open(unit=3984, file=trim(adjustl(output_prefix))//"_SE-layer_"//trim(adjustl(snum))// &
-        !                        & ".bin", form='binary', convert='big_endian')
-        !write(3984) layer_density
-        !close(3984)
-        ! calculate SE transmission function from density, slice thickness and inelastic mean free path
-        se_transmission(:,:,j) = exp(-1.0_fp_kind * layer_density * prop_distance(j) / se_imfp)
-	enddo ! End loop over slices
-	
+        layer_density(:,:,j) = layer_density(:,:,j) / sqrt(REAL(nopiy*nopix,fp_kind)) ! normalize layer density
+        if (j >= se_dens_slice1 .AND. j <= se_dens_slice2) then ! only accumulate density for selected slice range
+          zlen = zlen + prop_distance(j) ! accumulate total thickness
+          sadens = SUM(layer_density(:,:,j)) / REAL(nopiy*nopix,fp_kind)
+          zlendens = zlendens + prop_distance(j) * sadens ! accumulate thickness*density
+        endif
+    enddo ! End loop over slices
+    if (zlendens <= 0.0_fp_kind) then
+        write(*,*) 'Error: No density accumulated for SE transmission function calculation.'
+        write(*,*) '       Please check the selected slice range for density accumulation.'
+        stop 1
+    endif
+    fdens = zlen / zlendens ! first guess for the density scaling factor
+    ! actually we want that the attenuation through the selected slices corresponds to the input SE attenuation length
+    ! the problem can only be solved iteratively (numerically)
+    tatt = EXP(-zlen / se_alen) ! target average transmission
+    
+    if (tatt < 1.0e-3_fp_kind) then
+        write(*,*) 'Warning: The target average SE transmission is very low (', tatt, ').'
+        write(*,*) '         The calculation may not converge well.'
+        write(*,*) '         Consider rerunning and using a fraction of the input structure model'
+        write(*,*) '         for SE transmission function calculation. Use the slice range'
+        write(*,*) '         input offered after setting the SE attenuation length.'
+    endif
+    
+    ! check accumulated density, cdens is only used for this check
+    cdens(:,:) = 0.0_fp_kind
+    do j = se_dens_slice1, se_dens_slice2 ! loop selected slices to accumulate the density functions
+        cdens(:,:) = cdens(:,:) + layer_density(:,:,j) * prop_distance(j)
+    enddo ! End loop over slices
+    if (MAXVAL(cdens(:,:)) <= 0.0_fp_kind) then
+        write(*,*) 'Error: No density accumulated for SE transmission function calculation.'
+        write(*,*) '       Please check the selected slice range for density accumulation.'
+        stop 1
+    endif
+    fdens_step = fdens * 0.5_fp_kind ! initial step size for density scaling factor, start positive because the initial guess tends to under-estimate
+    catt = 1.0_fp_kind ! force at least one iteration
+    ttol = 0.01_fp_kind ! relaive tolerance for average transmission and step size
+    itmax = 99
+    it = 0
+    write(*,*) '  Determining density scaling factor ...'
+    ! iteratively improve fdens until the average transmission matches the target value
+    do while ((abs(catt - tatt)/tatt > ttol) .and. (abs(fdens_step)/fdens > ttol) .and. (it < itmax))
+        
+        ! calculate the current average transmission
+        acctf(:,:) = 1.0_fp_kind
+        do j = se_dens_slice1, se_dens_slice2 ! loop selected slices to accumulate the density functions
+            se_transmission(:,:,j) = exp(-1.0_fp_kind * fdens * layer_density(:,:,j) * &
+                                &     prop_distance(j) / se_alen)
+            acctf = acctf * se_transmission(:,:,j)
+#ifdef GPU
+            acctf_d = acctf ! copy to device
+            call conv2dr_apply(1+MODULO(j-1,n_se_psf), acctf_d, acctf_d, nopiy, nopix) ! convolute on device
+            acctf = acctf_d ! copy back to host
+#else
+            call conv2dr_apply(1+MODULO(j-1,n_se_psf), acctf, acctf, nopiy, nopix) ! convolute on host
+#endif
+        end do ! End loop over slices
+        catt = sum(acctf(:,:)) / REAL(nopiy*nopix, kind=fp_kind) ! current average transmission
+        
+        ! check if we need to lower step size and change direction
+        if (((catt > tatt).and.(fdens_step < 0)) .or. ((catt < tatt).and.(fdens_step > 0))) then
+            fdens_step = -0.5 * fdens_step ! swap sign and reduce step size
+304         format(1x, '     changed step size to ', E11.3)
+            write(*,304) fdens_step
+        end if
+        fdens = fdens + fdens_step ! update f
+        
+        it = it + 1
+305     format(1x, '   it = ', i2, ': avg. transm. =', E11.3, ', target =', E11.3)
+        write(*,305) it, catt, tatt
+    end do
+    write(*,*)
+    if (it >= itmax) then
+        write(*,*) 'Warning: Maximum number of iterations reached in SE transmission function calculation.'
+        write(*,*) '         The average transmission may not match the target value.'
+    end if
+    
+    ! final calculation of the transmission functions with the determined density scaling factor
+    do j= 1, n_slices ! loop over all slices of the input structure
+        se_transmission(:,:,j) = exp(-1.0_fp_kind * fdens * layer_density(:,:,j) * &
+                                &     prop_distance(j) / se_alen)
+    enddo
+    
 	delta = secnds(t1)
         
 	if(timing) then
@@ -1346,7 +1516,13 @@ module m_potential
 		close(9834)
     endif
     
-    deallocate(layer_density, atom_ff) ! deallocate temporary arrays
+310 format(1x, 'Average SE transmission for the full input structure model: ', f6.4, '.',/)
+    write(*,310) catt
+    
+    deallocate(layer_density, acctf, atom_ff, cdens) ! deallocate temporary arrays
+#ifdef GPU
+    deallocate(acctf_d)
+#endif
     
     if (0 < IAND(arg_debug_dump,2)) then ! store the SE transmission functions
       write(*,*) 'Saving SE transmission functions to file...',char(10)

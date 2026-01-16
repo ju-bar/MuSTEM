@@ -63,6 +63,7 @@ subroutine absorptive_stem(STEM,ionization,PACBED)
   use m_crystallography; use m_multislice; use m_tilt; use m_potential;
   use m_string; use output; use cufft_wrapper
   use m_Hn0; use m_absorption; use m_lens; use global_variables; use m_precision
+  use m_conv2dr ! convolution module, used for applying transmission point spread for SE imaging
   
   implicit none
 
@@ -174,6 +175,11 @@ subroutine absorptive_stem(STEM,ionization,PACBED)
     call make_se_transmission_grates() ! calculate the transmission function for SE per slice
     allocate(se_acctransm(nopiy,nopix)) ! allocate the accumulated SE transmission function
     se_acctransm = 1.0_fp_kind ! initialize to 1 (full transmission)
+    ! setup convolution module for applying the PSF to the SE transmission functions
+    call conv2dr_init(n_se_psf) ! initialize with number of PSFs
+    do i=1, n_se_psf
+      call conv2dr_set_kernel(i, se_psf(:,:,i), nopiy, nopix) ! set the kernel data
+    enddo
   endif
     
     
@@ -651,8 +657,14 @@ subroutine absorptive_stem(STEM,ionization,PACBED)
         endif
         
         if (SEI) then ! 2025-06-26, JB: Update accumulated SE transmission function
+          ! multiply the TF of the current slice to the accumulated SE transmission function
           call cuda_multiplication<<<blocks,threads>>>(se_acctransm_d,se_transmission_d(:,:,j),&
                             &se_acctransm_d,1.0_fp_kind,nopiy,nopix)
+          ! 2025-08-21, JB: added simulation of the secondary electron isotropic momentum taking
+          !                 effect in the propagation to the detector and on the absorption
+          ! convolute with the PSF of the current slice to model the point spread of
+          ! the secondary electrons propagating with perpendicular momenta and backwards to the detector
+          call conv2dr_apply(1+MODULO(j-1,n_se_psf), se_acctransm_d, se_acctransm_d, nopiy, nopix)
         endif
         
       enddo; ! do j = 1, n_slices
@@ -752,7 +764,14 @@ subroutine absorptive_stem(STEM,ionization,PACBED)
         endif
         
         ! 2025-06-26, JB: Update accumulated SE transmission function
-        if (SEI) se_acctransm = se_acctransm * se_transmission(:,:,j)
+        if (SEI) then
+          se_acctransm = se_acctransm * se_transmission(:,:,j)
+          ! 2025-08-21, JB: added simulation of the secondary electron isotropic momentum taking
+          !                 effect in the propagation to the detector and on the absorption
+          ! convolute with the PSF of the current slice to model the point spread of
+          ! the secondary electrons propagating with perpendicular momenta and backwards to the detector
+          call conv2dr_apply(1+MODULO(j-1,n_se_psf), se_acctransm, se_acctransm, nopiy, nopix)
+        endif
         
       enddo ! j = 1, n_slices
       ! end of pure CPU code

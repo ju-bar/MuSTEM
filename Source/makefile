@@ -89,6 +89,7 @@ GPU_MOD_SRC := \
 	m_electron.f90 \
 	m_absorption.f90 \
 	GPU_routines/mod_cuda_potential.f90 \
+	m_conv2dr.f90 \
 	m_potential.f90 \
 	mod_Hn0.f90 \
 	GPU_routines/mod_cuda_ms.f90 \
@@ -110,6 +111,7 @@ CPU_MOD_SRC := \
 	quadpack.f90 \
 	m_electron.f90 \
 	m_absorption.f90 \
+	m_conv2dr.f90 \
 	m_potential.f90 \
 	mod_Hn0.f90 \
 	MS_utilities.f90

@@ -5,6 +5,8 @@
 !
 !  modified:
 !  - J. Barthel, 2025-06-26 - removed unused interface variables
+!  - J. Barthel, 2025-08-20 - added C2R, R2C, Z2D, D2Z 2d execution interfaces
+!                        note (n1, n2) -> (n1/2+1, n2) for R2C transforms
 !
 !  This program is free software: you can redistribute it and/or modify
 !  it under the terms of the GNU General Public License as published by
@@ -58,13 +60,17 @@ module CUFFT_wrapper
 	end interface ifft1
 
     interface fft2
-	  module procedure dfft2d
-	  module procedure sfft2d
+	  module procedure dfft2d     ! double complex -> double complex
+	  module procedure sfft2d     ! single complex -> single complex
+	  module procedure drfft2d    ! double real -> double complex
+	  module procedure srfft2d    ! single real -> single complex
 	end interface fft2
 
     interface ifft2
-	  module procedure dfft2b
-	  module procedure sfft2b
+	  module procedure dfft2b     ! double complex -> double complex
+      module procedure sfft2b     ! single complex -> single complex
+	  module procedure drfft2b    ! double complex -> double real
+	  module procedure srfft2b    ! single complex -> single real
 	end interface ifft2
 
     interface fft3
@@ -182,6 +188,36 @@ module CUFFT_wrapper
 	array_out=array_out_d
     array_out=array_out/(dsqrt(dfloat(ny*nx)))
 	return
+    end subroutine
+    
+    subroutine drfft2d(ny,nx,array_in,array_out)
+
+	implicit none
+	integer	plan
+	integer(4) :: ny,nx
+	real(8),dimension(ny,nx) :: array_in
+	complex(8),dimension(ny/2+1,nx) :: array_out
+
+	!device arrays
+	real(8),device,dimension(ny,nx) :: array_in_d
+	complex(8),device,dimension(ny/2+1,nx) :: array_out_d
+	
+	!copy data to device
+	array_in_d=array_in
+
+	! Initialize the plan - reversed dimensions of the cufftPlan2d API
+	call cufftPlan(plan,nx,ny,CUFFT_D2Z)
+
+	! Execute FFTs
+	call cufftExec(plan,array_in_d,array_out_d)
+
+	! Destroy plans
+	call cufftDestroy(plan)
+
+	! Copy results back to host
+	array_out=array_out_d
+    array_out=array_out/(dsqrt(dfloat(ny*nx)))
+	return
 	end subroutine
 
 !----------------------------------------------------------------------------------------
@@ -206,6 +242,36 @@ module CUFFT_wrapper
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_INVERSE)
+
+	! Destroy plans
+	call cufftDestroy(plan)
+
+	! Copy results back to host
+	array_out=array_out_d
+    array_out=array_out/(dsqrt(dfloat(ny*nx)))
+	return
+    end subroutine
+    
+    subroutine drfft2b(ny,nx,array_in,array_out)
+
+	implicit none
+	integer	plan
+	integer(4) :: ny,nx
+	complex(8),dimension(ny/2+1,nx) :: array_in
+	real(8),dimension(ny,nx) :: array_out
+
+	!device arrays
+	complex(8),device,dimension(ny/2+1,nx) :: array_in_d
+	real(8),device,dimension(ny,nx) :: array_out_d
+	
+	!copy data to device
+	array_in_d=array_in
+
+	! Initialize the plan - reversed dimensions of the cufftPlan2d API
+	call cufftPlan(plan,nx,ny,CUFFT_Z2D)
+
+	! Execute FFTs
+	call cufftExec(plan,array_in_d,array_out_d)
 
 	! Destroy plans
 	call cufftDestroy(plan)
@@ -383,6 +449,36 @@ module CUFFT_wrapper
 	array_out=array_out_d
     array_out=array_out/(sqrt(float(ny*nx)))
 	return
+    end subroutine
+    
+    subroutine srfft2d(ny,nx,array_in,array_out)
+
+	implicit none
+	integer	plan
+	integer(4) :: ny,nx
+	real(4),dimension(ny,nx) :: array_in
+	complex(4),dimension(ny/2+1,nx) :: array_out
+
+	!device arrays
+	real(4),device,dimension(ny,nx) :: array_in_d
+	complex(4),device,dimension(ny/2+1,nx) :: array_out_d
+	
+	!copy data to device
+	array_in_d=array_in
+
+	! Initialize the plan - reversed dimensions of the cufftPlan2d API
+    call cufftPlan(plan,nx,ny,CUFFT_R2C)
+
+	! Execute FFTs
+	call cufftExec(plan,array_in_d,array_out_d)
+
+	! Destroy plans
+	call cufftDestroy(plan)
+
+	! Copy results back to host
+	array_out=array_out_d
+    array_out=array_out/(sqrt(float(ny*nx)))
+	return
 	end subroutine
 
 !----------------------------------------------------------------------------------------
@@ -407,6 +503,36 @@ module CUFFT_wrapper
 
 	! Execute FFTs
 	call cufftExec(plan,array_in_d,array_out_d,CUFFT_INVERSE)
+
+	! Destroy plans
+	call cufftDestroy(plan)
+
+	! Copy results back to host
+	array_out=array_out_d
+    array_out=array_out/(sqrt(float(ny*nx)))
+	return
+    end subroutine
+    
+    subroutine srfft2b(ny,nx,array_in,array_out)
+
+	implicit none
+	integer	plan
+	integer(4) :: ny,nx
+	complex(4),dimension(ny/2+1,nx) :: array_in
+	real(4),dimension(ny,nx) :: array_out
+
+	!device arrays
+	complex(4),device,dimension(ny,nx) :: array_in_d
+	real(4),device,dimension(ny/2+1,nx) :: array_out_d
+	
+	!copy data to device
+	array_in_d=array_in
+
+	! Initialize the plan - reversed dimensions of the cufftPlan2d API
+	call cufftPlan(plan,nx,ny,CUFFT_C2R)
+
+	! Execute FFTs
+	call cufftExec(plan,array_in_d,array_out_d)
 
 	! Destroy plans
 	call cufftDestroy(plan)
@@ -503,13 +629,17 @@ module CUFFT_wrapper
 	end interface ifft1
 
     interface fft2
-	  module procedure dfft2d
-	  module procedure sfft2d
+	  module procedure dfft2d     ! double complex -> double complex
+	  module procedure sfft2d     ! single complex -> single complex
+	  module procedure drfft2d    ! double real -> double complex
+	  module procedure srfft2d    ! single real -> single complex
 	end interface fft2
 
     interface ifft2
-	  module procedure dfft2b
-	  module procedure sfft2b
+	  module procedure dfft2b     ! double complex -> double complex
+      module procedure sfft2b     ! single complex -> single complex
+	  module procedure drfft2b    ! double complex -> double real
+	  module procedure srfft2b    ! single complex -> single real
 	end interface ifft2
 
 
@@ -540,8 +670,10 @@ module CUFFT_wrapper
     !end subroutine
     
     
+    ! --- double-precision FFTs ---
+    
+    
     subroutine dfft1b(n,array_in,array_out)
-
 	implicit none
 	include 'fftw3.f'
 	integer*8	plan
@@ -553,9 +685,9 @@ module CUFFT_wrapper
 	call dfftw_execute(plan)
 	call dfftw_destroy_plan(plan)
 	array_out=array_out/(dsqrt(dfloat(n)))
-
 	return
-	end subroutine
+    end subroutine
+    
 	
 	subroutine dfft1d(n,array_in,array_out)
 	implicit none
@@ -569,12 +701,11 @@ module CUFFT_wrapper
 	call dfftw_execute(plan)
 	call dfftw_destroy_plan(plan)
     array_out=array_out/(dsqrt(dfloat(n)))
-    
 	return
-	end subroutine
+    end subroutine
+    
 	
 	subroutine dfft2b(ny,nx,array_in,array_out)
-
 	implicit none
 	include 'fftw3.f'
 	integer*8	plan
@@ -586,12 +717,11 @@ module CUFFT_wrapper
 	call dfftw_execute(plan)
 	call dfftw_destroy_plan(plan)
 	array_out=array_out/(dsqrt(dfloat(ny*nx)))
-
 	return
-	end subroutine
+    end subroutine
+    
 
 	subroutine dfft2d(ny,nx,array_in,array_out)
-
 	implicit none
 	include 'fftw3.f'
 	integer*8	plan
@@ -599,19 +729,52 @@ module CUFFT_wrapper
 	complex*16  array_in(ny,nx)
 	complex*16  array_out(ny,nx)
 
-
     call dfftw_plan_dft_2d(plan,ny,nx,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
 	call dfftw_execute(plan)
 	call dfftw_destroy_plan(plan)
     array_out=array_out/(dsqrt(dfloat(ny*nx)))
-    	
 	return
-	end subroutine
+    end subroutine
+    
+    
+    subroutine drfft2d(ny,nx,array_in,array_out) ! 2025-08-20 JB
+	  implicit none
+	  include 'fftw3.f'
+	  integer*8 :: plan
+	  integer*4 :: ny,nx
+	  real*8 :: array_in(ny,nx)
+	  !complex*16 :: array_out(ny,nx/2+1)
+      complex*16 :: array_out(ny/2+1,nx)
+
+	  call dfftw_plan_dft_r2c_2d(plan, ny, nx, array_in, array_out, FFTW_ESTIMATE)
+	  call dfftw_execute(plan)
+	  call dfftw_destroy_plan(plan)
+	  array_out = array_out / dsqrt(dfloat(ny*nx))
+      return
+    end subroutine
+    
+    
+    subroutine drfft2b(ny,nx,array_in,array_out) ! 2025-08-20 JB
+	  implicit none
+	  include 'fftw3.f'
+	  integer*8 :: plan
+	  integer*4 :: ny,nx
+      !complex*16 :: array_in(ny,nx/2+1)
+	  complex*16 :: array_in(ny/2+1,nx)
+	  real*8 :: array_out(ny,nx)
+
+	  call dfftw_plan_dft_c2r_2d(plan, ny, nx, array_in, array_out, FFTW_ESTIMATE)
+	  call dfftw_execute(plan)
+	  call dfftw_destroy_plan(plan)
+	  array_out = array_out / dsqrt(dfloat(ny*nx))
+      return
+	end subroutine    
+    
 	
 	
+    ! --- single-precision FFTs ---
 	
 	subroutine sfft1b(n,array_in,array_out)
-
 	implicit none
 	include 'fftw3.f'
 	integer*8  plan
@@ -623,11 +786,11 @@ module CUFFT_wrapper
 	call sfftw_execute(plan)
 	call sfftw_destroy_plan(plan)
 	array_out=array_out/(sqrt(float(n)))
-
 	return
-	end subroutine
+    end subroutine
 	
-	subroutine sfft1d(n,array_in,array_out)
+	
+    subroutine sfft1d(n,array_in,array_out)
 	implicit none
 	include 'fftw3.f'
 	integer*8 plan
@@ -639,12 +802,11 @@ module CUFFT_wrapper
 	call sfftw_execute(plan)
 	call sfftw_destroy_plan(plan)
     array_out=array_out/(sqrt(float(n)))
-    
 	return
-	end subroutine
+    end subroutine
+    
 	
 	subroutine sfft2b(ny,nx,array_in,array_out)
-
 	implicit none
 	include 'fftw3.f'
 	integer*8 plan
@@ -656,12 +818,11 @@ module CUFFT_wrapper
 	call sfftw_execute(plan)
 	call sfftw_destroy_plan(plan)
 	array_out=array_out/(sqrt(float(ny*nx)))
-
 	return
-	end subroutine
+    end subroutine
+    
 
 	subroutine sfft2d(ny,nx,array_in,array_out)
-
 	implicit none
 	include 'fftw3.f'
 	integer*8 plan
@@ -669,14 +830,46 @@ module CUFFT_wrapper
 	complex*8 array_in(ny,nx)
 	complex*8 array_out(ny,nx)
 
-
     call sfftw_plan_dft_2d(plan,ny,nx,array_in,array_out,FFTW_FORWARD,FFTW_ESTIMATE )
 	call sfftw_execute(plan)
 	call sfftw_destroy_plan(plan)
     array_out=array_out/(sqrt(float(ny*nx)))
-    	
 	return
     end subroutine
+    
+    
+    subroutine srfft2d(ny,nx,array_in,array_out) ! 2025-08-20 JB
+	  implicit none
+	  include 'fftw3.f'
+	  integer*8 :: plan
+	  integer*4 :: ny,nx
+	  real*4 :: array_in(ny,nx)
+	  !complex*8 :: array_out(ny,nx/2+1)
+      complex*8 :: array_out(ny/2+1,nx)
+      
+	  call sfftw_plan_dft_r2c_2d(plan, ny, nx, array_in, array_out, FFTW_ESTIMATE)
+	  call sfftw_execute(plan)
+	  call sfftw_destroy_plan(plan)
+	  array_out = array_out / sqrt(real(ny*nx,kind=4))
+      return
+    end subroutine
+    
+    
+    subroutine srfft2b(ny,nx,array_in,array_out) ! 2025-08-20 JB
+	  implicit none
+	  include 'fftw3.f'
+	  integer*8 :: plan
+	  integer*4 :: ny,nx
+	  !complex*8 :: array_in(ny,nx/2+1)
+      complex*8 :: array_in(ny/2+1,nx)
+	  real*4 :: array_out(ny,nx)
+
+	  call sfftw_plan_dft_c2r_2d(plan, ny, nx, array_in, array_out, FFTW_ESTIMATE)
+	  call sfftw_execute(plan)
+	  call sfftw_destroy_plan(plan)
+	  array_out = array_out / sqrt(real(ny*nx,kind=4))
+      return
+	end subroutine
 
 #endif
 

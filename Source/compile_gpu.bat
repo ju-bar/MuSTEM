@@ -4,7 +4,7 @@ set PGICUDA=C:\Program Files\PGI\win64\2019\cuda\10.1
 set INCL="-I%PGILIB%\include" "-I%PGICUDALIB%\include"
 set LIBDIRS="-Wl,/libpath:%PGILIB%\lib" "-Wl,/libpath:%PGICUDALIB%\lib\x64"
 set LIBS=cufft.lib
-set OPTS=-Mpreprocess -DGPU -Dsingle_precision -Bstatic -Mbackslash -Mfree -mp -Mcuda=cuda10.1,ccall -fast -tp=px-64 -Minform=warn -O3
+set OPTS=-Mpreprocess -DGPU -Dsingle_precision -Bstatic -Mbackslash -Mfree -mp -Mcuda=cuda10.1,ccall -fast -tp=px-64 -Minform=warn -O2
 set OBJDIR=x64\objgpu
 set OUTDIR=x64\Release
 set OUTNAME=muSTEM_GPU
@@ -45,6 +45,7 @@ for %%f in (
 		mod_Hn0.f90
 		GPU_routines\mod_cuda_ms.f90
 		MS_utilities.f90
+        m_conv2dr.f90
 		s_qep_tem.f90
 		s_qep_stem.f90
 		s_absorptive_tem.f90
@@ -65,7 +66,7 @@ if exist %OUTDIR%\%OUTNAME%.exe (
 )
 REM LINKING ALL OBJECT FILES REQUIRED FOR MUSTEM
 echo - linking %OUTDIR%\%OUTNAME%.exe
-pgfortran %OPTS% %LIBDIRS% -o %OUTDIR%\%OUTNAME% %OBJDIR%\s_absorptive_stem.obj %OBJDIR%\s_absorptive_tem.obj %OBJDIR%\s_qep_stem.obj %OBJDIR%\s_qep_tem.obj %OBJDIR%\MS_utilities.obj %OBJDIR%\mod_cuda_ms.obj %OBJDIR%\m_plasmon.obj %OBJDIR%\mod_Hn0.obj %OBJDIR%\m_potential.obj %OBJDIR%\mod_cuda_potential.obj %OBJDIR%\m_absorption.obj %OBJDIR%\m_electron.obj %OBJDIR%\quadpack.obj %OBJDIR%\m_tilt.obj %OBJDIR%\m_lens.obj %OBJDIR%\m_multislice.obj %OBJDIR%\m_crystallography.obj %OBJDIR%\m_numerical_tools.obj %OBJDIR%\mod_output.obj %OBJDIR%\mod_CUFFT_wrapper.obj %OBJDIR%\mod_cuda_array_library.obj %OBJDIR%\mod_cuda_setup.obj %OBJDIR%\mod_cufft.obj %OBJDIR%\mod_global_variables.obj %OBJDIR%\m_user_input.obj %OBJDIR%\m_string.obj %OBJDIR%\m_precision.obj %OBJDIR%\muSTEM.obj %LIBS%
+pgfortran %OPTS% %LIBDIRS% -o %OUTDIR%\%OUTNAME% %OBJDIR%\s_absorptive_stem.obj %OBJDIR%\s_absorptive_tem.obj %OBJDIR%\s_qep_stem.obj %OBJDIR%\s_qep_tem.obj %OBJDIR%\m_conv2dr.obj %OBJDIR%\MS_utilities.obj %OBJDIR%\mod_cuda_ms.obj %OBJDIR%\m_plasmon.obj %OBJDIR%\mod_Hn0.obj %OBJDIR%\m_potential.obj %OBJDIR%\mod_cuda_potential.obj %OBJDIR%\m_absorption.obj %OBJDIR%\m_electron.obj %OBJDIR%\quadpack.obj %OBJDIR%\m_tilt.obj %OBJDIR%\m_lens.obj %OBJDIR%\m_multislice.obj %OBJDIR%\m_crystallography.obj %OBJDIR%\m_numerical_tools.obj %OBJDIR%\mod_output.obj %OBJDIR%\mod_CUFFT_wrapper.obj %OBJDIR%\mod_cuda_array_library.obj %OBJDIR%\mod_cuda_setup.obj %OBJDIR%\mod_cufft.obj %OBJDIR%\mod_global_variables.obj %OBJDIR%\m_user_input.obj %OBJDIR%\m_string.obj %OBJDIR%\m_precision.obj %OBJDIR%\muSTEM.obj %LIBS%
 echo Done
 @pause
 exit /b

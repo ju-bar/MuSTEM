@@ -43,9 +43,11 @@ Executables of previous versions can be found in the [Executables](https://githu
   Both filters can be used together or separately. The filters are turned off by setting the filter strength to 0.
 * The old filter to calculate for a fraction of the supercell in STEM EELS is removed.
 * Parts of the code have been reformatted and commented to improve readability and maintainability.
+* The SE absorption model has been redesigned to include a simulation of transversal momenta effectively by a convolution of the SE transmission functions. The convolution effect can be tuned by the effective SE angular range given by the user. The option to modify radii of the atomic absorption functions has been removed.
+* The effective SE attenuation length is now reproduced by the SE transmission model. For this to work an scaling is necessary which will be performed automatically. For some structure models it might be necessary to specificy a range of slices on which this is perfomed. Input options for this are provided.
 
 ### Version 6.2
-* Added STEM secondary electron imaging based on ionization tables also used for STEM EELS simulations. An iosotropic model is used to estimate the secondary electron emission into a user specified detector acceptance angle, and a user specified inelastic mean free path is used to estimate the decay of the SE signal towards the detector placed in the backwards direction.
+* Added STEM secondary electron imaging based on ionization tables also used for STEM EELS simulations. An iosotropic model is used to estimate the secondary electron emission into a user specified detector acceptance angle, and a user specified effective attenuation length is used to estimate the decay of the SE signal towards the detector placed in the backwards direction.
 * Several parts of the code were cleaned up to improve readability and maintainability.
 * Minor bug fixes in console output.
 * Added remaining calculation time estimate (ETA) to console output.

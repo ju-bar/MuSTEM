@@ -837,7 +837,14 @@ module m_Hn0
     
     integer(4) :: ml,lpr,mlpr   !l is in the module
     integer(4) :: lammax,lprmax!,lammin
-    integer(4),parameter :: mono = 1 !flag to kill the monopole contribution
+    integer(4),parameter :: mono = 1 !flag to kill the monopole contribution (for test purposes, only mono = 1 gives physical results)
+        ! Why is the monopole contribution killed?
+        ! The reason is that we are calculating with partially nonorthogonalized
+        ! wavefunctions. The monopole term (lam=0) can give rise to unphysical
+        ! contributions in this case. By removing it here, we ensure that only
+        ! physically meaningful multipole contributions are considered.
+        ! The constant monopole term is expected to contribute zero in case of orthogonal
+        ! sets of wavefunctios. <phi_f|1|psi_i> = 0 if f != i
     
     !real(fp_kind) :: Z             !atomic number
     real(fp_kind) :: ztmp   = 1     !flag for wavfuncsolo subroutine (1 for non hydrogenic potential)
@@ -904,6 +911,13 @@ module m_Hn0
             qtmp = qtmp + delq          ! increment qtmp
             call sbessel(qtmp,lprmax,sbess) ! Calculate the Sbessels at qtmp
             if(mono.eq.1) sbess(:,0)=sbess(:,0)-1.0_fp_kind ! kill the spurious monopole contribution
+            ! Why is the monopole contribution killed here?
+            ! The reason is that we are calculating with partially nonorthogonalized
+            ! wavefunctions. The monopole term (lam=0) can give rise to unphysical
+            ! contributions in this case. By removing it here, we ensure that only
+            ! physically meaningful multipole contributions are considered.
+            ! The constant monopole term is expected to contribute zero in case of orthogonal
+            ! sets of wavefunctios. <phi_f|1|psi_i> = 0 if f != i
             iqstep = (iqblk-1)*50 + iq 
             qpos_local(iqstep) = qtmp   ! store value of qtmp
             call ovlapint_solo_new(lpr,iqstep,Pnl,Rel,gint_local,sbess) ! calculate overlap integrals

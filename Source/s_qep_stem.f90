@@ -70,6 +70,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
 #endif
   use cufft_wrapper;use m_Hn0
   use m_crystallography;use m_tilt;use m_string;use m_multislice;use m_potential;use m_numerical_tools
+  use m_conv2dr ! convolution module, used for applying transmission point spread for SE imaging
     
   implicit none
     
@@ -239,10 +240,16 @@ subroutine qep_stem(STEM,ionization,PACBED)
     endif
     call make_local_inelastic_potentials(ionization)  !setup the REAL space inelastic potential (ionization and adf) for QUEP ADF is disabled
   endif
+
   if (SEI) then ! 2025-06-26, JB: Secondary electron transmission function (always not on-the-fly)
     call make_se_transmission_grates() ! calculate the transmission function for SE per slice
     allocate(se_acctransm(nopiy,nopix)) ! allocate the accumulated SE transmission function
     se_acctransm = 1.0_fp_kind ! initialize to 1 (full transmission)
+    ! setup convolution module for applying the PSF to the SE transmission functions
+    call conv2dr_init(n_se_psf) ! initialize with number of PSFs
+    do i=1, n_se_psf
+      call conv2dr_set_kernel(i, se_psf(:,:,i), nopiy, nopix) ! set the kernel data
+    enddo
   endif
 
   if(stem) then
@@ -609,8 +616,14 @@ subroutine qep_stem(STEM,ionization,PACBED)
         endif
         
         if (SEI) then ! 2025-06-26, JB: Update accumulated SE transmission function
+          ! multiply the TF of the current slice to the accumulated SE transmission function
           call cuda_multiplication<<<blocks,threads>>>(se_acctransm_d,se_transmission_d(:,:,j),&
                             &se_acctransm_d,1.0_fp_kind,nopiy,nopix)
+          ! 2025-08-21, JB: added simulation of the secondary electron isotropic momentum taking
+          !                 effect in the propagation to the detector and on the absorption
+          ! convolute with the PSF of the current slice to model the point spread of
+          ! the secondary electrons propagating with perpendicular momenta and backwards to the detector
+          call conv2dr_apply(1+MODULO(j-1,n_se_psf), se_acctransm_d, se_acctransm_d, nopiy, nopix)
         endif
         
       enddo ! End loop j over slices
@@ -644,6 +657,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
 			
         if(ionization) then
           do ii=1,num_ionizations
+            temp = ion_image_d(:,:,ii) ! download ion_image from device to host
             stem_ion_image(ny,nx,i_df,z_indx(1),ii) = stem_ion_image(ny,nx,i_df,z_indx(1),ii) +&
                             &get_sum(ion_image_d(:,:,ii))
           enddo ! ii
@@ -732,8 +746,14 @@ subroutine qep_stem(STEM,ionization,PACBED)
           endif
           
           ! 2025-06-26, JB: Update accumulated SE transmission function
-          if (SEI) se_acctransm = se_acctransm * se_transmission(:,:,j)
-            
+          if (SEI) then
+              se_acctransm = se_acctransm * se_transmission(:,:,j)
+              ! 2025-08-21, JB: added simulation of the secondary electron isotropic momentum taking
+              !                 effect in the propagation to the detector and on the absorption
+              ! convolute with the PSF of the current slice to model the point spread of
+              ! the secondary electrons propagating with perpendicular momenta and backwards to the detector
+              call conv2dr_apply(1+MODULO(j-1,n_se_psf), se_acctransm, se_acctransm, nopiy, nopix)
+          endif
         enddo ! End loop j over slices
 				
         !If this thickness corresponds to any of the output values then accumulate diffraction pattern
@@ -996,5 +1016,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
     endif	
 #endif
   enddo ! n_tilts_total
+    
+  call conv2dr_uninit() ! uninitialize the convolution module
 
 end subroutine qep_stem

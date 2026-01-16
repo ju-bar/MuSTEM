@@ -58,30 +58,40 @@
 				<File RelativePath=".\GPU_routines\mod_cuda_array_library.f90">
 					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
 					</FileConfiguration>
+					<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
 				</File>
 				<File RelativePath=".\GPU_routines\mod_cuda_ms.f90">
 					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
+					<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
 					</FileConfiguration>
 				</File>
 				<File RelativePath=".\GPU_routines\mod_cuda_potential.f90">
 					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
 					</FileConfiguration>
+					<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
 				</File>
 				<File RelativePath=".\GPU_routines\mod_cuda_setup.f90">
 					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
+					<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
 					</FileConfiguration>
 				</File>
 				<File RelativePath=".\GPU_routines\mod_cufft.f90">
 					<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
 					</FileConfiguration>
+					<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
+					</FileConfiguration>
 				</File>
 			</Filter>
 			<File RelativePath=".\m_absorption.f90"/>
+			<File RelativePath=".\m_conv2dr.f90"/>
 			<File RelativePath=".\m_crystallography.f90"/>
 			<File RelativePath=".\m_electron.f90"/>
 			<File RelativePath=".\m_lens.f90"/>
-			<File RelativePath=".\m_multislice.f90">
-			</File>
+			<File RelativePath=".\m_multislice.f90"/>
 			<File RelativePath=".\m_numerical_tools.f90"/>
 			<File RelativePath=".\m_plasmon.f90"/>
 			<File RelativePath=".\m_potential.f90"/>
@@ -110,8 +120,7 @@
 			<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
 			</FileConfiguration>
 		</File>
-		<File RelativePath="..\Readme.md">
-		</File>
+		<File RelativePath="..\Readme.md"/>
 	</Files>
 	<Globals/>
 </VisualStudioProject>

@@ -123,7 +123,10 @@ module global_variables
     
     ! SE variables, 2025-06-26, JB
     real(fp_kind) :: se_det_scale = 1.0_fp_kind ! scale factor for the SE detector, initialised to accept full angular range
-    real(fp_kind) :: se_imfp = 0.001_fp_kind ! inelastic mean free path (1/e decay) for secondary electrons, initialised to 0.001 A
+    real(fp_kind) :: se_alen = 0.001_fp_kind ! effective attenuation length (1/e decay) for secondary electrons, initialised to 0.001 A
+    real(fp_kind) :: se_tht_max = 1222.4_fp_kind ! maximum scattering angle for measured secondary electrons, initialised to 1222 mrad
+    integer(4) :: se_dens_slice1 = 1 ! first slice to calculate the density scaling factor
+    integer(4) :: se_dens_slice2 = 1000000 ! last slice to calculate the density scaling factor
     
     ! inelastic filter thresholds, 2025-07-29, JB
     real(fp_kind) :: Hn0_filter_threshold = 0.001_fp_kind ! threshold for Hn0 filter, initialised to 0.001

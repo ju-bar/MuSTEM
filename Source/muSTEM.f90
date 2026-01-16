@@ -87,7 +87,7 @@
        &1x,'|     | $$  \$ | $$ \$$    $$ \$$    $$  | $$   | $$     \| $$  \$ | $$      |',/,&
        &1x,'|      \$$      \$$  \$$$$$$   \$$$$$$    \$$    \$$$$$$$$ \$$      \$$      |',/,&
        &1x,'|                                                                            |',/,&
-       &1x,"|       Copyright (C) 2025 L.J. Allen, H.G. Brown, A.J. D'Alfonso,           |",/,&
+       &1x,"|       Copyright (C) 2026 L.J. Allen, H.G. Brown, A.J. D'Alfonso,           |",/,&
        &1x,'|              S.D. Findlay, B.D. Forbes, J. Barthel                         |',/,&
 	   &1x,'|       email: hgbrown@unimelb.edu.au                                        |',/,&
        &1x,'|              ju.barthel@fz-juelich.de (for this version)                   |',/,&
@@ -98,9 +98,9 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2025-08-01)        |',/,&
+       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2026-01-15)        |',/,&
 #else
-       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2025-08-01)   |',/,&
+       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2026-01-15)   |',/,&
 #endif
        &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&
@@ -126,7 +126,7 @@
                 write(*,*) '    linpoleels   - applies linear interpolation on EELS energy windows'
                 write(*,*) '    omp_num_threads={n} sets number of OpenMP threads, e.g. omp_num_threads=3'
                 write(*,*) '    dump_tmat    - dumps transition potentials used in double-channeling code'
-                write(*,*) '    dump_setf    - dumps transmission function simulating SE absorption'
+                write(*,*) '    dump_setf    - dumps transmission functions simulating SE absorption'
                 write(*,*)
                 stop
             case ('nopause')
@@ -384,9 +384,6 @@
    
     subroutine setup_threading(nthreads)
         use omp_lib
-#ifndef GPU
-        use mkl_service
-#endif
         use m_string, only: to_string,command_line_title_box
     
         implicit none
@@ -403,10 +400,6 @@
         num_threads = max(1, num_threads) ! Ensure at least one thread is used.
         
         call omp_set_num_threads(num_threads)
-#ifndef GPU
-        call mkl_set_num_threads(num_threads)
-        call mkl_set_dynamic(0)
-#endif
 
         call command_line_title_box('CPU multithreading')
         write(*,*) 'The number of available logical cores is: ' // to_string(num_cores)

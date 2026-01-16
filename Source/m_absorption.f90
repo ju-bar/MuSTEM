@@ -201,10 +201,10 @@ module m_absorption
             ! Status
 #ifdef GPU            
         131 format(a1,' Calculating absorptive scattering factor ', i5, ' of ', i5, '...' )
-            write(*,131, advance='no') achar(13),ipa, max_int
+            write(6,131, advance='no') achar(13),ipa, max_int
 #else
         131 format(1h+,' Calculating absorptive scattering factor ', i5, ' of ', i5, '...' )
-            write(*,131) ipa, max_int
+            write(6,131) ipa, max_int
 #endif
             !flush(unit=6)
 
