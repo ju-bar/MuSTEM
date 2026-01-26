@@ -176,9 +176,9 @@ module cuda_setup
             write(*,*) 'and non-square arrays.'
             write(*,*)
         
-10          write(*,*) '<0> Precalculated potentials'
+10          write(*,*) '<0> Pre-calculated potentials'
             write(*,*) '<1> On-the-fly calculation'
-            call get_input('<0> Precalculated potentials <1> On-the-fly calculation', i_choice)
+            call get_input('<0> Pre-calculated potentials <1> On-the-fly calculation', i_choice)
             write(*,*)
             
             select case (i_choice)

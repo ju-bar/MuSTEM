@@ -329,7 +329,7 @@
                     adf = STEM.and.(.not.qep)
                     if(istem) call setup_lens_parameters('Image',imaging_aberrations,imaging_cutoff)
                     
-                    ! Precalculate the scattering factors on a grid
+                    ! Pre-calculate the scattering factors on a grid
                     call precalculate_scattering_factors()
                     if(ionization) call setup_inelastic_ionization_types()
                     if(tp_eels) call ionizer_init(.true.)

@@ -134,7 +134,7 @@ subroutine absorptive_tem
 	do i=1,imaging_ndf
         if(pw_illum) lens_ctf(:,:,i) =  make_ctf([0.0_fp_kind,0.0_fp_kind,0.0_fp_kind],imaging_df(i),imaging_cutoff,imaging_aberrations,imaging_apodisation)
 	enddo
-    ! Precalculate the scattering factors on a grid
+    ! Pre-calculate the scattering factors on a grid
     call precalculate_scattering_factors()
 	
     if (pw_illum) then

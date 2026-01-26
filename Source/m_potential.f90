@@ -146,7 +146,7 @@ module m_potential
         real(fp_kind),allocatable :: xdata(:),tdsbrc(:,:,:) 
         real(fp_kind) :: factor, eps, g_vec_array(3,nopiy,nopix)
         
-        write(*,*) 'Precalculating scattering factors ...'
+        write(*,*) 'Pre-calculating scattering factors ...'
   
         if(allocated(inverse_sinc)) deallocate(inverse_sinc)
         if(allocated(fz)) deallocate(fz)
@@ -371,7 +371,7 @@ module m_potential
         call command_line_title_box('Ionization')
 		i_eels = 0
         do while(i_eels<1.or.i_eels>3) ! 2025-06-07 JB: added SE-Imaging option
-		    write(*,*) char(10),' <1> EELS',char(10),' <2> EDX',char(10),' <3> SE-imaging',char(10)
+		    write(*,*) char(10),' <1> EELS mapping',char(10),' <2> EDX mapping',char(10),' <3> SE imaging',char(10)
             call get_input('Ionization choice', i_eels)
         enddo
         EELS = i_eels.eq.1

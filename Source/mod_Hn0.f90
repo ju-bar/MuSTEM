@@ -264,7 +264,7 @@ module m_Hn0
         
         !call make_state_vector()
         write(*,*) "Please input the maximum order of the transition potential to be calculated,"
-        write(*,*) "with order = abs(l - l') the absolute difference between inital and final"
+        write(*,*) "with order = abs(l - l') the absolute difference between initial and final"
         write(*,*) "angular momentum quantum numbers. As a rule of thumb, transitions of order=1"
         write(*,*) "are sufficient for qualitative agreement with experiment, but inclusion of"
         write(*,*) "higher order quantum numbers, such as transitions of order=2 or more are"
@@ -414,7 +414,7 @@ module m_Hn0
               write(*,*) "Enter the final state quantum numbers l', m_l'"
               call get_input("Final state l'",state_vector(1,2))
               call get_input("Final state m_l'",state_vector(1,3))
-              write(*,*) 'Inital l:',lorb,' ml:',state_vector(1,1),'l_pr',state_vector(1,2),'ml_pr',state_vector(1,3)
+              write(*,*) 'Initial l:',lorb,' ml:',state_vector(1,1),'l_pr',state_vector(1,2),'ml_pr',state_vector(1,3)
               write(*,*) '<1> Continue'
               write(*,*) '<2> Choose again'
               call get_input('<1> accept quantum numbers',switch)
@@ -423,7 +423,7 @@ module m_Hn0
         elseif(singlestate.ne.1) then 
             
             write(*,*) "Please input the maximum order of the transition potential to be calculated,"
-            write(*,*) "with order = abs(l - l') the absolute difference between inital and final"
+            write(*,*) "with order = abs(l - l') the absolute difference between initial and final"
             write(*,*) "angular momentum quantum numbers. As a rule of thumb, dipole transitions"
             write(*,*) "(order=1) are sufficient for qualitative agreement with experiment,"
             write(*,*) "but inclusion of higher order quantum numbers such as quadrupole transitions"
@@ -821,7 +821,7 @@ module m_Hn0
     !   subroutine calc_gsplint calculates the overlap integral 
     !   between the continuum and the bound state radial wavefunctions
     !   
-    !   input:  l,ml    inital state
+    !   input:  l,ml    initial state
     !           lpr     final state angular momentum
     !                   *note that the m_lpr is used when filling the tmatrix
     !           eval    energy of the ejected electron

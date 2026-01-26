@@ -680,7 +680,7 @@ subroutine load_save_add_grates_abs(abs_grates,nopiy,nopix,n_slices)
         else
             write(*,101)
         101 format( ' Your choice of tiling and grid size does not permit quick shifting ', /, &
-                    &' of the precalculated transmission functions. Shifting using the ', /, &
+                    &' of the pre-calculated transmission functions. Shifting using the ', /, &
                     &' Fourier shift algorithm can be performed but is time consuming. ', /, &
                     &' You may wish to go back and calculate more distinct transmission ', /, &
                     &' functions, or simply proceed without using phase ramp shifting. ' /)

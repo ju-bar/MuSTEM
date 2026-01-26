@@ -154,7 +154,7 @@ subroutine absorptive_stem(STEM,ionization,PACBED)
 	
   call command_line_title_box('Pre-calculation setup')
   
-  ! Precalculate the scattering factors on a grid
+  ! Pre-calculate the scattering factors on a grid
   call precalculate_scattering_factors()
   if (on_the_fly) then
 #ifdef GPU

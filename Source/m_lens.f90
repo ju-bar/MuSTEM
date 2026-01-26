@@ -433,7 +433,7 @@ module m_lens
             &       ' x = ', 3g12.5, ' mag = ', g12.5, 1x, a1, /,         &
             &       ' y = ', 3g12.5, ' mag = ', g12.5, 1x, a1, /,         &
             &       ' The angle between these scan vectors is ', f12.2, ' degrees', /, &
-            &       ' The inital (fractional) position is ', g12.5, ', ', g12.5, /,/, &
+            &       ' The initial (fractional) position is ', g12.5, ', ', g12.5, /,/, &
 			&		' The maximum spatial frequency allowed by the probe is ', f5.2, ' A-1.')
 104			format( ' The STEM image has a bandwidth limit of twice that frequency. ')
 105			format( ' This corresponds to minimum ',a7,' sampling of ', f6.2, ' positions per Angstrom:', /, &

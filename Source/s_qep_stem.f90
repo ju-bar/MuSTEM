@@ -222,7 +222,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
   length = calculate_padded_string_length(zarray,nz)
   lengthdf = calculate_padded_string_length(probe_df,probe_ndf)
     
-! Precalculate the scattering factors on a grid
+! Pre-calculate the scattering factors on a grid
   call precalculate_scattering_factors()
   idum = seed_rng()
 #ifdef GPU	

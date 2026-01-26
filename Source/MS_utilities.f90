@@ -587,10 +587,10 @@
 		call get_input('<1> Diffraction pattern for each probe position',idum)
 		fourDSTEM = (idum == 1).or.(idum ==2)
         if(idum==2.or.idum==4) then
-            write(*,*) 'Please input number of y pixels in diffration pattern output'
+            write(*,*) 'Please input number of y pixels in diffraction pattern output'
             call get_input('diffraction pattern y pixels',nopiyout)
             
-            write(*,*) 'Please input number of x pixels in diffration pattern output'
+            write(*,*) 'Please input number of x pixels in diffraction pattern output'
             call get_input('diffraction pattern x pixels',nopixout)
         else
             nopiyout = nopiy/3*2
