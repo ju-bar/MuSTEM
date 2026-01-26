@@ -962,7 +962,7 @@ subroutine qep_stem(STEM,ionization,PACBED)
       do i=1,nz
         filename = trim(adjustl(output_prefix))
         if (n_tilts_total>1) fnam = trim(adjustl(output_prefix))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
-        if(nz>1) filename=trim(adjustl(filename))//'_z='//zero_padded_int(int(zarray(i)),length)//'_A_'
+        if(nz>1) filename=trim(adjustl(filename))//'_z='//zero_padded_int(int(zarray(i)),length)//'_A'
         call binary_out_unwrap(nopiy,nopix,pacbed_pattern(:,:,i)/const,trim(adjustl(filename))//&
                             &'_PACBED_Pattern',nopiyout=nopiyout,nopixout=nopixout)
         if(output_thermal) then
