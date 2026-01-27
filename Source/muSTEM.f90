@@ -18,9 +18,9 @@
 !   Date:           August 2017
 !   Requirements:   PGI Fortran
 !
-!   version:        6.2  
+!   version:        6.3  
 !  
-!  Copyright (C) 2025  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes, J. Barthel
+!  Copyright (C) 2026  L. J. Allen, H. G. Brown, A. J. D’Alfonso, S.D. Findlay, B. D. Forbes, J. Barthel
 !
 !  v6.1 includes modifications by J. Barthel and L. J. Allen (2019 - 2025)
 !
@@ -131,9 +131,9 @@
                 stop
             case ('nopause')
                 nopause = .true.
-			case ('timing')
-				timing = .true.
-			case ('ionic')
+            case ('timing')
+                timing = .true.
+            case ('ionic')
                 ionic = .true.
             case ('linpoleels')
                 linpoleels = .true.
