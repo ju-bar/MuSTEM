@@ -6,10 +6,11 @@
 # The `MODE` variable can be set to `CPU` or `GPU`, and the `PRECISION` variable can be set to `single` or `double`.
 #
 # Take care to initialize the Compiler and CUDA environment variables correctly before running the Makefile.
+# For CPU version compiles using the Intel oneAPI:
 #   source /usr/local/intel/oneapi/setvars.sh
-#    or
-#   source /opt/nvidia/hpc_sdk/Linux_x86_64/25.5/compilers/bin/nvhpcvars.sh
-#  before running the Makefile (you can try first and run those if  it fails)
+# For GPU version compiles with the Nvidia HPC SDK:
+#   see https://docs.nvidia.com/hpc-sdk/hpc-sdk-install-guide/index.html#end-user-environment-settings
+#  before running the Makefile (you can try first and run those if it fails)
 #
 # To build for CPU:
 #   make
@@ -29,25 +30,20 @@
 MODE      ?= CPU
 PRECISION ?= single
 
-# === Compiler & Toolchain Configuration ===
-NVCOMP_BIN := /opt/nvidia/hpc_sdk/Linux_x86_64/25.5/compilers/bin
-CUDA_ROOT  := /opt/nvidia/hpc_sdk/Linux_x86_64/25.5/cuda
-
 # === GPU Mode Configuration ===
 ifeq ($(MODE),GPU)
-  FC := $(NVCOMP_BIN)/nvfortran
-  #FCFLAGS := -Mpreprocess -DGPU -Mbackslash -Mfree -mp -cuda -fast -O3
+  ifndef NVCOMPILERS
+    $(error Please setup the HPC SDK environment before make with MODE GPU, see https://docs.nvidia.com/hpc-sdk/hpc-sdk-install-guide/index.html#end-user-environment-settings)
+  endif
+  FC := nvfortran
   FCFLAGS := -Mpreprocess -DGPU -Mbackslash -Mfree -mp -cuda -O2 -Kieee
-  INCLUDES := -I$(CUDA_ROOT)/include
-  LIBDIRS := -L$(CUDA_ROOT)/lib64
   LIBS := -lcufft -lrt -lpthread -ldl
   OBJDIR := x64/objgpu
   OUTNAME := muSTEM_GPU
-
 else
 # === CPU Mode Configuration ===
   ifndef MKLROOT
-    $(error Please run 'source /usr/local/intel/oneapi/setvars.sh' before calling make)
+    $(error Please run 'source /usr/local/intel/oneapi/setvars.sh' before make)
   endif
   FC := ifx
   FCFLAGS := -fpp -qopenmp -O2 -heap-arrays -extend-source 132 -assume byterecl
@@ -140,7 +136,7 @@ $(OBJDIR)/%.o: %.f90
 	@mkdir -p $(dir $@)
 	@echo "Compiling $< → $@"
 ifeq ($(MODE),GPU)
-	$(FC) $(FCFLAGS) $(INCLUDES) -module $(OBJDIR) -c $< -o $@
+	$(FC) $(FCFLAGS) -module $(OBJDIR) -c $< -o $@
 else
 	$(FC) $(FCFLAGS) $(INCLUDES) -module $(OBJDIR) -c $< -o $@
 endif
@@ -150,7 +146,7 @@ $(OUTDIR)/$(OUTNAME): $(OBJ)
 	@mkdir -p $(OUTDIR)
 	@echo "Linking $@"
 ifeq ($(MODE),GPU)
-	$(FC) $(FCFLAGS) $(LIBDIRS) $(OBJ) $(LIBS) -o $@
+	$(FC) $(FCFLAGS) $(OBJ) $(LIBS) -o $@
 else
 	$(FC) $(FCFLAGS) $(LIBDIRS) $(OBJ) $(LIBS) -o $@
 endif
