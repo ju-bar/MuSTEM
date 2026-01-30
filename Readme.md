@@ -45,6 +45,7 @@ Executables of previous versions can be found in the [Executables](https://githu
 * Parts of the code have been reformatted and commented to improve readability and maintainability.
 * The SE absorption model has been redesigned to include a simulation of transversal momenta effectively by a convolution of the SE transmission functions. The convolution effect can be tuned by the effective SE angular range given by the user. The option to modify radii of the atomic absorption functions has been removed.
 * The effective SE attenuation length is now reproduced by the SE transmission model. For this to work an scaling is necessary which will be performed automatically. For some structure models it might be necessary to specificy a range of slices on which this is perfomed. Input options for this are provided.
+* The makefile for compiling on Linux has been changed to require the Nvidia HPC SDK environment setup via the user shell (e.g. bash). See the Nvidia HPC SDK documentation (https://docs.nvidia.com/hpc-sdk/hpc-sdk-install-guide/index.html#end-user-environment-settings) for details.
 
 ### Version 6.2
 * Added STEM secondary electron imaging based on ionization tables also used for STEM EELS simulations. An iosotropic model is used to estimate the secondary electron emission into a user specified detector acceptance angle, and a user specified effective attenuation length is used to estimate the decay of the SE signal towards the detector placed in the backwards direction.
@@ -89,6 +90,22 @@ A compile_gpu.bat is provided with the repository to produce a GPU version of μ
 The repository also contains solution and project files for Microsoft Visual Studio 2022 set up to work with the Intel oneAPI for producing a CPU version of µSTEM.
 
 Compiler and CUDA versions should be compatible and also support the hardware you are using.
+
+Newer hardware will not be supported by the executables provided here. The reason is, that there is no Fortran compiler available on Windows that supports the latest CUDA versions. Therefore, to use newer hardware, you will need to compile the code on Linux and use it there. A tested solution exists for Windows 11 using WSL2 (Windows Subsystem for Linux) with GPU support enabled. 
+
+The following short guide outlines the steps to set up the Windows Subsystem for Linux with Ubuntu and the CUDA toolkit, so that you can run CUDA apps like muSTEM:
+* Update the Nvidia drivers on your Windows system.
+* Install the WSL2 on your Windows 11 system: open PowerShell or cmd as administrator and run `wsl --install`, then reboot your system
+* Install a Ubuntu Linux distribution: `wsl --install Ubuntu-24.04` (`wsl --list --online` to see which distributions are available)
+* Run the installed Linux distribution: `wsl`
+* Download and install the CUDA toolkit for Ubuntu-WSL (select this from the CUDA download page). DO NOT INSTALL Nvidia drivers on the Linux system! The WSL2 system will use the Windows Nvidia drivers.
+* Add the `line export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH` to the end of your `~/.bashrc` file to make sure the WSL2 system finds the CUDA libraries.
+
+The following steps outline how to enable your Ubuntu-WSL system to compile muSTEM:
+* Install the Nvidia HPC SDK following the instructions on the Nvidia website: https://docs.nvidia.com/hpc-sdk/hpc-sdk-install-guide/index.html
+* Edit the `~/.bashrc` again to setup the variables so make finds the compilers
+https://docs.nvidia.com/hpc-sdk/hpc-sdk-install-guide/index.html#end-user-environment-settings
+* You can actually compile muSTEM now using the provided makefile in the repository: `make mode=GPU` on the Windows drives (no need to copy code to the Linux file system). However, it is recommended to run calculations with I/O on the Linux file system for better performance.
 
 ### Notes
 * Test parallelization success with compiler options: /Qopt-report=2 /Qopt-report-phase=vec /Qopt-report-file:stdout
