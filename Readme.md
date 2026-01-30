@@ -113,7 +113,7 @@ https://docs.nvidia.com/hpc-sdk/hpc-sdk-install-guide/index.html#end-user-enviro
 
 ## Contributing
 
-Please contact [Dr. Hamish Brown](https://github.com/HamishGBrown) with project suggestions and contributions.
+Please contact [Dr. Juri Barthel](https://github.com/ju-bar) with project suggestions and contributions.
 
 
 ## Authors
