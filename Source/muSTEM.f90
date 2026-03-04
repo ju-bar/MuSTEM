@@ -60,13 +60,16 @@
         
         implicit none
         
-        integer :: i_illum, i_tds_model, i_cb_menu, i_cb_calc_type,ifile,nfiles,i_arg,idum,i,ieftem
+        integer :: i_illum, i_tds_model, i_cb_menu, i_cb_calc_type,ifile,nfiles
+        integer :: io_err, i_arg,idum,i,ieftem
         integer :: arg_num_threads, nerr
         
         logical :: nopause = .false.,there,ionization,stem,pacbed
         character(512)::command_argument
         character(120)::fnam, pnam
+        character(120), allocatable :: fnam_array(:)
         character(2):: symb
+        integer, allocatable :: use_file(:)
         
         nerr                     = 0
         arg_num_threads          = 0
@@ -98,9 +101,9 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2026-01-30)        |',/,&
+       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2026-03-04)        |',/,&
 #else
-       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2026-01-30)   |',/,&
+       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2026-03-04)   |',/,&
 #endif
        &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&
@@ -157,26 +160,47 @@
             read(*,*)
         endif
        
-        
+        ! Set up CPU multithreading (26/03/04 JB, moved outside the "play all" loop to be global)
+        call setup_threading(arg_num_threads)
         
         ! Set up user input routines, nfiles is the number
         ! of user input files to play if "play all" is inputted
         nfiles = init_input()
-       
+        ! handling user input file names up fron (JB 26/03/04)
+        allocate(fnam_array(nfiles), use_file(nfiles))
+        use_file(:) = 0 ! preset all user files to not be used, then set to 1 if found and opened successfully in the loop below
+        
+        ! Read all user input file names into an array for easy access if "play all" is chosen
         do ifile=1,nfiles
             !If play or play all open relevant user input file.
             if(input_file_number.ne.5) then
-                fnam = get_driver_file(ifile)
-                inquire(file=fnam,exist = there)
+                fnam_array(ifile) = get_driver_file(ifile)
+                inquire(file=fnam_array(ifile),exist = there)
                 if (there) then
-                    open(unit=in_file_number, file=fnam, status='old')
+                    open(unit=in_file_number, file=fnam_array(ifile), &
+                        & status='old', iostat=io_err)
+                    if (io_err==0) then
+                        use_file(ifile) = 1
+                        close(in_file_number)
+                    else
+                        write(*,*) "Couldn't open user input file: ",trim(adjustl(fnam_array(ifile)))
+                    end if
                 else
-                    write(*,*) "Couldn't find user input file: ",trim(adjustl(fnam))
-                    cycle
+                    write(*,*) "Couldn't find user input file: ",trim(adjustl(fnam_array(ifile)))
                 endif
             endif
-        ! Set up CPU multithreading
-        call setup_threading(arg_num_threads)
+        end do
+       
+        do ifile=1,nfiles
+            !If play or play all open relevant user input files stored in fnam_array.
+            fnam = fnam_array(ifile)
+            if ((input_file_number.ne.5).AND.(use_file(ifile)==1)) then
+                open(unit=in_file_number, file=fnam, status='old')
+            else
+                write(*,*) "Skipping user input file: ",trim(adjustl(fnam))
+                cycle
+            endif
+        
 #ifdef GPU
         ! Set up GPU
         call setup_GPU
