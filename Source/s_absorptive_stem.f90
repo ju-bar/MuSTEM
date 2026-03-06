@@ -1009,5 +1009,5 @@ subroutine absorptive_stem(STEM,ionization,PACBED)
 #endif
 
   enddo !End loop over tilts
-    
+  call conv2dr_uninit() ! uninitialize the convolution module
 end subroutine absorptive_stem

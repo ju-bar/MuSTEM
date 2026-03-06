@@ -101,9 +101,9 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2026-03-04)        |',/,&
+       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2026-03-06)        |',/,&
 #else
-       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2026-03-04)   |',/,&
+       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2026-03-06)   |',/,&
 #endif
        &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&
@@ -181,20 +181,23 @@
                         & status='old', iostat=io_err)
                     if (io_err==0) then
                         use_file(ifile) = 1
+                        write(*,fmt='(A,I0,A)') "Using user input file (line #",ifile+1,"): "//trim(adjustl(fnam_array(ifile)))
                         close(in_file_number)
                     else
-                        write(*,*) "Couldn't open user input file: ",trim(adjustl(fnam_array(ifile)))
+                        write(*,fmt='(A,I0,A)') "Couldn't open user input file (line #",ifile+1,"): "//trim(adjustl(fnam_array(ifile)))
                     end if
                 else
-                    write(*,*) "Couldn't find user input file: ",trim(adjustl(fnam_array(ifile)))
+                    write(*,fmt='(A,I0,A)') "Couldn't find user input file (line #",ifile+1,"): "//trim(adjustl(fnam_array(ifile)))
                 endif
             endif
         end do
+        write(*,*)
        
-        do ifile=1,nfiles
+        do ifile=1,nfiles ! execution loop
             !If play or play all open relevant user input files stored in fnam_array.
             fnam = fnam_array(ifile)
             if ((input_file_number.ne.5).AND.(use_file(ifile)==1)) then
+                write(*,*) "Excuting user input file: ",trim(adjustl(fnam))
                 open(unit=in_file_number, file=fnam, status='old')
             else
                 write(*,*) "Skipping user input file: ",trim(adjustl(fnam))
@@ -397,7 +400,8 @@
         close(in_file_number)
         call reset_allocatable_variables
         
-        enddo
+        enddo ! end of loop over user run files if "play all" is chosen
+        
         if (.not. nopause) then
             write(*,*) ' Press enter to exit.'
             read(*,*) 
@@ -439,6 +443,7 @@
 		use m_lens
         use m_potential
         use m_multislice
+        use m_Hn0
 #ifdef GPU
 		use cuda_potential
 #endif
@@ -476,6 +481,30 @@
 		if(allocated(adf_potential           )) deallocate(adf_potential           )  
 		if(allocated(ionization_potential    )) deallocate(ionization_potential    )  
 		if(allocated(eels_correction_detector)) deallocate(eels_correction_detector)
+        if(allocated(se_transf_aty_radius    )) deallocate(se_transf_aty_radius)
+        if(allocated(se_transmission         )) deallocate(se_transmission)
+        if(allocated(se_psf                  )) deallocate(se_psf)
+        if(allocated(state_vector            )) deallocate(state_vector)
+        if(allocated(state_use               )) deallocate(state_use)
+        if(allocated(qpos                    )) deallocate(qpos)
+        if(allocated(dgint                   )) deallocate(dgint)
+        if(allocated(gint                    )) deallocate(gint)
+        if(allocated(qmin                    )) deallocate(qmin)
+        if(allocated(dc_eels_outer           )) deallocate(dc_eels_outer)
+        if(allocated(dc_eels_inner           )) deallocate(dc_eels_inner)
+        if(allocated(Hn0_eels_detector       )) deallocate(Hn0_eels_detector)
+        if(allocated(natoms_slice_total      )) deallocate(natoms_slice_total)
+        if(allocated(Hn0_shiftx_coord        )) deallocate(Hn0_shiftx_coord)
+        if(allocated(Hn0_shifty_coord        )) deallocate(Hn0_shifty_coord)
+        if(allocated(ion_tau                 )) deallocate(ion_tau)
+        if(allocated(output_cell_list        )) deallocate(output_cell_list)
+        if(allocated(output_thickness_list   )) deallocate(output_thickness_list)
+        if(allocated(cell_map                )) deallocate(cell_map)
+        if(allocated(amplitude_fnam          )) deallocate(amplitude_fnam)
+        if(allocated(phase_fnam              )) deallocate(phase_fnam)
+        if(allocated(shift_arrayx            )) deallocate(shift_arrayx)
+        if(allocated(shift_arrayy            )) deallocate(shift_arrayy)
+        
 #ifdef GPU
 		if(allocated(ccd_slice_array		 )) deallocate(ccd_slice_array)
 		if(allocated(Volume_array			 )) deallocate(Volume_array)
