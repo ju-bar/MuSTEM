@@ -116,7 +116,7 @@ module global_variables
     
     
     !logical types to pick inelastic calculations
-    logical :: adf 
+    logical :: adf = .false. 
     logical :: EELS = .false.
     logical :: EDX = .false.
     logical :: SEI = .false.
@@ -135,7 +135,7 @@ module global_variables
     logical :: qep,output_thermal,interpolation,fourdSTEM
     
     logical :: on_the_fly = .false.
-    logical :: high_accuracy
+    logical :: high_accuracy = .false.
     logical :: ionic = .false.
     logical :: tp_eels,istem
     logical :: single_channeling = .true. ! tp_eels single-channeling mode flag, 2025-07-29, JB

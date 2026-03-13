@@ -60,16 +60,13 @@
         
         implicit none
         
-        integer :: i_illum, i_tds_model, i_cb_menu, i_cb_calc_type,ifile,nfiles
+        integer :: i_illum, i_tds_model, i_cb_menu, i_cb_calc_type,ifile
         integer :: io_err, i_arg,idum,i,ieftem
         integer :: arg_num_threads, nerr
         
         logical :: nopause = .false.,there,ionization,stem,pacbed
         character(512)::command_argument
         character(120)::fnam, pnam
-        character(120), allocatable :: fnam_array(:)
-        character(2):: symb
-        integer, allocatable :: use_file(:)
         
         nerr                     = 0
         arg_num_threads          = 0
@@ -101,9 +98,9 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2026-03-06)        |',/,&
+       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2026-03-13)        |',/,&
 #else
-       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2026-03-06)   |',/,&
+       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2026-03-13)   |',/,&
 #endif
        &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&
@@ -125,6 +122,7 @@
                 write(*,*) 
                 write(*,*) '  List of options for muSTEM:    e.g.  muSTEM nopause'
                 write(*,*) '    nopause      - avoids program pauses'
+                write(*,*) '    timing       - appends timing information to file *timing.txt'
                 write(*,*) '    ionic        - applies ionic form factors (requires charge input via xtl)'
                 write(*,*) '    linpoleels   - applies linear interpolation on EELS energy windows'
                 write(*,*) '    omp_num_threads={n} sets number of OpenMP threads, e.g. omp_num_threads=3'
@@ -163,46 +161,27 @@
         ! Set up CPU multithreading (26/03/04 JB, moved outside the "play all" loop to be global)
         call setup_threading(arg_num_threads)
         
-        ! Set up user input routines, nfiles is the number
-        ! of user input files to play if "play all" is inputted
-        nfiles = init_input()
-        ! handling user input file names up fron (JB 26/03/04)
-        allocate(fnam_array(nfiles), use_file(nfiles))
-        use_file(:) = 0 ! preset all user files to not be used, then set to 1 if found and opened successfully in the loop below
-        
-        ! Read all user input file names into an array for easy access if "play all" is chosen
-        do ifile=1,nfiles
-            !If play or play all open relevant user input file.
-            if(input_file_number.ne.5) then
-                fnam_array(ifile) = get_driver_file(ifile)
-                inquire(file=fnam_array(ifile),exist = there)
-                if (there) then
-                    open(unit=in_file_number, file=fnam_array(ifile), &
-                        & status='old', iostat=io_err)
-                    if (io_err==0) then
-                        use_file(ifile) = 1
-                        write(*,fmt='(A,I0,A)') "Using user input file (line #",ifile+1,"): "//trim(adjustl(fnam_array(ifile)))
-                        close(in_file_number)
-                    else
-                        write(*,fmt='(A,I0,A)') "Couldn't open user input file (line #",ifile+1,"): "//trim(adjustl(fnam_array(ifile)))
-                    end if
-                else
-                    write(*,fmt='(A,I0,A)') "Couldn't find user input file (line #",ifile+1,"): "//trim(adjustl(fnam_array(ifile)))
-                endif
-            endif
-        end do
-        write(*,*)
+        ! Set up user input routines
+        call init_input()
        
-        do ifile=1,nfiles ! execution loop
-            !If play or play all open relevant user input files stored in fnam_array.
-            fnam = fnam_array(ifile)
-            if ((input_file_number.ne.5).AND.(use_file(ifile)==1)) then
-                write(*,*) "Excuting user input file: ",trim(adjustl(fnam))
-                open(unit=in_file_number, file=fnam, status='old')
-            else
-                write(*,*) "Skipping user input file: ",trim(adjustl(fnam))
-                cycle
-            endif
+        do ifile=1, num_run_files ! execution loop
+            if (use_file(ifile)==0) cycle ! skip files without use flag
+            select case(run_mode)
+            case(1) ! interactive
+                write(*,*) "Executing interactively"
+            case(2) ! record
+                write(*,*) "Recording input to new run file: ",trim(adjustl(run_file(ifile)))
+                open(unit=in_file_number, file=trim(adjustl(run_file(ifile))), status='new')
+            case(3) ! record overwrite
+                write(*,*) "Recording input to run file: ",trim(adjustl(run_file(ifile)))
+                open(unit=in_file_number, file=trim(adjustl(run_file(ifile))), status='replace')
+            case(4,5) ! play and play all
+                write(*,*) "Excuting user input file: ",trim(adjustl(run_file(ifile)))
+                open(unit=in_file_number, file=trim(adjustl(run_file(ifile))), status='old')
+            case default
+                write(*,*) "ERROR: Unknown run mode."
+                stop 1
+            end select
         
 #ifdef GPU
         ! Set up GPU
@@ -400,7 +379,7 @@
         close(in_file_number)
         call reset_allocatable_variables
         
-        enddo ! end of loop over user run files if "play all" is chosen
+        enddo ! end of loop over user run files
         
         if (.not. nopause) then
             write(*,*) ' Press enter to exit.'
@@ -444,6 +423,24 @@
         use m_potential
         use m_multislice
         use m_Hn0
+        
+        !reset mode flags too, otherwise teh second run might falsely access not allocated variables
+        adf = .false.
+        EELS = .false.
+        EDX = .false.
+        SEI = .false.
+        qep =.false.
+        output_thermal = .false.
+        interpolation = .false.
+        fourdSTEM = .false.
+        on_the_fly = .false.
+        high_accuracy = .false.
+        ionic = .false.
+        tp_eels = .false.
+        istem = .false.
+        single_channeling = .true. ! tp_eels single-channeling mode flag, 2025-07-29, JB
+        plasmonmc = .false.
+        
 #ifdef GPU
 		use cuda_potential
 #endif

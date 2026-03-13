@@ -43,36 +43,41 @@ module m_user_input
         module procedure write_to_in_file_real_array
     end interface
 
+    integer :: run_mode = 0 ! run modes set from control file (1="interactive", 2="record", 3="record overwrite", 4="play", 5="play all")
+    integer :: num_run_files = 0
+    character(120), allocatable :: run_file(:)
+    integer, allocatable :: use_file(:)
 
-
-    integer(4) :: output_file_number
-
+    integer(4) :: output_file_number ! this is the file unit where m_user_input writes to
     
+    integer(4) :: input_file_number ! thsi is the file unit where m_user_input reads from
+    integer(4) :: line_no ! line number
     
-    integer(4) :: input_file_number, line_no
-
-    
-    integer(4),parameter :: control_file_number = 90
-    integer(4),parameter :: in_file_number = 91
+    integer(4),parameter :: control_file_number = 90 ! logical file unit used fro control file i/o
+    integer(4),parameter :: in_file_number = 91 ! logical file unit used for input (run file) i/o
     
     contains
 
+    ! This routine writes a new file "user_input.txt" using an
+    ! interactive menu with the user. The idea is that this file
+    ! will then be used as a control file.
+    ! This doesn't create a control file with the "play all" option.
     subroutine make_new_user_input_file()
-    implicit none
-    integer*4::ichoice,ichoice2
-    character(120)::temp_string
-    logical::exists,exists2
-    
-    open(unit=control_file_number, file="user_input.txt", status='new')
+        implicit none
+        integer*4::ichoice,ichoice2
+        character(120)::temp_string
+        logical::exists,exists2
+        
+        open(unit=control_file_number, file="user_input.txt", status='new')
 
-            ichoice=-1
-            do while(ichoice<1.or.ichoice>3)
-                
-                write(*,*) 'Please select from the following options:'
-                write(*,*) '<1> Use the program in interactive mode'
-                write(*,*) '<2> Record a new driving file'
-                write(*,*) '<3> Play an already existing driving file'
-                read(*,*) ichoice
+        ichoice=-1
+        do while(ichoice<1.or.ichoice>3)
+            
+            write(*,*) 'Please select from the following options:'
+            write(*,*) '<1> Use the program in interactive mode'
+            write(*,*) '<2> Record a new driving file'
+            write(*,*) '<3> Play an already existing driving file'
+            read(*,*) ichoice
             
             
             if(ichoice==1) write(control_file_number,*) 'interactive'
@@ -117,19 +122,34 @@ module m_user_input
                     endif
                 enddo
             endif
-            enddo
-            close(unit=control_file_number)
-            end subroutine
-            
-    function init_input()
+        enddo
+        close(unit=control_file_number)
+    end subroutine make_new_user_input_file
+    
+    ! Modified input handling (JB 2026-03-13)
+    ! This routine attempts to read the control file 'user_input.txt'
+    ! to setup the run_mode. A new control file may be created if there
+    ! is none or the one that is there is not working.
+    ! This has been changed to no longe keep any run file open after exit.
+    ! The run file access is made from the main routine in the file list loop.
+    ! Here we just determine ...
+    !   the run mode -> run_mode
+    !   the number of run files -> num_run_files
+    !   the names of run files -> run_file
+    !   which run files to work with -> use_file
+    ! The number of run files is stored in 
+    subroutine init_input()
         use m_string,only:to_lower
         implicit none
         
-        integer*4::init_input,io,i,ichoice,ichoice2,reason
-        character(120) :: temp_string
+        integer*4::io,i,ichoice,ichoice2,reason
+        character(120) :: temp_string, file_name
         logical::exists,exists2
         line_no = 0
-        init_input = 1
+        run_mode = 0
+        num_run_files = 0
+        if (ALLOCATED(run_file)) deallocate(run_file)
+        if (ALLOCATED(use_file)) deallocate(use_file)
         
         inquire(file="user_input.txt",exist = exists)
         !If the user_input file does not already exist then make new one
@@ -138,61 +158,110 @@ module m_user_input
             call make_new_user_input_file()
         endif
         
+        ! open the control file (there should be one)
         open(unit=control_file_number, file="user_input.txt", status='old', err = 997)
 
+        ! read the run mode string (first line)
         read(control_file_number, '(A120)',IOSTAT=Reason) temp_string
         
-        if(reason<0) then
-            write(*,*) char(10),'"user_input.txt" seems to be empty, creating a new one'
+        if(reason<0) then ! failed to read the control file
+            write(*,*) char(10),'failed to read from "user_input.txt", creating a new one'
             close(control_file_number, status='delete')
-            call make_new_user_input_file()
+            call make_new_user_input_file() ! try making a new one
+            ! (attempt 2)
             open(unit=control_file_number, file="user_input.txt", status='old', err = 997)
             read(control_file_number, '(A120)',IOSTAT=Reason) temp_string
         endif
-            
 
+        ! check run modes from temp_string
         if(to_lower(trim(adjustl(temp_string))) .eq. "interactive") then
-            input_file_number = 5
+            run_mode = 1
+            input_file_number = 5 ! reads input from stdin
             call init_in_file(-1)
+            num_run_files = 1
+            allocate(run_file(1), use_file(1))
+            run_file(1) = ""
+            use_file(1) = 1
 
         elseif(to_lower(trim(adjustl(temp_string))) .eq. "record") then
-            input_file_number = 5
-            read(control_file_number, '(A120)') temp_string
-            inquire(file=trim(temp_string),exist = exists)
-            if(exists) then
-                write(*,*) 'File "',trim(adjustl(temp_string)),'", listed in "user_input.txt"'," already exists, and you've"
+            run_mode = 2
+            input_file_number = 5 ! reads input from stdin
+            read(control_file_number, '(A120)') file_name
+            inquire(file=trim(adjustl(file_name)),exist = exists)
+            if(exists) then ! avoid writing to existing file
+                write(*,*) 'File "',trim(adjustl(file_name)),'", listed in "user_input.txt"'," already exists, and you've"
                 write(*,*) 'attempted to record a file of the same name, if you would like to'
                 write(*,*) 'overwrite the already existing file change "record" to "record overwrite"'
                 write(*,*) 'in user_input.txt and rerun muSTEM.'
                 pause
                 stop
             endif
-            open(unit=in_file_number, file=trim(temp_string), status='new')
-            call init_in_file(in_file_number)
+            !open(unit=in_file_number, file=trim(temp_string), status='new')
+            call init_in_file(in_file_number) ! writes to file
+            num_run_files = 1
+            allocate(run_file(1), use_file(1))
+            run_file(1) = trim(adjustl(file_name))
+            use_file(1) = 1
 
         elseif(to_lower(trim(adjustl(temp_string))) .eq. "record overwrite") then
-          input_file_number = 5
-          read(control_file_number, '(A120)') temp_string
-          open(unit=in_file_number, file=trim(temp_string), status='replace')
-          call init_in_file(in_file_number)
+            run_mode = 3
+            input_file_number = 5 ! reads input from stdin
+            read(control_file_number, '(A120)') file_name
+            !open(unit=in_file_number, file=trim(file_name), status='replace')
+            call init_in_file(in_file_number) ! writes to file
+            num_run_files = 1
+            allocate(run_file(1), use_file(1))
+            run_file(1) = trim(adjustl(file_name))
+            use_file(1) = 1
 
         elseif(to_lower(trim(adjustl(temp_string))) .eq. "play") then
-          input_file_number = in_file_number
-          read(control_file_number, '(A120)') temp_string
-          !open(unit=in_file_number, file=trim(temp_string), status='old', err = 998)
-          call init_in_file(-1)
-          
-          
+            run_mode = 4
+            input_file_number = in_file_number
+            read(control_file_number, '(A120)') file_name
+            open(unit=in_file_number, file=trim(adjustl(file_name)), status='old', err = 998)
+            close(unit=in_file_number)
+            call init_in_file(-1)
+            num_run_files = 1
+            allocate(run_file(1), use_file(1))
+            run_file(1) = trim(adjustl(file_name))
+            use_file(1) = 1
+
         elseif(to_lower(trim(adjustl(temp_string))).eq. "play all") then
-          input_file_number = in_file_number
-          init_input = 0
-          do
-            read(control_file_number, '(A120)',iostat = io) temp_string
-            if(io==0) init_input = init_input + 1
-            if(io<0) exit
-          enddo
-          call init_in_file(-1)
-        else
+            run_mode = 5
+            input_file_number = in_file_number
+            call init_in_file(-1)
+            num_run_files = 0
+            do
+                read(control_file_number, '(A120)',iostat = io) file_name
+                if(io==0) num_run_files = num_run_files + 1
+                if(io<0) exit ! stop reading run file names
+            enddo
+            if (num_run_files == 0) then ! problem: no run files given - stop
+                write(*,*) 'ERROR: No file names provided with "play all" mode.'
+                stop 1
+            else ! read names of run files to play all
+                allocate(run_file(num_run_files), use_file(num_run_files))
+                use_file = 0
+                rewind(control_file_number) ! rewind the control file
+                read(control_file_number, '(A120)',IOSTAT=Reason) temp_string ! read the first line again
+                do i=1, num_run_files
+                    read(control_file_number, '(A120)',IOSTAT=Reason) file_name ! read the file names again
+                    run_file(i) = TRIM(adjustl(file_name)) ! store file name
+                    open(unit=in_file_number, file=trim(adjustl(file_name)), status='old', iostat=reason)
+                    if (reason==0) then ! run file opening works
+                        use_file(i) = 1
+                    else
+                        write(*,fmt='(A,I0,A)') "Couldn't open user input file (line #",i+1,"): "//trim(adjustl(file_name))
+                    end if
+                    close(in_file_number)
+                end do
+                if (SUM(use_file) == 0) then ! no valid run file
+                    write(*,*) "ERROR: Couldn't open any file name provided."
+                    stop 1
+                end if
+            end if
+            
+        else ! mode error
             write(*,*) "ERROR: The first line of user_input.txt must be one of"
             write(*,*) "    interactive"
             write(*,*) "    record"
@@ -209,32 +278,30 @@ module m_user_input
         close(control_file_number)
         return
         
-997     write(*,*) 'ERROR: USER_INPUT.TXT is missing '
-        goto 999
-998     write(*,*) 'ERROR:',trim(temp_string),' does not exist '
-999     write(*,*) 'Defaulting to RECORD OVERWRITE status'  
-        write(*,*) 'Enter the filename to record the simulation options:'
-        read(*,*) temp_string
-        input_file_number = 5
-        open(unit=in_file_number, file=trim(temp_string), status='replace')
-        call init_in_file(in_file_number)
+997     write(*,*) 'ERROR: Control file user_input.txt could not be opened.'
+        stop 1
+998     write(*,*) 'ERROR: Run file (',trim(file_name),') does not exist '
+        stop 1
 
-    end function
+    end subroutine init_input
     
-    function get_driver_file(ifile)
-        integer*4,intent(in)::ifile
-        integer*4::i
-        character(120)::get_driver_file
-        line_no = 0
-        open(unit=control_file_number, file="user_input.txt", status='old', err = 997)
-        do i=1,ifile+1
-            read(control_file_number, '(A120)') get_driver_file
-        enddo
-        close(control_file_number)
-        return
-997     stop 'ERROR: USER_INPUT.TXT is missing '
     
-    end function
+
+!    REPLACED BY HANDLING RUN FILES DIFFERENTLY
+!    function get_driver_file(ifile)
+!        integer*4,intent(in)::ifile
+!        integer*4::i
+!        character(120)::get_driver_file
+!        line_no = 0
+!        open(unit=control_file_number, file="user_input.txt", status='old', err = 997)
+!        do i=1,ifile+1
+!            read(control_file_number, '(A120)') get_driver_file
+!        enddo
+!        close(control_file_number)
+!        return
+!997     stop 'ERROR: USER_INPUT.TXT is missing '
+!    
+!    end function
     
 	function get_string_from_file(input_filenumber_,line_no,formatter)
 
