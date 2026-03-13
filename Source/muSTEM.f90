@@ -424,6 +424,12 @@
         use m_multislice
         use m_Hn0
         
+        
+        
+#ifdef GPU
+		use cuda_potential
+#endif
+
         !reset mode flags too, otherwise teh second run might falsely access not allocated variables
         adf = .false.
         EELS = .false.
@@ -441,9 +447,6 @@
         single_channeling = .true. ! tp_eels single-channeling mode flag, 2025-07-29, JB
         plasmonmc = .false.
         
-#ifdef GPU
-		use cuda_potential
-#endif
         if(allocated(Kz)                      ) deallocate(Kz)
         if(allocated(claue)                   ) deallocate(claue)
 		if(allocated(nat)                     ) deallocate(nat)    
