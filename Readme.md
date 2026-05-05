@@ -47,6 +47,7 @@ Executables of previous versions can be found in the [Executables](https://githu
 * The effective SE attenuation length is now reproduced by the SE transmission model. For this to work an scaling is necessary which will be performed automatically. For some structure models it might be necessary to specificy a range of slices on which this is perfomed. Input options for this are provided.
 * The makefile for compiling on Linux has been changed to require the Nvidia HPC SDK environment setup via the user shell (e.g. bash). See the Nvidia HPC SDK documentation (https://docs.nvidia.com/hpc-sdk/hpc-sdk-install-guide/index.html#end-user-environment-settings) for details.
 * Changed run file reading to be done upfront for all run files in "play all" mode. This allows to catch run file name errors and also to launch multiple "play all" processes in parallel without them interfering, since different "user_input.txt" files are then needed.
+* Fixed sample tilt series for QEP code. Tilt series setup does no longer run over azimuth of tilt is zero and gives output about the respective zero order Laue zone vectors.
 * Fixed a bug in QEP PACBED output naming when performing a sample tilt series.
 
 ### Version 6.2

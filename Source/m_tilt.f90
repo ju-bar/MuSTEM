@@ -128,6 +128,7 @@ module m_tilt
         
         real(fp_kind),allocatable::azimuth_array(:),tilt_array(:)
         integer*4::n_azimuth,n_tilt,i,j,index
+        REAL(fp_kind) :: theta, phi
 		character*120::input_string
         
         write(*,*) 'Please enter the specimen tilt in mrad'
@@ -148,14 +149,31 @@ module m_tilt
         call read_sequence_string(input_string,120,n_azimuth,azimuth_array)
         
         n_tilts_total = n_azimuth*n_tilt
+        write(*,'(1x,a,i0)') 'The total number of tilts requested: ', n_tilts_total
         if(allocated(claue)) deallocate(claue);if(allocated(Kz)) deallocate(Kz)
         allocate(Kz(n_tilts_total),claue(3,n_tilts_total))
-        do i=1,n_tilt;do j=1,n_azimuth
-                index = (i-1)*n_azimuth+j
-                Kz(index) = ak1 * cos( tilt_array(i)*1e-3_fp_kind )
-                claue(:,index)  = ak1 * [ sin(tilt_array(i)*1e-3_fp_kind)*cos(azimuth_array(j)*1e-3_fp_kind)/trimi(ig1,ss), &
-                    & sin(tilt_array(i)*1e-3_fp_kind)*sin(azimuth_array(j)*1e-3_fp_kind)/trimi(ig2,ss), 0._fp_kind] ! JB 2022-08-03 error fixed on ifort compilation
-        enddo;enddo
+        index = 1
+        do i=1,n_tilt ! loop rewritten for better readability and avoid looping phi at zero theta
+            theta = tilt_array(i)*1e-3_fp_kind
+            do j=1,n_azimuth
+                if (ABS(tilt_array(i)) < 1e-3_fp_kind) then
+                    phi = 0._fp_kind
+                    Kz(index) = ak1
+                    claue(:,index)  = [ 0._fp_kind, 0._fp_kind, 0._fp_kind]
+                    write(*,'(3x,a,i0,a,e11.3,a,e11.3,a)') 'tilt #',index,': 2d Laue vector: [',claue(1,index),', ',claue(2,index),']'
+                    index = index + 1
+                    exit
+                endif
+                phi = azimuth_array(j)*1e-3_fp_kind
+                Kz(index) = ak1 * cos( theta )
+                claue(:,index)  = ak1 * [ sin(theta)*cos(phi)/trimi(ig1,ss), &
+                    & sin(theta)*sin(phi)/trimi(ig2,ss), 0._fp_kind] ! JB 2022-08-03 error fixed on ifort compilation
+                write(*,'(3x,a,i0,a,e11.3,a,e11.3,a)') 'tilt #',index,': 2d Laue vector: [',claue(1,index),', ',claue(2,index),']'
+                index = index + 1
+            enddo
+        enddo
+        n_tilts_total = index-1 ! update n_tilts_total in case some tilts were zero and the loop was exited early
+        write(*,'(1x,a,i0)') 'Number of tilts used for calculations: ', n_tilts_total
     end subroutine      
     
     
@@ -192,11 +210,14 @@ module m_tilt
         integer*4,intent(in)::ig1(3),ig2(3)
         real(fp_kind)::theta,phi
         
-            theta = sqrt(claue(1)**2*trimi(ig1,ss)**2+claue(2)**2*trimi(ig2,ss)**2)/ak1*1e3
-            phi = atan2(claue(2),claue(1))
-            if(theta<0.and.phi<0) then;tilt_description = '_theta_'//to_string(theta)//'_mrad_phi_'//to_string(phi)//'_mrad'
-            elseif(theta>0.and.phi<0) then;tilt_description = '_theta__'//to_string(theta)//'_mrad_phi_'//to_string(phi)//'_mrad'
-            else;tilt_description = '_theta__'//to_string(theta)//'_mrad_phi__'//to_string(phi)//'_mrad'
+            theta = sqrt(claue(1)**2*trimi(ig1,ss)**2+claue(2)**2*trimi(ig2,ss)**2)/ak1*1e3 ! rad -> mrad
+            phi = atan2(claue(2),claue(1)) ! in radians
+            if(theta<0.and.phi<0) then
+                tilt_description = '_theta_'//to_string(theta)//'_mrad_phi_'//to_string(phi)//'_rad'
+            elseif(theta>0.and.phi<0) then
+                tilt_description = '_theta__'//to_string(theta)//'_mrad_phi_'//to_string(phi)//'_rad'
+            else
+                tilt_description = '_theta__'//to_string(theta)//'_mrad_phi__'//to_string(phi)//'_rad'
             endif
     end function
 end module

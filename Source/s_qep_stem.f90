@@ -352,7 +352,8 @@ subroutine qep_stem(STEM,ionization,PACBED)
   ! loop over the specimen tilts
   do ntilt=1,n_tilts_total
     do i = 1, n_slices
-      call make_propagator(nopiy,nopix,prop(:,:,i),prop_distance(i),Kz(1),ss,ig1,ig2,claue(:,1),ifactorx,ifactory)
+      call make_propagator(nopiy,nopix,prop(:,:,i),prop_distance(i),Kz(ntilt),ss,ig1,ig2, &
+                        &  claue(:,ntilt),ifactorx,ifactory) ! fixed that tilt is actually used in propagator, JB-260505
       prop(:,:,i) = prop(:,:,i) * bwl_mat
       qep_grates(:,:,:,i) = exp(ci*pi*a0_slice(3,i)/Kz(ntilt)*projected_potential(:,:,:,i))
       do j=1,n_qep_grates
