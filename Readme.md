@@ -47,7 +47,7 @@ Executables of previous versions can be found in the [Executables](https://githu
 * The effective SE attenuation length is now reproduced by the SE transmission model. For this to work an scaling is necessary which will be performed automatically. For some structure models it might be necessary to specificy a range of slices on which this is perfomed. Input options for this are provided.
 * The makefile for compiling on Linux has been changed to require the Nvidia HPC SDK environment setup via the user shell (e.g. bash). See the Nvidia HPC SDK documentation (https://docs.nvidia.com/hpc-sdk/hpc-sdk-install-guide/index.html#end-user-environment-settings) for details.
 * Changed run file reading to be done upfront for all run files in "play all" mode. This allows to catch run file name errors and also to launch multiple "play all" processes in parallel without them interfering, since different "user_input.txt" files are then needed.
-* Fixed a bug in QEP PACBED output naming when using a sample tilt series.
+* Fixed a bug in QEP PACBED output naming when performing a sample tilt series.
 
 ### Version 6.2
 * Added STEM secondary electron imaging based on ionization tables also used for STEM EELS simulations. An iosotropic model is used to estimate the secondary electron emission into a user specified detector acceptance angle, and a user specified effective attenuation length is used to estimate the decay of the SE signal towards the detector placed in the backwards direction.

@@ -98,9 +98,9 @@
 	   &1x,'|       Software Foundation.                                                 |',/,&
        &1x,'|                                                                            |',/,&
 #ifdef GPU
-       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2026-03-13)        |',/,&
+       &1x,'|       GPU Version 6.3 (branch https://github.com/ju-bar 2026-05-05)        |',/,&
 #else
-       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2026-03-13)   |',/,&
+       &1x,'|       CPU only Version 6.3 (branch https://github.com/ju-bar 2026-05-05)   |',/,&
 #endif
        &1x,'|           (',a6,' precision compile)                                       |',/,&
        &1x,'|                                                                            |',/,&
