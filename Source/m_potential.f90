@@ -1459,7 +1459,7 @@ module m_potential
     endif
     fdens_step = fdens * 0.5_fp_kind ! initial step size for density scaling factor, start positive because the initial guess tends to under-estimate
     catt = 1.0_fp_kind ! force at least one iteration
-    ttol = 0.01_fp_kind ! relaive tolerance for average transmission and step size
+    ttol = 0.01_fp_kind ! relative tolerance for average transmission and step size
     itmax = 99
     it = 0
     write(*,*) '  Determining density scaling factor ...'

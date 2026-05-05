@@ -961,14 +961,14 @@ subroutine qep_stem(STEM,ionization,PACBED)
       const = float(nysample*nxsample)
       do i=1,nz
         filename = trim(adjustl(output_prefix))
-        if (n_tilts_total>1) fnam = trim(adjustl(output_prefix))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
+        if (n_tilts_total>1) filename = trim(adjustl(filename))//tilt_description(claue(:,ntilt),ak1,ss,ig1,ig2)
         if(nz>1) filename=trim(adjustl(filename))//'_z='//zero_padded_int(int(zarray(i)),length)//'_A'
         call binary_out_unwrap(nopiy,nopix,pacbed_pattern(:,:,i)/const,trim(adjustl(filename))//&
                             &'_PACBED_Pattern',nopiyout=nopiyout,nopixout=nopixout)
         if(output_thermal) then
           call binary_out_unwrap(nopiy,nopix,PACBED_elastic(:,:,i)/const,trim(adjustl(filename))//&
                             &'_elastic_PACBED_Pattern',nopiyout=nopiyout,nopixout=nopixout)    
-          call binary_out_unwrap(nopiy,nopix,pacbed_pattern(:,:,i)/const-PACBED_elastic(:,:,i)/const,&
+          call binary_out_unwrap(nopiy,nopix,(pacbed_pattern(:,:,i)-PACBED_elastic(:,:,i))/const,&
                             &trim(adjustl(filename))//'_thermal_PACBED_Pattern',nopiyout=nopiyout,nopixout=nopixout)
         endif
       enddo
